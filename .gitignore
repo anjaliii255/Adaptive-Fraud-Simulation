@@ -1,0 +1,31 @@
+# artefacts of running, never of the repo
+data/**
+!data/**/
+!data/**/.gitkeep
+artifacts/**
+!artifacts/.gitkeep
+mlruns/
+outputs/          # hydra run dirs
+multirun/
+wandb/
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# notebooks
+.ipynb_checkpoints/
+
+# env + editors
+.env
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,10 @@
+# The zero-day layer: trained on legit traffic only, so it degrades gracefully against the
+# family it has never seen — which in a leave-one-attack-out run is the whole point.
+
+kind: iforest          # iforest | ae
+contamination: 0.01
+legit_only: true
+
+ensemble:
+  enabled: true
+  weight: 0.7          # supervised share of the blend

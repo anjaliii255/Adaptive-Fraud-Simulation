@@ -1,0 +1,12 @@
+# @package _global_
+# System B — off-the-shelf oversampling. The honest control: it exists so that System C's claim
+# is falsifiable rather than merely impressive.
+
+experiment:
+  name: smote
+  system: smote
+  rounds: 0
+  augment: smote
+  smote_ratio: 1.0
+  smote_k: 5
+  compare: false

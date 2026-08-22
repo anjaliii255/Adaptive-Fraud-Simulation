@@ -1,0 +1,123 @@
+# The 9 vectors. Declarative on purpose: adding a vector must never mean editing an engine.
+#
+#   maturity: mature   -> we believe the numbers
+#             emerging -> plausible, thin evidence
+#             research -> in the lab only; reported separately, never in the headline table
+#
+# `params` are the fixed defaults. `search_space` is what the optimiser is allowed to move,
+# and the bounds are the realism envelope — outside them the batch stops looking like traffic.
+
+vectors:
+  # ── S: structuring / graph family ────────────────────────────────────────────────
+  S1:
+    name: Mule fan-in cash-out
+    engine: graph
+    actor: mule
+    maturity: mature
+    why: The canonical scam payout. One collector, many victims, money gone within the hour.
+    params: {motif: fan_in, n_sources: 8, n_hops: 1, split_ratio: 1.0, hold_time_s: 900, leak: 0.03}
+    search_space:
+      n_sources: {type: int, low: 3, high: 25}
+      hold_time_s: {type: float, low: 60, high: 86400, log: true}
+      leak: {type: float, low: 0.0, high: 0.2}
+
+  S2:
+    name: Multi-hop layering
+    engine: graph
+    actor: mule
+    maturity: mature
+    why: Depth defeats one-hop rules; each hop dilutes the link back to the victim.
+    params: {motif: layering, n_sources: 5, n_hops: 3, split_ratio: 0.5, hold_time_s: 3600, leak: 0.05}
+    search_space:
+      n_hops: {type: int, low: 2, high: 6}
+      split_ratio: {type: float, low: 0.2, high: 1.0}
+      hold_time_s: {type: float, low: 300, high: 172800, log: true}
+
+  S3:
+    name: Circular / round-trip
+    engine: graph
+    actor: fraudster
+    maturity: emerging
+    why: Cycles fake legitimate trade volume; they are invisible to per-edge scoring.
+    params: {motif: cycle, n_sources: 4, n_hops: 3, split_ratio: 1.0, hold_time_s: 7200, leak: 0.02}
+    search_space:
+      n_hops: {type: int, low: 2, high: 5}
+      leak: {type: float, low: 0.0, high: 0.1}
+
+  # ── V: velocity family ───────────────────────────────────────────────────────────
+  V1:
+    name: Card-testing burst
+    engine: velocity
+    actor: fraudster
+    maturity: mature
+    why: Many tiny probes against a card BIN range; the loudest, easiest family to catch.
+    params: {n_txns: 40, burst_size: 40, burst_gap_s: 0, intra_burst_s: 3, threshold: null,
+             device_rotation: 0.9, amount_jitter: 0.4}
+    search_space:
+      n_txns: {type: int, low: 10, high: 120}
+      intra_burst_s: {type: float, low: 1, high: 120, log: true}
+      device_rotation: {type: float, low: 0.0, high: 1.0}
+
+  V2:
+    name: Threshold-aware structuring
+    engine: velocity
+    actor: mule
+    maturity: mature
+    why: Paced just under the reporting ceiling — the direct counter to a static amount rule.
+    params: {n_txns: 15, burst_size: 3, burst_gap_s: 21600, intra_burst_s: 600, threshold: 10000,
+             device_rotation: 0.1, amount_jitter: 0.08}
+    search_space:
+      burst_size: {type: int, low: 1, high: 8}
+      burst_gap_s: {type: float, low: 600, high: 172800, log: true}
+      amount_jitter: {type: float, low: 0.01, high: 0.3}
+
+  V3:
+    name: Slow-drip siphon
+    engine: velocity
+    actor: fraudster
+    maturity: emerging
+    why: Below every window a velocity rule watches. Costs the attacker time, not detectability.
+    params: {n_txns: 25, burst_size: 1, burst_gap_s: 86400, intra_burst_s: 86400, threshold: 1000,
+             device_rotation: 0.0, amount_jitter: 0.2}
+    search_space:
+      n_txns: {type: int, low: 8, high: 60}
+      burst_gap_s: {type: float, low: 21600, high: 604800, log: true}
+
+  # ── M: maturation / drift family ─────────────────────────────────────────────────
+  M1:
+    name: Account takeover
+    engine: drift
+    actor: fraudster
+    maturity: mature
+    why: Real history, new operator. The baseline tail is what makes it hard.
+    params: {n_baseline: 30, n_post: 12, ramp: 0.0, amount_shift: 6.0, new_device: true,
+             dormancy_s: 3600}
+    search_space:
+      amount_shift: {type: float, low: 1.2, high: 10.0}
+      ramp: {type: float, low: 0.0, high: 1.0}
+      n_post: {type: int, low: 3, high: 30}
+
+  M2:
+    name: Dormant mule activation
+    engine: drift
+    actor: mule
+    maturity: emerging
+    why: Aged account, clean history, wakes up for one payout window then goes quiet.
+    params: {n_baseline: 40, n_post: 6, ramp: 0.0, amount_shift: 8.0, new_device: false,
+             dormancy_s: 2592000}
+    search_space:
+      dormancy_s: {type: float, low: 604800, high: 15552000, log: true}
+      n_post: {type: int, low: 2, high: 15}
+
+  M3:
+    name: Gradual behavioural drift
+    engine: drift
+    actor: fraudster
+    maturity: research
+    why: No event to anchor on — the hardest family, and the natural leave-one-attack-out holdout.
+    params: {n_baseline: 50, n_post: 40, ramp: 1.0, amount_shift: 3.0, new_device: false,
+             dormancy_s: 0}
+    search_space:
+      ramp: {type: float, low: 0.5, high: 1.0}
+      amount_shift: {type: float, low: 1.1, high: 4.0}
+      n_post: {type: int, low: 20, high: 80}

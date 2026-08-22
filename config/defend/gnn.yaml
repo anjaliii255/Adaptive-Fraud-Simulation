@@ -1,0 +1,15 @@
+# Experiment, with a stated fallback. A temporal GNN is the right shape for fan-in and layering,
+# and it is also the easiest place to spend a week for no lift.
+#
+# Fallback if it does not beat lgbm by the deadline: keep the hand-built graph features in
+# defend/features.py and report the GNN as a negative result. That is a finding, not a failure.
+
+kind: temporal_gnn
+enabled: false
+
+snapshot_hours: 24
+hidden_size: 64
+num_layers: 2
+epochs: 30
+learning_rate: 0.005
+neighbour_sample: 25

@@ -1,0 +1,17 @@
+# One operating point, agreed before any result exists. Two systems are never compared at two
+# different thresholds, and this file is the reason why.
+
+held_out_vector: M3    # research-maturity drift: no event to anchor on, the hardest family
+fixed_fpr: 0.01
+k: 100
+
+train_frac: 0.7
+embargo_days: 1.0
+
+# Episodes generated for the held-out family alone. Episode start times are random across the
+# window, so too few of them and the out-of-time cut can land after every one — leaving a test
+# set with no positives and metrics that read 0.0 without having measured anything.
+holdout_episodes: 12
+
+# Run the full matrix (hold out each family in turn) rather than a single flattering row.
+sweep_all_vectors: false

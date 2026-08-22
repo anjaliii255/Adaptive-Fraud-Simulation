@@ -1,0 +1,9 @@
+# @package _global_
+# System A — real data only. What a team has today, and the floor everything else must clear.
+
+experiment:
+  name: baseline
+  system: baseline
+  rounds: 0
+  augment: none
+  compare: false

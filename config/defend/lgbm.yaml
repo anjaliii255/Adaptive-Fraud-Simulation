@@ -1,0 +1,26 @@
+# The workhorse. Every headline number is measured against this; the exotic layers have to
+# beat it on the same split before they earn a row in the table.
+
+kind: lgbm
+replay_weight: 3.0     # evasions are the expensive examples
+explain: false         # SHAP costs real time in the loop; on for the demo, off for sweeps
+
+params:
+  learning_rate: 0.05
+  num_leaves: 31
+  min_child_samples: 20
+  n_estimators: 300
+  subsample: 0.9
+  colsample_bytree: 0.8
+
+features:
+  stateful: true       # a mule's history does not reset because a new round began
+  windows_s: [3600, 86400, 604800]
+
+decision:
+  mode: threshold      # threshold | cost
+  step_up_at: 0.20
+  hold_at: 0.50
+  review_at: 0.70
+  decline_at: 0.90
+  calibrate_to_fpr: 0.01   # null to keep the fixed bands above

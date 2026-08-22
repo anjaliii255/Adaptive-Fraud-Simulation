@@ -1,0 +1,13 @@
+# Additive. Earns its place only by beating lgbm on the same split, or it does not ship.
+# Requires the `deep` extra (torch); falls back to a sklearn MLP over pooled sequences.
+
+kind: gru              # gru | transformer
+enabled: false
+
+max_len: 32
+hidden_size: 64
+num_layers: 1
+dropout: 0.1
+epochs: 20
+batch_size: 128
+learning_rate: 0.001

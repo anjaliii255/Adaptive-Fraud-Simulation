@@ -1,0 +1,21 @@
+# @package _global_
+# System C — the adaptive loop. The hero run.
+#
+# attack -> detect -> log evasions -> mutate -> retrain -> eval, held-out family never generated.
+
+experiment:
+  name: adaptive
+  system: adaptive
+  rounds: 12
+  augment: adaptive
+  compare: true          # emit the 3-system table from this run
+  smote_ratio: 1.0
+
+attack:
+  optimiser:
+    rounds: 12
+    lambda_realism: 0.5
+
+defend:
+  supervised:
+    explain: true        # the demo shows reason codes; a score with no reason is not a decision

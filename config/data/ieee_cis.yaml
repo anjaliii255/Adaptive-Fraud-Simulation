@@ -1,0 +1,17 @@
+name: ieee_cis
+loader: ieee_cis
+
+txn_path: null       # null → data/raw/train_transaction.csv
+identity_path: null  # merged when present; absent is fine
+limit: 200000
+
+# IEEE-CIS is card-rail and entity-poor (no true beneficiary id), so graph features are thin
+# here by construction. Say so when reporting; do not quietly compare it to PaySim graph numbers.
+train_frac: 0.7
+embargo_days: 1.0
+
+# Real labelled fraud is present, so System A needs no synthetic stand-in.
+known_fraud_vectors: []
+
+# A real anchor dataset: numbers from this config are reportable.
+is_pipeline_check: false

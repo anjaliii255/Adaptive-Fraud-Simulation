@@ -1,0 +1,13 @@
+# fitness = evasion_rate - lambda_realism * realism_penalty
+#
+# lambda_realism is the ethic of the project expressed as a number. At 0 the optimiser wins by
+# inventing traffic no bank would ever see, and every downstream recall claim becomes worthless.
+
+vector_id: S1
+backend: auto          # optuna | random | auto
+lambda_realism: 0.5
+rounds: 12
+
+# Only searched knobs move; bounds live in afl/attack/templates/vectors.yaml because the
+# realism envelope belongs to the vector, not to the search.
+n_startup_trials: 5

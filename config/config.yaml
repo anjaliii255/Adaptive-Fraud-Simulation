@@ -1,0 +1,36 @@
+# Top-level defaults. Every run is config-driven: if a number appears in a result, it came
+# from here or from a command-line override, never from a literal buried in a script.
+
+defaults:
+  - _self_
+  - data: synthetic
+  - attack@attack.engines: engines
+  - attack@attack.optimiser: optimiser
+  - defend@defend.supervised: lgbm
+  - defend@defend.unsupervised: anomaly
+  - eval: leave_one_attack_out
+  - experiment: adaptive
+
+seed: 1337
+run_name: ${experiment.name}
+artifact_dir: artifacts
+
+# "auto" uses MLflow when it is reachable and falls back to in-memory; the loop never
+# depends on a tracking server being up.
+tracker: auto
+
+fidelity:
+  enabled: true
+  level1_min: 0.70
+  level2_min: 0.60
+  max_tstr_gap: 0.15
+  min_recall_lift: 0.0
+  min_dcr_ratio: 0.80
+  max_mia_advantage: 0.20
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-${run_name}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}

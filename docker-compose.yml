@@ -1,0 +1,35 @@
+services:
+  api:
+    build: .
+    command: uvicorn serve.api:app --host 0.0.0.0 --port 8000 --reload
+    ports: ["8000:8000"]
+    env_file: [.env]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./:/app
+    depends_on: [mlflow]
+
+  streamlit:
+    build: .
+    command: streamlit run serve/app.py --server.port 8501 --server.address 0.0.0.0
+    ports: ["8501:8501"]
+    env_file: [.env]
+    environment:
+      AFL_API_URL: http://api:8000
+    volumes:
+      - ./:/app
+    depends_on: [api]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlruns/mlflow.db
+      --default-artifact-root /mlruns/artifacts
+    ports: ["5000:5000"]
+    volumes:
+      - mlruns:/mlruns
+
+volumes:
+  mlruns:

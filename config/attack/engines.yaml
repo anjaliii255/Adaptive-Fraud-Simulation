@@ -1,0 +1,25 @@
+# Population and background traffic the attack episodes are injected into.
+# An attack batch with no haystack is not a detection problem.
+
+n_entities: 400
+n_background: 2000
+start_ts: "2024-01-01"
+window_days: 30
+n_episodes: 5
+
+# Vectors the red side is allowed to generate during a run. The eval holdout must not
+# appear here — scripts/run_experiment.py asserts it.
+vectors: [S1, S2, S3, V1, V2, V3, M1, M2]
+
+engines:
+  graph:
+    motifs: [fan_in, fan_out, layering, cycle, pass_through]
+  velocity:
+    thresholds: [10000, 5000, 2000, 1000]
+  drift:
+    label_baseline: false   # pre-event rows are not fraud; labelling them teaches the wrong thing
+
+realism:
+  max_degree_concentration: 0.6
+  max_round_share: 0.5
+  min_fraud_rows: 1

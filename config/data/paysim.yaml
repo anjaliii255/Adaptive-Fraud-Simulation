@@ -1,0 +1,16 @@
+name: paysim
+loader: paysim
+
+# null → data/raw/paysim.csv, or $AFL_DATA_DIR/paysim.csv
+path: null
+# PaySim is 6.3M rows; the loop does not need all of them to produce a stable number
+limit: 200000
+
+train_frac: 0.7
+embargo_days: 1.0
+
+# Real labelled fraud is present, so System A needs no synthetic stand-in.
+known_fraud_vectors: []
+
+# A real anchor dataset: numbers from this config are reportable.
+is_pipeline_check: false

@@ -1,0 +1,23 @@
+# The zero-download default: the simulator's own background traffic stands in for "real".
+#
+# PIPELINE CHECK - NOT A RESULT. Good enough to run the whole pipeline end to end on a fresh
+# clone; not good enough to report from. Any headline number must be produced on paysim or
+# ieee_cis. Runs against this config stamp that banner into the logs, the artefacts and the
+# figures, so a synthetic number cannot be mistaken for a result later.
+name: synthetic
+loader: null
+
+# Read by scripts/run_experiment.py and scripts/make_figures.py to raise the banner.
+is_pipeline_check: true
+
+n_background: 6000
+n_entities: 400
+window_days: 60
+limit: null
+
+# There is no labelled real fraud here, so System A ("real only") would have nothing to learn
+# from. These mature families stand in for the fraud a team already has labels for.
+known_fraud_vectors: [S1, S2, V1, V2, M1]
+
+train_frac: 0.7
+embargo_days: 1.0

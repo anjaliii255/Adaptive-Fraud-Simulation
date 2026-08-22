@@ -1,0 +1,64 @@
+[project]
+name = "adaptive-fraud-lab"
+version = "0.1.0"
+description = "Adaptive attacker-defender loop for payment fraud detection"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+
+dependencies = [
+    "pydantic>=2.7,<3",
+    "numpy>=1.26,<2.1",
+    "pandas>=2.2,<2.3",
+    "scipy>=1.13,<1.15",
+    "scikit-learn>=1.5,<1.6",
+    "lightgbm>=4.3,<4.6",
+    "networkx>=3.3,<3.5",
+    "hydra-core>=1.3,<1.4",
+    "omegaconf>=2.3,<2.4",
+    "pyyaml>=6.0,<7",
+    "optuna>=3.6,<4.1",
+    "shap>=0.45,<0.47",
+    "mlflow>=2.13,<2.18",
+    "fastapi>=0.111,<0.116",
+    "uvicorn[standard]>=0.30,<0.33",
+    "streamlit>=1.36,<1.41",
+    "matplotlib>=3.9,<3.10",
+    "pyarrow>=16.1,<18",
+]
+
+[project.optional-dependencies]
+# Additive only — steps 1-6 must reproduce before these are installed.
+deep = [
+    "torch>=2.3,<2.6",
+    "torch-geometric>=2.5,<2.7",
+]
+dev = [
+    "pytest>=8.2,<9",
+    "pytest-cov>=5.0,<6",
+    "ruff>=0.5,<0.8",
+    "mypy>=1.10,<1.14",
+    "jupyter>=1.0,<2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["afl", "serve"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
