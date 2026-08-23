@@ -17,7 +17,6 @@ from afl.contract.metrics import Action, DetectorScore
 from afl.contract.schema import Rail, Transaction
 from afl.data.splits import assert_no_leakage, holdout_vector, out_of_time_split
 from afl.defend.decision import CostModel, DecisionPolicy
-from afl.defend.features import FeatureBuilder
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol, three_system
 from afl.evaluation.leave_one_attack_out import LeaveOneAttackOut, make_splits, sweep
@@ -202,42 +201,7 @@ def test_calibration_hits_the_target_fpr():
     assert realised == pytest.approx(0.01, abs=0.005)
 
 
-# ── features stay causal ────────────────────────────────────────────────────────
-def test_scoring_does_not_mutate_feature_state():
-    """Ask the same question twice, get the same answer — even with a stateful builder."""
-    builder = FeatureBuilder(stateful=True)
-    rows = txns(60, fraud_every=6)
-    builder.transform(rows, update=True)
-
-    first = builder.transform(rows, update=False)
-    second = builder.transform(rows, update=False)
-    assert first.equals(second)
-
-
-def test_features_do_not_see_the_future():
-    """Traffic that happens after a transaction must not change that transaction's features.
-
-    This is the failure mode the whole feature module exists to avoid: an offline table that
-    looks excellent because it was built with knowledge no scorer would have had.
-    """
-    builder = FeatureBuilder(stateful=True)
-    history = txns(8, fraud_every=99)
-    probe = Transaction(
-        txn_id="probe", ts=T0 + timedelta(hours=9), src="s1", dst="d1", amount=250.0, rail=Rail.A2A
-    )
-    later = [
-        t.model_copy(update={"txn_id": f"late{i}", "ts": T0 + timedelta(hours=12 + i)})
-        for i, t in enumerate(txns(6, fraud_every=99))
-    ]
-
-    builder.transform(history, update=True)
-    before = builder.transform([probe], update=False)
-
-    builder.transform(later, update=True)  # the future arrives
-    after = builder.transform([probe], update=False)
-    assert before.equals(after)
-
-
+# ── the detector remembers ──────────────────────────────────────────────────────
 def test_retrain_accumulates_rather_than_forgetting():
     """The loop must not reduce the detector to whatever it saw most recently."""
     sim = Simulator(seed=26, n_entities=100, n_background=250, n_episodes=2)

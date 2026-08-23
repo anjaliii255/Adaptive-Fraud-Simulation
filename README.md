@@ -23,8 +23,10 @@ the contract and drive the whole run on a config override alone. Out of the box 
 a synthetic placeholder so a fresh clone works with nothing to download, and anything a synthetic
 run prints is stamped as a pipeline check.
 
-The detector itself is still the skeleton's. Real-anchor numbers exist but they are a *first
-reading*, not a result: tickets 07 and 08 are what turn them into one.
+The **feature table is now built for that data** rather than for the synthetic placeholder —
+56 causal features, each with a rationale, measured per anchor in `docs/features.md`. The
+detector on top of it is still the skeleton's, so real-anchor numbers are a *first reading*
+rather than a result: ticket 08 is what turns them into one.
 
 ## Setup
 
@@ -47,6 +49,7 @@ make smoke                     # runs the whole loop on dummy data; has to pass
 ## Running it
 
 ```bash
+make features    # build the feature table over every anchor; record cost and coverage
 make fidelity    # build the fidelity scorecard, before trusting any generator
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
@@ -101,6 +104,37 @@ Full PaySim is ~7.7 GB once it is contract rows, so the default reads a determin
 hash-sample of beneficiaries (636,409 rows, base rate within 2.2% relative of the full file).
 `data.sample.sample_fraction=1.0` reads the lot.
 
+## Features
+
+56 columns, all computed from events strictly *before* the row they belong to, none of them
+derived from the label. `docs/features.md` is the dictionary: every column, one line on why it
+exists, and how much of it each anchor actually fills in — generated from the code and the files
+on disk by `make features`, so it cannot drift from the table it describes.
+
+```bash
+make features    # rebuild the dictionary and the per-anchor cost + coverage artefacts
+```
+
+Two things about it are worth knowing before you read a number that came out of it.
+
+**Direction is the design.** Every entity has two histories — what it sent and what it received —
+and the blocks that matter are the ones crossing them. Fan-out (`src_out_uniq_dst_*`) is card
+testing and mule spraying; fan-in (`dst_in_uniq_src_*`) is the collector; money arriving and
+leaving inside the hour (`src_seconds_since_last_in`, `src_passthrough_ratio_3600s`) is
+pass-through, and it is invisible if the two directions are added together. The previous version
+of this module kept one history per entity and did add them together.
+
+**A third of the table is structurally empty on PaySim, and that is a property of the anchor,
+not a bug.** `nameOrig` is effectively unique per row, so there is no sender to have a history:
+17 of 56 columns never take a second value there, against 8 on AMLSim and 1 on synthetic traffic.
+The feature dictionary marks each one **dead** per anchor rather than letting it read as a
+feature the model has. The beneficiary block is the one that carries signal on both real anchors,
+and `tests/test_features.py` asserts on the real files that it does.
+
+Causality is proved, not asserted: the tests check the property directly (appending later traffic
+never changes an earlier row's features) and cross-check all 56 columns against a brute-force
+reference that shares no code with the implementation.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -115,7 +149,7 @@ afl/loop         where attack meets defend; the closed loop lives here
 afl/evaluation   out-of-time split, leave-one-attack-out, three-system table         [blue]
 serve            FastAPI + Streamlit demo
 config           Hydra configs; experiment/{baseline,smote,adaptive}
-scripts          run_experiment, build_splits, build_fidelity, make_figures
+scripts          run_experiment, build_splits, build_features, build_fidelity, make_figures
 ```
 
 ## How it's scored
@@ -140,32 +174,48 @@ those two rates.
 Held out on M3, System A only, at the committed split:
 
 ```
-paysim   PR-AUC 0.025   recall@1%FPR 0.243   precision@100 0.00
-amlsim   PR-AUC 0.007   recall@1%FPR 0.067   precision@100 0.08
+paysim   PR-AUC 0.006   recall@1%FPR 0.040   precision@100 0.00      (was 0.025 / 0.243 / 0.00)
+amlsim   PR-AUC 0.040   recall@1%FPR 0.160   precision@100 0.24      (was 0.007 / 0.067 / 0.08)
 ```
 
 ```bash
 python scripts/run_experiment.py data=paysim experiment=baseline run_name=paysim_baseline
+python scripts/run_experiment.py data=amlsim experiment=baseline run_name=amlsim_baseline
 ```
 
-These are weak and they are supposed to be read as weak. Three reasons, none of them mysterious:
+The bracketed figures are the same command before ticket 07's feature table landed. AMLSim went
+up and PaySim went down, and the second one is the more informative of the two:
 
-- **The features have not been built for this data yet.** Ticket 07 is unstarted, and on PaySim
-  every sender-side feature is structurally empty (see Data, above). The model is working from
-  roughly half the feature table it thinks it has.
+- **This fold cannot carry a claim on a real anchor, and finding that out is the useful part.**
+  Every positive in the M3 holdout is an injected synthetic row and every negative is a real one,
+  so the number partly measures how far the injected family sits from the real distribution
+  rather than how well the detector finds first-party fraud. The committed fidelity scorecards
+  say how far that is: on PaySim, KS 0.86 on log-amount and 0.89 on the inter-transaction gap,
+  and a TSTR ratio of 0.03. A classifier told to sort real rows from injected M3 rows on either
+  feature table does it at AUC 1.00. Neither 0.025 nor 0.006 is evidence about detection.
+  **Ticket 11** is where the fold has to say this itself; **ticket 15** is where the generator
+  closes the distance.
+- **On each anchor's own labelled fraud — same haystack, same labels — the features do move the
+  number.** With the model, the seed and the committed boundary held fixed, the table went from
+  35 columns to 56: AMLSim PR-AUC 0.83 → 0.95, recall@1%FPR 0.93 → 0.97, precision@100 0.98 →
+  1.00; PaySim PR-AUC 0.14 → 0.13 with precision@100 0.38 → 0.47. That split is exactly what the
+  anchors are: AMLSim has real sender *and* beneficiary histories for the new directional and
+  graph features to read, and PaySim has almost none — 17 of the 56 columns never take a second
+  value there. AMLSim is itself a simulator with a deliberately distinctive fan-in / cycle
+  topology, so read its near-perfect column as "graph features find graph fraud", not as a
+  production number. See `docs/features.md` and the ticket 07 carry-out.
 - **It is not LightGBM.** libomp was missing, so both runs fell back to sklearn
   HistGradientBoosting. The run artefact records which backend produced each number.
-- **`precision@100 = 0.00` on PaySim is the honest headline, not `caught_rate = 1.0`.** The
-  calibrated bands apply friction to 14% of holdout traffic, which technically leaves nothing
-  ALLOWed — but the top 100 ranked rows contain no M3 fraud at all. Blanket friction is not
-  detection, and the ranking is what ticket 08 has to fix.
+- **`precision@100 = 0.00` on PaySim is the honest headline.** The calibrated bands apply
+  friction to 16% of holdout traffic, and the top 100 ranked rows still contain no M3 fraud at
+  all. Blanket friction is not detection, and the ranking is what ticket 08 has to fix.
 
 ### On the synthetic placeholder — pipeline check, not comparable
 
 ```
-A_baseline   PR-AUC 0.508   recall@1%FPR 0.233
-B_smote      PR-AUC 0.499   recall@1%FPR 0.233
-C_adaptive   PR-AUC 0.126   recall@1%FPR 0.051
+A_baseline   PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63
+B_smote      PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63
+C_adaptive   PR-AUC 0.187   recall@1%FPR 0.000   precision@100 0.04
 ```
 
 The adaptive system lands below both controls. That is the weak-side reading the design predicts

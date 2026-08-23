@@ -8,6 +8,11 @@ artifacts/**
 # that makes this week's number comparable to last week's, so it is version-controlled.
 !artifacts/splits/
 !artifacts/splits/**
+# the feature report is the evidence behind docs/features.md — the timings, and which columns
+# are structurally empty on which anchor. Committed for the same reason the data cards are: a
+# number in a document that traces to nothing is a number nobody can check.
+!artifacts/features/
+!artifacts/features/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/
