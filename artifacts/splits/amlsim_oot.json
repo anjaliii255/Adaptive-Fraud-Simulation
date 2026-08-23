@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "dataset": "amlsim",
+  "digest": "0400e45485d9de69",
+  "train_end": "2023-05-21T00:00:00",
+  "test_start": "2023-05-23T00:00:00",
+  "embargo_seconds": 172800,
+  "embargo_rationale": "Steps are days and graph features look back one window, so a one-day gap stops a layering chain being half-trained-on and half-tested-on.",
+  "train_frac": 0.7,
+  "time_unit": "days",
+  "epoch": "2023-01-01T00:00:00",
+  "train_end_step": 140,
+  "test_start_step": 142,
+  "stats": {
+    "full": {
+      "rows": 1323234,
+      "row_share": 1.0,
+      "fraud": 1719,
+      "base_rate": 0.00129909
+    },
+    "span": {
+      "start": "2023-01-01T00:00:00",
+      "end": "2023-07-19T00:00:00",
+      "first_step": 0,
+      "last_step": 199
+    },
+    "partition": {
+      "train": {
+        "rows": 930465,
+        "row_share": 0.7032,
+        "fraud": 1170,
+        "base_rate": 0.00125744
+      },
+      "test": {
+        "rows": 385909,
+        "row_share": 0.2916,
+        "fraud": 544,
+        "base_rate": 0.00140966
+      },
+      "embargoed": {
+        "rows": 6860,
+        "row_share": 0.0052,
+        "fraud": 5,
+        "base_rate": 0.00072886
+      }
+    },
+    "sample": {
+      "fraction": 1.0,
+      "note": "no sampling; the loader reads every row"
+    },
+    "integrity": {
+      "non_positive_amounts": 19,
+      "non_positive_amount_share": 1.4359e-05,
+      "self_transfers": 181,
+      "self_transfer_share": 0.000136786
+    },
+    "synthetic_base_rate": 0.047445,
+    "synthetic_base_rate_data_config": 0.014097,
+    "base_rate_ratio_vs_synthetic": 0.0274
+  }
+}

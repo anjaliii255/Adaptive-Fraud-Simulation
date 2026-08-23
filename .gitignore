@@ -4,6 +4,10 @@ data/**
 !data/**/.gitkeep
 artifacts/**
 !artifacts/.gitkeep
+# the committed out-of-time boundary is a repo artefact, not a run artefact: it is the thing
+# that makes this week's number comparable to last week's, so it is version-controlled.
+!artifacts/splits/
+!artifacts/splits/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/

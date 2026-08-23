@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "dataset": "paysim",
+  "digest": "6ea0b94c1c8d3d3a",
+  "train_end": "2023-01-14T11:00:00",
+  "test_start": "2023-01-15T12:00:00",
+  "embargo_seconds": 90000,
+  "embargo_rationale": "Velocity features look back up to 24h. A 24-step embargo stops a test row's features being computed over train-side rows, and stops a fraud ring straddling the boundary.",
+  "train_frac": 0.7,
+  "time_unit": "hours",
+  "epoch": "2023-01-01T00:00:00",
+  "train_end_step": 323,
+  "test_start_step": 348,
+  "stats": {
+    "full": {
+      "rows": 6362620,
+      "row_share": 1.0,
+      "fraud": 8213,
+      "base_rate": 0.00129082
+    },
+    "span": {
+      "start": "2023-01-01T01:00:00",
+      "end": "2023-01-31T23:00:00",
+      "first_step": 1,
+      "last_step": 743
+    },
+    "partition": {
+      "train": {
+        "rows": 4463587,
+        "row_share": 0.7015,
+        "fraud": 3643,
+        "base_rate": 0.00081616
+      },
+      "test": {
+        "rows": 1505969,
+        "row_share": 0.2367,
+        "fraud": 4352,
+        "base_rate": 0.00288983
+      },
+      "embargoed": {
+        "rows": 393064,
+        "row_share": 0.0618,
+        "fraud": 218,
+        "base_rate": 0.00055462
+      }
+    },
+    "sample": {
+      "fraction": 0.1,
+      "sampled_by": "nameDest",
+      "rows": 636409,
+      "fraud": 803,
+      "base_rate": 0.00126177,
+      "base_rate_full": 0.00129082,
+      "base_rate_drift_relative": -0.0225
+    },
+    "integrity": {
+      "non_positive_amounts": 16,
+      "non_positive_amount_share": 2.515e-06,
+      "self_transfers": 0,
+      "self_transfer_share": 0.0
+    },
+    "synthetic_base_rate": 0.047445,
+    "synthetic_base_rate_data_config": 0.014097,
+    "base_rate_ratio_vs_synthetic": 0.0272
+  }
+}

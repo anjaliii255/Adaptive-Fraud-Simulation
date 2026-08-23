@@ -1,4 +1,4 @@
-.PHONY: setup smoke test fidelity loop compare figures demo lint fmt clean
+.PHONY: setup smoke test splits fidelity loop compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -8,6 +8,9 @@ smoke:    ## the day-one gate: loop runs end-to-end on dummy data
 
 test:     ## full suite
 	uv run pytest -q
+
+splits:   ## compute + commit the out-of-time boundary and data cards for every real anchor
+	uv run python scripts/build_splits.py
 
 fidelity: ## harness before generator
 	uv run python scripts/build_fidelity.py

@@ -21,7 +21,7 @@ blocks the frontier for both lanes.
 | # | Ticket | Owner | Blocked by |
 |---|--------|-------|-----------|
 | 01 | ~~Freeze the seam and the taxonomy~~ **done** | ◆ A+B | — |
-| 02 | Anchor on a real dataset with a committed split | ■ B | — |
+| 02 | ~~Anchor on a real dataset with a committed split~~ **done** | ■ B | — |
 | 03 | M3 — first-party fraud, the holdout family | ▲ A | 01 |
 | 04 | C2 — UPI collect-request / APP scam | ▲ A | 01 |
 | 05 | C3 — instant-A2A pass-through | ▲ A | 01 |
@@ -129,7 +129,7 @@ computed over fraud rows, never over all rows.
 and it always runs on the *same* split. Someone re-running the pipeline next week gets numbers
 comparable to today's.
 
-A real dataset (PaySim, IEEE-CIS, or both) enters through the loaders and leaves as
+A real dataset (PaySim, AMLSim, or both) enters through the loaders and leaves as
 `list[Transaction]`. Nothing downstream may know which dataset it came from — that is what makes
 one detector, one feature set and one evaluation run over all three sources unchanged. Real rows
 carry no provenance: a real row that gains a `vector_id` has leaked a label path.
@@ -140,18 +140,75 @@ its known quirks, and what it cannot tell us.
 
 **Blocked by:** None (can start immediately, in parallel with 01).
 
-**Status:** ready-for-agent
+**Status:** done — split artefacts in `artifacts/splits/`, data cards in `docs/data-cards/`,
+decisions of record amended into `docs/adr/0002-dataset-anchors.md`
 
-- [ ] At least one real dataset loads end to end into contract types and the whole pipeline runs
-      on it via a config override, no code change
-- [ ] Real rows have `vector_id=None` and `attack_run_id=None`; a test asserts this
-- [ ] The out-of-time split boundary is committed as an artefact and re-used, and re-running
-      produces an identical partition
-- [ ] The embargo gap is non-zero and its rationale is recorded
-- [ ] A data card exists: source, licence, row count, fraud base rate, time span, quirks, limits
-- [ ] The synthetic placeholder config still works with nothing to download
-- [ ] Fraud base rate on the real anchor is reported; if it differs from the synthetic default by
-      an order of magnitude, that is called out, because every operating point depends on it
+- [x] **Both** real datasets load end to end into contract types and the whole pipeline runs on
+      them via a config override, no code change — `data=paysim` (636k rows, 74s) and
+      `data=amlsim` (1.32M rows, 3m19s)
+- [x] Real rows have `vector_id=None` and `attack_run_id=None`; `loaders.assert_no_provenance`
+      runs inside every loader and three tests assert it, one per failure mode
+- [x] The out-of-time split boundary is committed as an artefact and re-used — `CommittedSplit`
+      stores two timestamps plus a digest, and a test proves the partition does not move when the
+      pool grows, where the fraction-based split does
+- [x] Re-running produces an identical partition — asserted on the real files, txn_id by txn_id,
+      across both the entity sample and the boundary
+- [x] The embargo gap is non-zero and its rationale is recorded — enforced in `__post_init__`:
+      a zero gap and a blank rationale both raise
+- [x] A data card exists per anchor: source, licence, row count, base rate, span, the committed
+      split, sampling, measured integrity checks, quirks, limits — generated from the files by
+      `make splits`, never hand-typed
+- [x] The synthetic placeholder config still works with nothing to download — `make smoke`,
+      `make loop`, `make compare`, `make fidelity`, `make figures` all green, and every synthetic
+      number is byte-identical to pre-change `HEAD`
+- [x] Fraud base rate reported and the gap called out — measured, not quoted: both anchors at
+      ~0.13% against the synthetic default's 4.74%, ~37x, printed as a warning by `make splits`
+      and written into every data card
+- [x] `make test` green (128 passed, up from 85), `ruff` clean
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **PaySim has no sender history, and this is the biggest finding.** `nameOrig` is effectively
+  unique per row — 6,353,307 distinct origins over 6,362,620 rows, mean 1.001. Every `src`-side
+  velocity, RFM and recency feature is *structurally empty* on that anchor. **Ticket 07 has to
+  build on the beneficiary side or it is building on nothing.** `nameDest` is the only entity
+  with a past (mean 2.34, max 113).
+- **Four claims in ADR 0002 did not survive contact with the files** and are corrected in the
+  amendment: the synthetic base rate is 4.74% not ~17% (so 37x, not 130x); the typology join key
+  is `TX_ID` not `ALERT_ID` (1,719 alert rows share only 391 alert ids); a step-fraction split is
+  not a row-fraction split; and BankSim is not on disk at all.
+- **The committed boundary moved, and the old one was wrong.** PaySim's `train_end_step: 500` put
+  95.3% of rows in train and left a 4% test tail, because 341 of its 743 steps carry under 100
+  rows. Boundaries are now derived from the row quantile: PaySim step 323 (70.2%/23.7%), AMLSim
+  step 140 (70.3%/29.2%). `train_end_step` is gone from the configs — the config holds the
+  *inputs*, the artefact holds the *decision*.
+- **The out-of-time cut lands on two different base rates.** PaySim fraud is 3.5x denser in test
+  (0.289%) than train (0.082%). **Ticket 08 inherits this:** a threshold calibrated on a tail of
+  train does not transfer unchanged to test, and every recall figure has to name its side.
+- **Real traffic breaks a realism rule we enforce.** AMLSim has 181 self-transfers and 19
+  zero-amount rows; PaySim has 16 zero-amount rows. `afl/attack/realism.py` penalises the
+  generator for emitting a self-transfer. **Ticket 14** derives its empirical bounds from these
+  files and has to decide whether that rule is a fact or a modelling choice.
+- **Full PaySim is ~7.7 GB as contract rows**, so the default reads a deterministic 10%
+  hash-sample of beneficiaries. Whole entities are kept or dropped, never individual rows — half
+  an account's history is a velocity profile no production scorer would ever see. Base rate holds
+  to within 2.2% relative. `data.sample.sample_fraction=1.0` reads everything.
+- **The simulator's window is now aligned to the anchor.** `engines.yaml` starts on 2024-01-01
+  and PaySim's epoch puts it in January 2023; left alone, every synthetic fraud row landed a year
+  after every real row and the out-of-time split degenerated into "real = train, synthetic =
+  test". An attack has to happen inside the traffic it hides in.
+- **The AMLSim typology is a side-channel, not a wire field.** `loaders.amlsim_typologies()`
+  returns `txn_id → fan_in|cycle`. It is deliberately not on `Transaction`: **ticket 11** reads
+  the map, and writing it into `vector_id` would put provenance on a real row and make the family
+  carve-out treat AMLSim rows as a synthetic family.
+- **The README's adaptive figure was already stale** (0.312; it reproduces at 0.126). Verified
+  against pre-change `HEAD` — nothing in this ticket moved it. Refreshed, and the two number
+  regimes are now quarantined into separate sections as ADR 0002 requires.
+- **First real-anchor reading, and it is weak on purpose:** PaySim PR-AUC 0.025, recall@1%FPR
+  0.243, **precision@100 0.00**; AMLSim 0.007 / 0.067 / 0.08. `caught_rate = 1.0` on PaySim is
+  blanket friction on 14% of traffic, not detection. Features (07) and the tuned detector (08)
+  are what make these mean anything.
+- **Fixed in passing:** `load_ieee_cis` removed as ADR 0002 planned; `make splits` added.
 
 ---
 

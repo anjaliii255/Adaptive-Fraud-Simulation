@@ -23,6 +23,7 @@ import numpy as np
 
 from afl.contract.metrics import MetricResult
 from afl.contract.schema import Transaction
+from afl.data.splits import CommittedSplit
 from afl.evaluation.leave_one_attack_out import DEFAULT_HOLDOUT, LeaveOneAttackOut
 from afl.loop.closed_loop import run_closed_loop
 from afl.tracking import InMemoryTracker
@@ -148,6 +149,7 @@ def run_three_systems(
     seed: int = 1337,
     tracker=None,
     real_vectors: tuple[str, ...] = (),
+    split: CommittedSplit | None = None,
 ) -> list[SystemResult]:
     """All three systems, same split, same operating point, fresh detector each time.
 
@@ -159,7 +161,11 @@ def run_three_systems(
     and the control is vacuous rather than merely weak.
     """
     evaluator, train = LeaveOneAttackOut.from_pool(
-        pool, held_out_vector=held_out_vector, train_frac=train_frac, embargo_days=embargo_days
+        pool,
+        held_out_vector=held_out_vector,
+        train_frac=train_frac,
+        embargo_days=embargo_days,
+        split=split,
     )
     # what a team already had before any of this: real rows plus the families they have labels for
     historical = [t for t in train if t.vector_id is None or t.vector_id in real_vectors]

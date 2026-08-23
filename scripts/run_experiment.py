@@ -25,7 +25,7 @@ from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
 from afl.contract.schema import Transaction
 from afl.data import loaders
-from afl.data.splits import out_of_time_split
+from afl.data.splits import committed_split_for, out_of_time_split
 from afl.defend.decision import DecisionPolicy
 from afl.defend.features import FeatureBuilder
 from afl.defend.models.anomaly import AnomalyDetector, EnsembleDetector
@@ -40,16 +40,31 @@ log = logging.getLogger(__name__)
 
 
 # ── assembly ────────────────────────────────────────────────────────────────────
-def build_simulator(cfg: DictConfig) -> Simulator:
-    e = cfg.attack.engines
+def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) -> Simulator:
+    """The attack simulator, with its window aligned to the real anchor when there is one.
+
+    Alignment is not cosmetic. `config/attack/engines.yaml` starts the simulation on 2024-01-01;
+    PaySim's fixed epoch puts its 743 hourly steps in January 2023. Left alone, every synthetic
+    fraud row lands a year after every real row, so the out-of-time split degenerates into
+    "real = train, synthetic = test" and the held-out family is separable by timestamp alone.
+    An attack has to happen inside the traffic it is hiding in.
+    """
     from datetime import datetime
+
+    e = cfg.attack.engines
+    start = datetime.fromisoformat(str(e.start_ts))
+    window = int(e.window_days)
+    if anchor:
+        start = min(t.ts for t in anchor)
+        window = max(1, int((max(t.ts for t in anchor) - start).total_seconds() // 86_400))
+        log.info("simulator window aligned to the anchor: %s + %d days", start, window)
 
     return Simulator(
         seed=cfg.seed,
         n_entities=int(e.n_entities),
         n_background=int(e.n_background),
-        start_ts=datetime.fromisoformat(str(e.start_ts)),
-        window_days=int(e.window_days),
+        start_ts=start,
+        window_days=window,
         n_episodes=int(e.n_episodes),
     )
 
@@ -91,7 +106,14 @@ def build_detector_factory(cfg: DictConfig):
     return factory
 
 
-def build_pool(cfg: DictConfig, simulator: Simulator) -> list[Transaction]:
+def load_anchor(cfg: DictConfig) -> list[Transaction]:
+    """The real rows, straight from the data config. `[]` on the synthetic default."""
+    return loaders.load_from_config(OmegaConf.to_container(cfg.data))
+
+
+def build_pool(
+    cfg: DictConfig, simulator: Simulator, real: list[Transaction] | None = None
+) -> list[Transaction]:
     """Real traffic plus one attack batch per allowed vector — the input to every split."""
     held_out = str(cfg.eval.held_out_vector)
     allowed = [v for v in cfg.attack.engines.vectors]
@@ -101,16 +123,7 @@ def build_pool(cfg: DictConfig, simulator: Simulator) -> list[Transaction]:
             "the red side would be handing the blue side the answer"
         )
 
-    real: list[Transaction] = []
-    if cfg.data.loader:
-        kwargs = {
-            k: v
-            for k, v in OmegaConf.to_container(cfg.data).items()
-            if k in ("path", "txn_path", "identity_path", "limit") and v is not None
-        }
-        real = loaders.load(str(cfg.data.loader), **kwargs)
-        log.info("loaded %d real rows from %s", len(real), cfg.data.name)
-
+    real = list(real or [])
     pool = list(real)
     for vid in allowed:
         batch = simulator.generate(registry.get(vid).to_attack_params())
@@ -183,10 +196,25 @@ def main(cfg: DictConfig) -> None:
         }
     )
 
-    simulator = build_simulator(cfg)
+    real = load_anchor(cfg)
+    simulator = build_simulator(cfg, anchor=real)
     detector_factory = build_detector_factory(cfg)
-    pool = build_pool(cfg, simulator)
+    pool = build_pool(cfg, simulator, real)
     log.info("pool: %d rows, %d fraud", len(pool), sum(1 for t in pool if t.is_fraud))
+
+    # The boundary is read, never re-derived. Absent (synthetic default) the fraction is used
+    # and the run is a pipeline check anyway.
+    split = committed_split_for(OmegaConf.to_container(cfg.data))
+    if split:
+        log.info(
+            "committed split %s: train <= %s, test >= %s (embargo %s, digest %s)",
+            split.dataset,
+            split.train_end,
+            split.test_start,
+            split.embargo,
+            split.digest,
+        )
+        tracker.log_params({"split_digest": split.digest, "base_rate": loaders.base_rate(real)})
 
     optimiser = AttackOptimiser(
         vector_id=str(cfg.attack.optimiser.vector_id),
@@ -209,9 +237,10 @@ def main(cfg: DictConfig) -> None:
             seed=int(cfg.seed),
             tracker=tracker,
             real_vectors=tuple(cfg.data.get("known_fraud_vectors") or ()),
+            split=split,
         )
     else:
-        results = _single_system(cfg, pool, detector_factory)
+        results = _single_system(cfg, pool, detector_factory, split)
 
     for r in results:
         tracker.log(system=r.name, **r.metrics.model_dump(), **r.operational)
@@ -226,6 +255,9 @@ def main(cfg: DictConfig) -> None:
             {
                 "pipeline_check": pipeline_check,
                 "data": str(cfg.data.name),
+                "n_real_rows": len(real),
+                "real_base_rate": loaders.base_rate(real),
+                "split": split.to_dict() if split else None,
                 "systems": [{**r.row(), **r.operational} for r in results],
             },
             indent=2,
@@ -243,13 +275,14 @@ def main(cfg: DictConfig) -> None:
             embargo_days=float(cfg.eval.embargo_days),
             fixed_fpr=float(cfg.eval.fixed_fpr),
             k=int(cfg.eval.k),
+            split=split,
         )
         (artifact_dir / "loao_matrix.json").write_text(
             json.dumps({k: v.model_dump() for k, v in matrix.items()}, indent=2)
         )
 
     if cfg.fidelity.enabled:
-        _fidelity(cfg, pool, detector_factory, artifact_dir)
+        _fidelity(cfg, pool, detector_factory, artifact_dir, split)
 
     print("\n" + three_system.to_markdown(results))
     print("\nlift over controls:", three_system.lift(results))
@@ -258,7 +291,7 @@ def main(cfg: DictConfig) -> None:
         print("\n" + banner(str(cfg.data.name)))
 
 
-def _single_system(cfg: DictConfig, pool, detector_factory):
+def _single_system(cfg: DictConfig, pool, detector_factory, split=None):
     """Systems A and B on their own, when `experiment.compare` is off."""
     from afl.evaluation.three_system import SystemResult
 
@@ -267,6 +300,7 @@ def _single_system(cfg: DictConfig, pool, detector_factory):
         held_out_vector=str(cfg.eval.held_out_vector),
         train_frac=float(cfg.eval.train_frac),
         embargo_days=float(cfg.eval.embargo_days),
+        split=split,
         fixed_fpr=float(cfg.eval.fixed_fpr),
         k=int(cfg.eval.k),
     )
@@ -291,12 +325,15 @@ def _single_system(cfg: DictConfig, pool, detector_factory):
     ]
 
 
-def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path) -> None:
+def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path, split=None) -> None:
     real = [t for t in pool if t.vector_id is None]
     synth = [t for t in pool if t.vector_id is not None]
-    real_train, real_test = out_of_time_split(
-        real, train_frac=float(cfg.eval.train_frac), embargo_days=float(cfg.eval.embargo_days)
-    )
+    if split is not None:
+        real_train, real_test = split.apply(real)
+    else:
+        real_train, real_test = out_of_time_split(
+            real, train_frac=float(cfg.eval.train_frac), embargo_days=float(cfg.eval.embargo_days)
+        )
     card = scorecard.build(
         real=real,
         synth=synth,
