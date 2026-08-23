@@ -129,15 +129,15 @@ def build(
 
     if real_train and real_test and detector_factory is not None:
         card.levels["level3"] = level3_utility.report(
-            real_train, real_test, synth, detector_factory, max_gap=thresholds.max_tstr_gap
+            real_train, real_test, synth, detector_factory, max_gap=card.thresholds.max_tstr_gap
         )
         card.levels["privacy"] = privacy.report(
             real_train,
             real_test,
             synth,
             seed=seed,
-            min_dcr_ratio=thresholds.min_dcr_ratio,
-            max_mia_advantage=thresholds.max_mia_advantage,
+            min_dcr_ratio=card.thresholds.min_dcr_ratio,
+            max_mia_advantage=card.thresholds.max_mia_advantage,
         )
     else:
         card.reasons.append("level 3 + privacy skipped: no real train/test split or detector given")

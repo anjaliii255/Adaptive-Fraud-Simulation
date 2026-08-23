@@ -90,13 +90,22 @@ almost nothing.
 
 ## Current numbers (honest)
 
-On the synthetic placeholder config, the adaptive system currently lands below the baselines:
+On the synthetic placeholder config, held out on M3, the adaptive system lands below both
+baselines:
 
 ```
-baseline   PR-AUC 0.97   recall@1%FPR 0.95
-SMOTE      PR-AUC 0.96   recall@1%FPR 0.95
-adaptive   PR-AUC 0.77   recall@1%FPR 0.49
+baseline   PR-AUC 0.736   recall@1%FPR 0.546
+SMOTE      PR-AUC 0.748   recall@1%FPR 0.600
+adaptive   PR-AUC 0.239   recall@1%FPR 0.167
 ```
+
+Produced on the sklearn HistGradientBoosting fallback, not LightGBM, because libomp was missing on
+the machine that ran it. Install libomp before quoting any of it.
+
+These are lower than the pre-freeze numbers, and nothing regressed to cause that. Freezing the
+taxonomy changed which families get generated and changed what the holdout *is* — M3 went from
+gradual behavioural drift to first-party fraud, which is a harder family on purpose. The old figures
+are not comparable and were replaced rather than kept alongside.
 
 That's the untuned output. Nobody massaged it. It's the weak-side reading the design itself
 predicts when the loop searches a single vector against a detector that already generalises to the
@@ -110,14 +119,41 @@ numbers.
 
 ## Vectors
 
-There are nine vectors across three engines: graph, velocity, and drift.
+Nine vectors, three engines. The ids match the architecture doc and are frozen; see
+`docs/adr/0001-vector-taxonomy-and-holdout.md` for why each one is where it is, and
+`afl/attack/templates/vectors.yaml` for the definitions. Adding a vector is a YAML edit.
 
-The IDs in `config/attack/*` and `vectors.yaml` are still being aligned with the architecture doc,
-so treat the doc as the source of truth for what each vector is meant to be.
+| id | vector | engine | level | tier | status |
+| --- | --- | --- | --- | --- | --- |
+| S1 | Mule network & layering | graph | mechanism | strong | built |
+| S2 | Card testing / BIN enumeration | velocity | mechanism | strong | built |
+| S3 | Account takeover via drift | drift | mechanism | strong | built |
+| C1 | Bust-out | drift | mechanism | common | template |
+| C2 | UPI collect-request / APP scam | velocity | enabler | common | planned |
+| C3 | Instant-A2A pass-through | graph | mechanism | common | template |
+| M1 | Boundary probing / paced evasion | velocity | model-attack | mid | template |
+| M2 | Synthetic-identity lifecycle | drift | enabler | mid | planned |
+| M3 | First-party / friendly fraud | drift | mechanism | mid | template · **holdout** |
 
-Aligning them, and adding the vectors that aren't built yet, including bust-out, UPI
-collect-request / APP, instant-A2A pass-through, and first-party fraud as the anomaly holdout, is
-the first build task.
+`level` is the taxonomy level and never gets flattened: mechanisms are the fraud, enablers are what
+make it possible, and M1 is an attack against our own model. `tier` is the role in the build: the
+adaptive loop wraps the strong three, the common three are must-catch load, the mid three are
+novelty and the holdout.
+
+`status` is the honest part — what the code can generate today, as opposed to what the taxonomy
+declares:
+
+- **built** — the engines express the vector's defining behaviour.
+- **template** — valid traffic of roughly the right shape, but the defining tell is missing. Fine as
+  training load and haystack; not reportable as a recall figure for that family. Each carries a
+  `gap` naming what is missing and the ticket that fixes it.
+- **planned** — cannot be generated. `Simulator.generate` raises and names the ticket, because a
+  family that silently emits nothing looks exactly like a family the detector caught.
+
+So three of the nine are done and six still owe work, and the file says which and why. **M3 is
+the leave-one-attack-out holdout** because `user == fraudster` breaks the legit-vs-attacker assumption every supervised
+feature rests on — and it is `template` today, so the headline number is currently measured on a
+proxy for first-party fraud rather than the real thing.
 
 ## What we're not claiming
 

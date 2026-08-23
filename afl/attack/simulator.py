@@ -75,9 +75,10 @@ class Simulator:
     def _background(self, r, run_id: str, end_ts: datetime | None = None) -> list[Transaction]:
         """Legit traffic across the whole window the attack actually occupies.
 
-        `end_ts` is passed by `generate` so a long-dormancy vector (M2 sleeps 30 days) does not
-        end up with its payout window sitting outside the legit traffic entirely — fraud with no
-        contemporaneous haystack is trivially separable by timestamp alone.
+        `end_ts` is passed by `generate` so a long-dormancy vector (M2 can sleep for months once
+        ticket 06 lands it) does not end up with its payout window sitting outside the legit
+        traffic entirely — fraud with no contemporaneous haystack is trivially separable by
+        timestamp alone.
         """
         normals = self._pool(EntityRole.NORMAL)
         merchants = self._pool(EntityRole.MERCHANT)
@@ -107,9 +108,9 @@ class Simulator:
     def _fit_into_window(self, rows: list[Transaction]) -> list[Transaction]:
         """Slide an episode back so it finishes inside the simulation window.
 
-        M2 sleeps for 30 days before it pays out. Left alone, its whole payout tail lands after
-        every other family's traffic has ended — and an out-of-time split then sorts families by
-        vector id instead of by time, which is not a temporal split at all.
+        A seasoned family sleeps for weeks before it pays out. Left alone, its whole payout tail
+        lands after every other family's traffic has ended — and an out-of-time split then sorts
+        families by vector id instead of by time, which is not a temporal split at all.
         """
         if not rows:
             return rows
@@ -125,13 +126,16 @@ class Simulator:
 
     # ── the seam method ─────────────────────────────────────────────────────────
     def generate(self, params: AttackParams) -> AttackBatch:
-        spec = registry.get(params.vector_id)
+        # a declared-but-unbuilt vector refuses here rather than returning an empty episode:
+        # an attack family that silently generates nothing reads exactly like one we caught
+        spec = registry.require_generatable(params.vector_id)
         knobs = registry.clamp(params.vector_id, {**spec.params, **params.params})
         seed = child_seed(self.seed, params.vector_id, self._round, str(sorted(knobs.items())))
         r = make_rng(seed)
         run_id = f"{params.vector_id}-{self._round:03d}-{uuid.UUID(int=seed).hex[:8]}"
 
-        actor = actor_lib.get_actor(spec.actor)
+        # per-vector actor retune: card testing settles on the card rail, not on the shared default
+        actor = actor_lib.get_actor(spec.actor, **spec.actor_overrides)
         victims = self._pool(EntityRole.NORMAL)
         mules = self._pool(EntityRole.MULE)
         cashout = self._pool(EntityRole.MERCHANT) + mules

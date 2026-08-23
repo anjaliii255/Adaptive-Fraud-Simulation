@@ -66,7 +66,7 @@ class Lab:
         if self.evaluator is not None:
             return
         pool: list[Transaction] = []
-        for vid in ("S1", "V1", "M1", HELD_OUT):
+        for vid in ("S1", "S2", "S3", HELD_OUT):
             pool.extend(self.simulator.generate(registry.get(vid).to_attack_params()).transactions)
         self.evaluator, train = LeaveOneAttackOut.from_pool(pool, held_out_vector=HELD_OUT)
         self.detector.fit(train)

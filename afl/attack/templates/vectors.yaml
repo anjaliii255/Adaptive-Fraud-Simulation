@@ -1,69 +1,195 @@
-# The 9 vectors. Declarative on purpose: adding a vector must never mean editing an engine.
+# The nine vectors. Declarative on purpose: adding a vector must never mean editing an engine.
 #
-#   maturity: mature   -> we believe the numbers
+# Four axes, and they answer four different questions. Flattening them is how a taxonomy stops
+# being a model of the domain and becomes a list.
+#
+#   level     what kind of thing this is
+#             mechanism    -> the fraud itself
+#             enabler      -> what makes the fraud possible (social engineering, a fabricated
+#                             identity); the loss lands elsewhere
+#             model-attack -> an attack against our own detector
+#
+#   tier      its role in this build, not a judgement of severity
+#             strong -> the adaptive optimiser wraps these; the closed loop runs here
+#             common -> must-catch load: templates in training, and fixed benchmarks
+#             mid    -> emerging / novelty: held out, or free by construction
+#
+#   maturity  how well-evidenced the family is in the real world, and therefore how much weight
+#             its numbers can carry
+#             mature   -> we believe the numbers
 #             emerging -> plausible, thin evidence
 #             research -> in the lab only; reported separately, never in the headline table
 #
-# `params` are the fixed defaults. `search_space` is what the optimiser is allowed to move,
-# and the bounds are the realism envelope — outside them the batch stops looking like traffic.
+#   status    what this repo can actually generate TODAY. Nothing may assume otherwise.
+#             built    -> the engines express this vector's defining behaviour
+#             template -> schema-valid traffic of roughly the right shape, but the defining tell
+#                         is not modelled yet. Fine as background fraud; NOT reportable as a
+#                         family until its ticket lands. `gap` says exactly what is missing.
+#             planned  -> cannot be generated at all. `Simulator.generate` raises and names the
+#                         ticket, because a vector that silently produces nothing is worse than
+#                         one that is honestly absent.
+#
+# `params` are the fixed defaults. `search_space` is what the optimiser is allowed to move, and
+# the bounds are the realism envelope — outside them the batch stops looking like traffic.
+# `actor_overrides` retunes the actor bundle for this vector only (a card-testing vector that
+# settles on the UPI rail is not a card-testing vector).
 
 vectors:
-  # ── S: structuring / graph family ────────────────────────────────────────────────
+  # ── STRONG · the three that run the full adaptive loop ───────────────────────────
   S1:
-    name: Mule fan-in cash-out
+    name: Mule network & layering
     engine: graph
     actor: mule
+    level: mechanism
+    tier: strong
     maturity: mature
-    why: The canonical scam payout. One collector, many victims, money gone within the hour.
-    params: {motif: fan_in, n_sources: 8, n_hops: 1, split_ratio: 1.0, hold_time_s: 900, leak: 0.03}
+    status: built
+    why: >-
+      The richest structure we have: network behaviour reveals fraud even when every single
+      transaction looks legitimate. Fan-in to a collector, then layering hops before cash-out.
+      Perfect substrate for graph features and for the adaptive loop, and directly relevant to
+      India's mule-account crackdown.
+    params: {motif: layering, n_sources: 8, n_hops: 2, split_ratio: 1.0, hold_time_s: 900, leak: 0.03}
     search_space:
       n_sources: {type: int, low: 3, high: 25}
+      n_hops: {type: int, low: 1, high: 6}
+      split_ratio: {type: float, low: 0.2, high: 1.0}
       hold_time_s: {type: float, low: 60, high: 86400, log: true}
       leak: {type: float, low: 0.0, high: 0.2}
 
   S2:
-    name: Multi-hop layering
-    engine: graph
-    actor: mule
-    maturity: mature
-    why: Depth defeats one-hop rules; each hop dilutes the link back to the victim.
-    params: {motif: layering, n_sources: 5, n_hops: 3, split_ratio: 0.5, hold_time_s: 3600, leak: 0.05}
-    search_space:
-      n_hops: {type: int, low: 2, high: 6}
-      split_ratio: {type: float, low: 0.2, high: 1.0}
-      hold_time_s: {type: float, low: 300, high: 172800, log: true}
-
-  S3:
-    name: Circular / round-trip
-    engine: graph
-    actor: fraudster
-    maturity: emerging
-    why: Cycles fake legitimate trade volume; they are invisible to per-edge scoring.
-    params: {motif: cycle, n_sources: 4, n_hops: 3, split_ratio: 1.0, hold_time_s: 7200, leak: 0.02}
-    search_space:
-      n_hops: {type: int, low: 2, high: 5}
-      leak: {type: float, low: 0.0, high: 0.1}
-
-  # ── V: velocity family ───────────────────────────────────────────────────────────
-  V1:
-    name: Card-testing burst
+    name: Card testing / BIN enumeration
     engine: velocity
     actor: fraudster
+    level: mechanism
+    tier: strong
     maturity: mature
-    why: Many tiny probes against a card BIN range; the loudest, easiest family to catch.
-    params: {n_txns: 40, burst_size: 40, burst_gap_s: 0, intra_burst_s: 3, threshold: null,
+    status: built
+    why: >-
+      Automated validation of generated card numbers. Adaptation is visually legible here — the
+      attacker walks from a loud burst to low-and-slow to randomised intervals to distribution
+      across cards and merchants, straight around a static velocity threshold. Trivial to
+      evaluate, and the cleanest live demonstration of the loop working.
+    params: {n_txns: 40, burst_size: 40, burst_gap_s: 60, intra_burst_s: 3, threshold: null,
              device_rotation: 0.9, amount_jitter: 0.4}
+    actor_overrides: {rails: [card]}
     search_space:
       n_txns: {type: int, low: 10, high: 120}
-      intra_burst_s: {type: float, low: 1, high: 120, log: true}
+      burst_size: {type: int, low: 1, high: 40}
+      burst_gap_s: {type: float, low: 60, high: 172800, log: true}
+      intra_burst_s: {type: float, low: 1, high: 3600, log: true}
       device_rotation: {type: float, low: 0.0, high: 1.0}
 
-  V2:
-    name: Threshold-aware structuring
+  S3:
+    name: Account takeover via drift
+    engine: drift
+    actor: fraudster
+    level: mechanism
+    tier: strong
+    maturity: mature
+    status: built
+    why: >-
+      Post-compromise behavioural change on a real account: new device, new beneficiary, changed
+      velocity. `ramp` is the axis that matters — a sudden switch is easy, gradual drift with no
+      event to anchor on is where per-row features run out and a sequence model has to earn its
+      seat instead of decorating the deck.
+    params: {n_baseline: 30, n_post: 12, ramp: 0.0, amount_shift: 6.0, new_device: true,
+             dormancy_s: 3600}
+    search_space:
+      ramp: {type: float, low: 0.0, high: 1.0}
+      amount_shift: {type: float, low: 1.2, high: 10.0}
+      n_baseline: {type: int, low: 10, high: 60}
+      n_post: {type: int, low: 3, high: 30}
+
+  # ── COMMON · must-catch load, templates plus fixed benchmarks ────────────────────
+  C1:
+    name: Bust-out
+    engine: drift
+    actor: normal
+    level: mechanism
+    tier: common
+    maturity: mature
+    status: template
+    gap: >-
+      One account only. The defining tell — a correlated utilisation spike across several
+      accounts run by the same operator — is not modelled yet. Ticket 06.
+    why: >-
+      Long clean tenure, then a sudden utilisation spike before cash-out. A dominant real-loss
+      category and a pure sequence problem. It shares the drift engine with S3, so a whole extra
+      family costs almost nothing to carry.
+    params: {n_baseline: 60, n_post: 10, ramp: 0.2, amount_shift: 8.0, new_device: false,
+             dormancy_s: 0}
+    search_space:
+      n_baseline: {type: int, low: 30, high: 120}
+      n_post: {type: int, low: 3, high: 20}
+      amount_shift: {type: float, low: 3.0, high: 15.0}
+      ramp: {type: float, low: 0.0, high: 0.6}
+
+  C2:
+    name: UPI collect-request / APP scam
+    engine: velocity
+    actor: normal
+    level: enabler
+    tier: common
+    maturity: mature
+    status: planned
+    gap: >-
+      The velocity engine spreads payments across a pool of beneficiaries. This vector needs the
+      opposite: one first-time payee, the victim's own prior history to be atypical against, and
+      a drain measured in minutes. Ticket 04.
+    why: >-
+      The dominant India account-to-account scam class, and the one where the victim authorises
+      the payment themselves — so there is no compromised credential to find. First-time-payee
+      and rapid-drain features are cheap and high-signal, and it keeps the submission on-rail for
+      a Mastercard / GFF audience.
+    params: {n_txns: 4, burst_size: 4, burst_gap_s: 60, intra_burst_s: 120, threshold: null,
+             device_rotation: 0.0, amount_jitter: 0.3}
+    actor_overrides: {rails: [upi]}
+    search_space:
+      n_txns: {type: int, low: 1, high: 8}
+      intra_burst_s: {type: float, low: 30, high: 3600, log: true}
+      amount_jitter: {type: float, low: 0.05, high: 0.5}
+
+  C3:
+    name: Instant-A2A pass-through
+    engine: graph
+    actor: mule
+    level: mechanism
+    tier: common
+    maturity: mature
+    status: template
+    gap: >-
+      No cross-institution marker, and the beneficiary is drawn from the mule pool rather than
+      guaranteed to have no prior inbound history. Ticket 05.
+    why: >-
+      A new payee plus immediate onward drain, on rails with no chargeback. It exploits the exact
+      irrevocability property that makes real-time payments hard to defend, and it reuses the
+      graph and velocity primitives already built for S1 and S2.
+    params: {motif: pass_through, n_sources: 3, n_hops: 1, split_ratio: 1.0, hold_time_s: 30,
+             leak: 0.01}
+    search_space:
+      n_sources: {type: int, low: 1, high: 8}
+      hold_time_s: {type: float, low: 5, high: 3600, log: true}
+      leak: {type: float, low: 0.0, high: 0.05}
+
+  # ── MID · emerging, novelty, and the holdout ─────────────────────────────────────
+  M1:
+    name: Boundary probing / paced evasion
     engine: velocity
     actor: mule
-    maturity: mature
-    why: Paced just under the reporting ceiling — the direct counter to a static amount rule.
+    level: model-attack
+    tier: mid
+    maturity: research
+    status: template
+    gap: >-
+      Today it paces under a *static* reporting ceiling. The vector the architecture argues for
+      paces under the detector's own learned boundary; that trajectory is the optimiser's search,
+      surfaced as an artefact in ticket 13.
+    why: >-
+      Activity deliberately clustered just under known limits, with the attacker mapping the
+      approve/decline boundary and walking along the safe side of it. It costs almost nothing to
+      build because it *is* the adaptive optimiser's search strategy, and it is the cleanest
+      attack-against-our-own-model in the taxonomy.
     params: {n_txns: 15, burst_size: 3, burst_gap_s: 21600, intra_burst_s: 600, threshold: 10000,
              device_rotation: 0.1, amount_jitter: 0.08}
     search_space:
@@ -71,53 +197,49 @@ vectors:
       burst_gap_s: {type: float, low: 600, high: 172800, log: true}
       amount_jitter: {type: float, low: 0.01, high: 0.3}
 
-  V3:
-    name: Slow-drip siphon
-    engine: velocity
-    actor: fraudster
-    maturity: emerging
-    why: Below every window a velocity rule watches. Costs the attacker time, not detectability.
-    params: {n_txns: 25, burst_size: 1, burst_gap_s: 86400, intra_burst_s: 86400, threshold: 1000,
-             device_rotation: 0.0, amount_jitter: 0.2}
-    search_space:
-      n_txns: {type: int, low: 8, high: 60}
-      burst_gap_s: {type: float, low: 21600, high: 604800, log: true}
-
-  # ── M: maturation / drift family ─────────────────────────────────────────────────
-  M1:
-    name: Account takeover
-    engine: drift
-    actor: fraudster
-    maturity: mature
-    why: Real history, new operator. The baseline tail is what makes it hard.
-    params: {n_baseline: 30, n_post: 12, ramp: 0.0, amount_shift: 6.0, new_device: true,
-             dormancy_s: 3600}
-    search_space:
-      amount_shift: {type: float, low: 1.2, high: 10.0}
-      ramp: {type: float, low: 0.0, high: 1.0}
-      n_post: {type: int, low: 3, high: 30}
-
   M2:
-    name: Dormant mule activation
+    name: Synthetic-identity lifecycle
     engine: drift
-    actor: mule
+    actor: normal
+    level: enabler
+    tier: mid
     maturity: emerging
-    why: Aged account, clean history, wakes up for one payout window then goes quiet.
-    params: {n_baseline: 40, n_post: 6, ramp: 0.0, amount_shift: 8.0, new_device: false,
-             dormancy_s: 2592000}
+    status: planned
+    gap: >-
+      The tell is an account with no genuine history — fabricated, onboarded, then seasoned. The
+      simulator gives every entity a real opening date and real traffic, so that absence cannot
+      be expressed yet. Ticket 06.
+    why: >-
+      Identity fabrication, onboarding, seasoning, then payment abuse. It covers the onboarding
+      surface and models fraud that begins *before* the first transaction, then hands off into
+      the bust-out arc rather than needing an engine of its own.
+    params: {n_baseline: 25, n_post: 8, ramp: 0.1, amount_shift: 10.0, new_device: false,
+             dormancy_s: 604800}
     search_space:
-      dormancy_s: {type: float, low: 604800, high: 15552000, log: true}
+      n_baseline: {type: int, low: 10, high: 60}
       n_post: {type: int, low: 2, high: 15}
+      dormancy_s: {type: float, low: 86400, high: 15552000, log: true}
 
   M3:
-    name: Gradual behavioural drift
+    name: First-party / friendly fraud
     engine: drift
-    actor: fraudster
-    maturity: research
-    why: No event to anchor on — the hardest family, and the natural leave-one-attack-out holdout.
-    params: {n_baseline: 50, n_post: 40, ramp: 1.0, amount_shift: 3.0, new_device: false,
+    actor: normal
+    level: mechanism
+    tier: mid
+    maturity: emerging
+    status: template
+    gap: >-
+      Modelled as an amount-shift drift on the owner's own account. Real first-party abuse is
+      about the *product* — chargebacks, refunds, intentional default — and those semantics are
+      not in the schema yet, so today's holdout number is measured on a proxy. Ticket 03.
+    why: >-
+      The legitimate owner abusing the product. `user == fraudster` breaks the legit-vs-attacker
+      assumption every supervised feature quietly rests on: no compromised device, no new
+      operator, no ring. That is exactly why it is the leave-one-attack-out holdout, why the
+      anomaly layer exists at all, and the single biggest omission a domain judge would probe.
+    params: {n_baseline: 50, n_post: 20, ramp: 0.8, amount_shift: 2.5, new_device: false,
              dormancy_s: 0}
     search_space:
       ramp: {type: float, low: 0.5, high: 1.0}
       amount_shift: {type: float, low: 1.1, high: 4.0}
-      n_post: {type: int, low: 20, high: 80}
+      n_post: {type: int, low: 10, high: 60}

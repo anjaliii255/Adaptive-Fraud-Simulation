@@ -20,7 +20,7 @@ blocks the frontier for both lanes.
 
 | # | Ticket | Owner | Blocked by |
 |---|--------|-------|-----------|
-| 01 | Freeze the seam and the taxonomy | ◆ A+B | — |
+| 01 | ~~Freeze the seam and the taxonomy~~ **done** | ◆ A+B | — |
 | 02 | Anchor on a real dataset with a committed split | ■ B | — |
 | 03 | M3 — first-party fraud, the holdout family | ▲ A | 01 |
 | 04 | C2 — UPI collect-request / APP scam | ▲ A | 01 |
@@ -84,20 +84,40 @@ computed over fraud rows, never over all rows.
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done — decision of record in `docs/adr/0001-vector-taxonomy-and-holdout.md`
 
-- [ ] `vectors.yaml` uses the doc's nine IDs, each with `name`, `engine`, `actor`, `maturity`,
-      `why`, `params` and a bounded `search_space`
-- [ ] Vectors not yet implemented are present with their spec and marked so an unimplemented
-      vector fails loudly rather than silently generating nothing
-- [ ] Every config, default and test referencing an old ID is updated in the same change; a
+- [x] `vectors.yaml` uses the doc's nine IDs, each with `name`, `engine`, `actor`, `maturity`,
+      `why`, `params` and a bounded `search_space` — plus `level`, `tier` and `status`
+- [x] Vectors not yet implemented are present with their spec and marked so an unimplemented
+      vector fails loudly rather than silently generating nothing — three-state `status`
+      (built / template / planned); `planned` raises from `Simulator.generate` naming its ticket,
+      and a non-built vector with no stated `gap` fails to load at all
+- [x] Every config, default and test referencing an old ID is updated in the same change; a
       grep for the old IDs returns nothing
-- [ ] The leave-one-attack-out default holdout is M3 (first-party fraud), and the reason is
+- [x] The leave-one-attack-out default holdout is M3 (first-party fraud), and the reason is
       recorded where the default lives
-- [ ] `afl/contract` is confirmed unchanged, or changed once here with both owners agreeing
+- [x] `afl/contract` is confirmed unchanged — zero diff, the seam held
 - [ ] Both owners can state, without looking, what the three taxonomy levels are and which
-      vectors sit at each
-- [ ] `make test` green
+      vectors sit at each — *for A and B to do together; the code cannot check it*
+- [x] `make test` green (85 passed), plus `make smoke`, `make loop`, `make compare`,
+      `make fidelity` and `make figures` all run
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **Six of the nine vectors still owe work**, and `vectors.yaml` says which and why. Built: S1, S2,
+  S3. Template (right shape, defining tell missing): C1, C3, M1, M3. Planned (raises): C2, M2.
+- **The holdout is a proxy today.** M3 is `template`, so ticket 11's headline number is measured on
+  an amount-shift drift standing in for first-party fraud until ticket 03 lands. Label it, don't
+  quote it.
+- **The numbers moved and nothing regressed.** Changing which families are generated and what the
+  holdout *is* changed every downstream number. README refreshed; pre-freeze figures are not
+  comparable and were replaced, not kept alongside.
+- **`motif` is a fixed knob, not a searched one.** S1 spans fan-in to deep layering via `n_hops`,
+  which the optimiser does search. Searching `motif` needs categorical support — ticket 12's call.
+- **New in the registry for ticket 12:** `list_vectors(tier="strong")` is the three the loop should
+  wrap, and `list_vectors(generatable=True)` is what any run should iterate.
+- **Fixed in passing:** `scorecard.build` read `thresholds` off its argument instead of off the
+  card, so any caller omitting it crashed. That was every `make fidelity` run.
 
 ---
 

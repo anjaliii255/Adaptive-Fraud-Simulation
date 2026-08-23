@@ -8,8 +8,9 @@ window_days: 30
 n_episodes: 5
 
 # Vectors the red side is allowed to generate during a run. The eval holdout must not
-# appear here — scripts/run_experiment.py asserts it.
-vectors: [S1, S2, S3, V1, V2, V3, M1, M2]
+# appear here — scripts/run_experiment.py asserts it. C2 and M2 are declared in
+# vectors.yaml but not yet buildable, so asking for them would raise; M3 is the holdout.
+vectors: [S1, S2, S3, C1, C3, M1]
 
 engines:
   graph:

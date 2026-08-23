@@ -160,7 +160,7 @@ def test_loop_runs_with_real_components():
     """Same loop, stubs swapped for the real halves. This is step 4 of the build order."""
     simulator = Simulator(seed=13, n_entities=120, n_background=400, n_episodes=2)
     pool = []
-    for vid in ("S1", "V1", "M3"):
+    for vid in ("S1", "S2", "M3"):
         pool.extend(simulator.generate(registry.get(vid).to_attack_params()).transactions)
 
     evaluator, train = LeaveOneAttackOut.from_pool(pool, held_out_vector="M3")

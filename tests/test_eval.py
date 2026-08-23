@@ -130,7 +130,7 @@ def test_holdout_vector_keeps_the_haystack():
 def test_make_splits_removes_the_family_and_the_future():
     sim = Simulator(seed=21, n_entities=120, n_background=300, n_episodes=6)
     pool = []
-    for vid in ("S1", "V1", "M3"):
+    for vid in ("S1", "S2", "M3"):
         pool.extend(sim.generate(registry.get(vid).to_attack_params()).transactions)
 
     train, holdout = make_splits(pool, held_out_vector="M3")
@@ -171,11 +171,11 @@ def test_evaluator_never_returns_the_training_number():
 def test_sweep_reports_one_row_per_family():
     sim = Simulator(seed=23, n_entities=120, n_background=300, n_episodes=2)
     pool = []
-    for vid in ("S1", "V1"):
+    for vid in ("S1", "S2"):
         pool.extend(sim.generate(registry.get(vid).to_attack_params()).transactions)
 
     matrix = sweep(pool, lambda: LGBMDetector(seed=23, params={"n_estimators": 20}))
-    assert set(matrix) <= {"S1", "V1"}
+    assert set(matrix) <= {"S1", "S2"}
     for vid, result in matrix.items():
         assert result.held_out_vector == vid
 
@@ -242,7 +242,7 @@ def test_retrain_accumulates_rather_than_forgetting():
     """The loop must not reduce the detector to whatever it saw most recently."""
     sim = Simulator(seed=26, n_entities=100, n_background=250, n_episodes=2)
     first = sim.generate(registry.get("S1").to_attack_params())
-    second = sim.generate(registry.get("V1").to_attack_params())
+    second = sim.generate(registry.get("S2").to_attack_params())
 
     detector = LGBMDetector(seed=26, params={"n_estimators": 20})
     detector.fit(first.transactions)
@@ -266,7 +266,7 @@ def test_smote_stays_inside_its_own_family():
 def test_three_systems_share_one_holdout_and_one_operating_point():
     sim = Simulator(seed=24, n_entities=120, n_background=400, n_episodes=2)
     pool = []
-    for vid in ("S1", "V1", "M3"):
+    for vid in ("S1", "S2", "M3"):
         pool.extend(sim.generate(registry.get(vid).to_attack_params()).transactions)
 
     from afl.attack.optimiser import AttackOptimiser

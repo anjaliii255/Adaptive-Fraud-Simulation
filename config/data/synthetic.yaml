@@ -16,8 +16,9 @@ window_days: 60
 limit: null
 
 # There is no labelled real fraud here, so System A ("real only") would have nothing to learn
-# from. These mature families stand in for the fraud a team already has labels for.
-known_fraud_vectors: [S1, S2, V1, V2, M1]
+# from. These stand in for the fraud a team already has labels for: mule networks, card
+# testing, account takeover, bust-out. The holdout (M3) is deliberately absent.
+known_fraud_vectors: [S1, S2, S3, C1, M1]
 
 train_frac: 0.7
 embargo_days: 1.0

@@ -1,7 +1,11 @@
 # One operating point, agreed before any result exists. Two systems are never compared at two
 # different thresholds, and this file is the reason why.
 
-held_out_vector: M3    # research-maturity drift: no event to anchor on, the hardest family
+# First-party / friendly fraud: user == fraudster, so there is no compromised device, no new
+# operator and no ring. It breaks the assumption every supervised feature rests on, which is
+# what makes it a generalisation test rather than just a harder fold. Reason of record lives
+# in afl/evaluation/leave_one_attack_out.py:DEFAULT_HOLDOUT.
+held_out_vector: M3
 fixed_fpr: 0.01
 k: 100
 

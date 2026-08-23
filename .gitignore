@@ -5,7 +5,8 @@ data/**
 artifacts/**
 !artifacts/.gitkeep
 mlruns/
-outputs/          # hydra run dirs
+# hydra run dirs (no inline comments here: git treats the whole line as the pattern)
+outputs/
 multirun/
 wandb/
 

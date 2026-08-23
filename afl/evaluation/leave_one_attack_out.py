@@ -21,7 +21,12 @@ from afl.evaluation import protocol
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HOLDOUT = "M3"  # the research-maturity drift family: no event to anchor on
+#: First-party / friendly fraud. Chosen as the holdout because `user == fraudster` breaks the
+#: legit-vs-attacker assumption every supervised feature quietly rests on: no compromised device,
+#: no new operator, no ring. A family that is merely *unseen* still shares that assumption; this
+#: one does not, which is what makes it a real generalisation test rather than a harder fold.
+#: It is also why the anomaly layer exists at all — see afl/defend/models/anomaly.py.
+DEFAULT_HOLDOUT = "M3"
 
 
 def make_splits(

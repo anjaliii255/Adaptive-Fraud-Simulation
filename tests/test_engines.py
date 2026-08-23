@@ -81,7 +81,7 @@ def test_velocity_engine_stays_under_its_threshold():
     rows = velocity.generate(
         rng=make_rng(2),
         run_id="r2",
-        vector_id="V2",
+        vector_id="M1",
         actor=actors.MULE,
         start_ts=START,
         params={
@@ -96,7 +96,7 @@ def test_velocity_engine_stays_under_its_threshold():
         src="m000",
         dst_pool=CASHOUT,
     )
-    assert_valid_attack(rows, "V2")
+    assert_valid_attack(rows, "M1")
     assert len(rows) == 20
     assert all(t.amount < 10_000 for t in rows), "threshold-aware pacing must respect the ceiling"
 
@@ -105,7 +105,7 @@ def test_velocity_bursts_are_tighter_than_the_gaps_between_them():
     rows = velocity.generate(
         rng=make_rng(3),
         run_id="r3",
-        vector_id="V1",
+        vector_id="S2",
         actor=actors.FRAUDSTER,
         start_ts=START,
         params={
@@ -129,7 +129,7 @@ def test_drift_engine_labels_only_the_post_event_tail():
     rows = drift.generate(
         rng=make_rng(4),
         run_id="r4",
-        vector_id="M1",
+        vector_id="S3",
         actor=actors.FRAUDSTER,
         start_ts=START,
         params={
@@ -144,7 +144,7 @@ def test_drift_engine_labels_only_the_post_event_tail():
         benign_dst_pool=CASHOUT,
         cashout_pool=CASHOUT,
     )
-    assert_valid_attack(rows, "M1")
+    assert_valid_attack(rows, "S3")
     assert [t.is_fraud for t in rows] == [False] * 15 + [True] * 5
     # the post-event tail is what makes it detectable at all
     baseline = sum(t.amount for t in rows[:15]) / 15
@@ -156,7 +156,7 @@ def test_drift_new_device_only_after_the_event():
     rows = drift.generate(
         rng=make_rng(5),
         run_id="r5",
-        vector_id="M1",
+        vector_id="S3",
         actor=actors.FRAUDSTER,
         start_ts=START,
         params={"n_baseline": 10, "n_post": 4, "new_device": True, "dormancy_s": 0},
@@ -169,14 +169,58 @@ def test_drift_new_device_only_after_the_event():
 
 
 # ── registry ────────────────────────────────────────────────────────────────────
+#: The taxonomy, frozen. Ticket 01 exists so that these ids mean the same thing in a config
+#: file, a test, a metric and a conversation — so they are pinned here, not derived.
+TAXONOMY = {"S1", "S2", "S3", "C1", "C2", "C3", "M1", "M2", "M3"}
+
+
 def test_all_nine_vectors_load():
     vectors = registry.load_vectors()
     assert len(vectors) == 9
-    assert set(vectors) == {"S1", "S2", "S3", "V1", "V2", "V3", "M1", "M2", "M3"}
+    assert set(vectors) == TAXONOMY
     for spec in vectors.values():
         assert spec.engine in registry.ENGINES
         assert spec.maturity in registry.MATURITIES
+        assert spec.level in registry.LEVELS
+        assert spec.tier in registry.TIERS
+        assert spec.status in registry.STATUSES
         assert spec.why, f"{spec.vector_id} has no stated reason to exist"
+
+
+def test_nine_vectors_collapse_onto_three_engines():
+    """The design's headline claim: breadth is near-free because the engines are shared."""
+    assert {s.engine for s in registry.list_vectors()} == set(registry.ENGINES)
+
+
+def test_the_three_taxonomy_levels_are_populated_and_never_flattened():
+    by_level = {
+        lvl: {s.vector_id for s in registry.list_vectors(level=lvl)} for lvl in registry.LEVELS
+    }
+    assert by_level["model-attack"] == {"M1"}, "the attack against our own model is its own level"
+    assert by_level["enabler"] == {"C2", "M2"}
+    assert set().union(*by_level.values()) == TAXONOMY
+    assert sum(len(v) for v in by_level.values()) == len(TAXONOMY), "a vector sits at one level"
+
+
+def test_the_strong_tier_is_the_three_the_loop_runs_on():
+    assert {s.vector_id for s in registry.list_vectors(tier="strong")} == {"S1", "S2", "S3"}
+    assert all(s.status == registry.BUILT for s in registry.list_vectors(tier="strong"))
+
+
+def test_an_unfinished_vector_must_say_what_is_missing():
+    """`status` without `gap` would let a half-built family pass as a finished one."""
+    for spec in registry.list_vectors():
+        if spec.status != registry.BUILT:
+            assert spec.gap, f"{spec.vector_id} is {spec.status} but names no gap"
+            assert "icket" in spec.gap, f"{spec.vector_id}'s gap names no ticket to close it"
+
+
+def test_the_declared_holdout_exists_and_is_never_generated_by_the_red_side():
+    from afl.evaluation.leave_one_attack_out import DEFAULT_HOLDOUT
+
+    spec = registry.get(DEFAULT_HOLDOUT)
+    assert spec.name.startswith("First-party"), "the holdout is first-party fraud, by decision"
+    assert spec.level == "mechanism" and spec.tier == "mid"
 
 
 def test_clamp_pulls_params_back_into_the_realism_envelope():
@@ -192,14 +236,35 @@ def test_unknown_vector_is_a_loud_error():
 
 
 # ── simulator ───────────────────────────────────────────────────────────────────
-@pytest.mark.parametrize("vector_id", ["S1", "S2", "S3", "V1", "V2", "V3", "M1", "M2", "M3"])
-def test_simulator_generates_every_vector(vector_id):
+GENERATABLE = [s.vector_id for s in registry.list_vectors(generatable=True)]
+PLANNED = [s.vector_id for s in registry.list_vectors(generatable=False)]
+
+
+@pytest.mark.parametrize("vector_id", GENERATABLE)
+def test_simulator_generates_every_generatable_vector(vector_id):
     sim = Simulator(seed=11, n_entities=120, n_background=200, n_episodes=2)
     batch = sim.generate(registry.get(vector_id).to_attack_params())
     assert_valid_attack(batch.transactions, vector_id)
     assert batch.fraud_transactions, f"{vector_id} produced no fraud"
     assert batch.transactions == sorted(batch.transactions, key=lambda t: t.ts)
     assert batch.params.vector_id == vector_id
+
+
+@pytest.mark.parametrize("vector_id", PLANNED)
+def test_a_planned_vector_refuses_loudly_instead_of_generating_nothing(vector_id):
+    """An attack family that silently emits nothing reads exactly like one the detector caught."""
+    sim = Simulator(seed=11, n_entities=60, n_background=50, n_episodes=1)
+    with pytest.raises(NotImplementedError, match="declared but not implemented"):
+        sim.generate(registry.get(vector_id).to_attack_params())
+
+
+def test_card_testing_settles_on_the_card_rail():
+    """A card-testing vector that settles on UPI is not a card-testing vector."""
+    from afl.contract.schema import Rail
+
+    sim = Simulator(seed=12, n_entities=120, n_background=100, n_episodes=1)
+    batch = sim.generate(registry.get("S2").to_attack_params())
+    assert {t.rail for t in batch.fraud_transactions} == {Rail.CARD}
 
 
 def test_same_seed_same_batch():

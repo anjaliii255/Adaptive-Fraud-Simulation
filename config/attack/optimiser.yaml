@@ -3,6 +3,9 @@
 # lambda_realism is the ethic of the project expressed as a number. At 0 the optimiser wins by
 # inventing traffic no bank would ever see, and every downstream recall claim becomes worthless.
 
+# S1 alone today. Ticket 12 widens this to search across the strong tier (S1, S2, S3) in one
+# run — grinding a single vector against a detector that already generalises is the diagnosis
+# behind the adaptive system currently scoring below both baselines.
 vector_id: S1
 backend: auto          # optuna | random | auto
 lambda_realism: 0.5
