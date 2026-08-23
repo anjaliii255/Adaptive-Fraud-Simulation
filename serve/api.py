@@ -111,7 +111,10 @@ def health() -> dict[str, Any]:
         "seed": SEED,
         "held_out_vector": HELD_OUT,
         "rounds_run": LAB.round,
-        "detector_backend": LAB.detector.backend,
+        # str(), not the dataclass: this is JSON, and the demo shows it in a metric tile.
+        # The full backend record — version and why it was chosen — is on the model card.
+        "detector_backend": str(LAB.detector.backend),
+        "detector_backend_reason": LAB.detector.backend.reason,
     }
 
 

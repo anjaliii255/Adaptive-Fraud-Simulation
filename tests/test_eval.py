@@ -2,6 +2,9 @@
 
 Most of the ways this project could quietly become dishonest live in this file: a random split,
 a held-out family that isn't held out, a metric measured at a threshold nobody agreed to.
+
+The detector's own guarantees — the backend it ran on, honest tuning, accumulating retrains,
+the weight on an evasion — live in `tests/test_detector.py`.
 """
 
 from __future__ import annotations
@@ -199,22 +202,6 @@ def test_calibration_hits_the_target_fpr():
     policy = DecisionPolicy().calibrate_to_fpr(scores, labels, target_fpr=0.01)
     realised = float((scores[labels == 0] >= policy.decline_at).mean())
     assert realised == pytest.approx(0.01, abs=0.005)
-
-
-# ── the detector remembers ──────────────────────────────────────────────────────
-def test_retrain_accumulates_rather_than_forgetting():
-    """The loop must not reduce the detector to whatever it saw most recently."""
-    sim = Simulator(seed=26, n_entities=100, n_background=250, n_episodes=2)
-    first = sim.generate(registry.get("S1").to_attack_params())
-    second = sim.generate(registry.get("S2").to_attack_params())
-
-    detector = LGBMDetector(seed=26, params={"n_estimators": 20})
-    detector.fit(first.transactions)
-    detector.retrain(second, evasions=second.fraud_transactions[:3])
-
-    corpus = {t.txn_id for t in detector._corpus}
-    assert {t.txn_id for t in first.transactions} <= corpus
-    assert {t.txn_id for t in second.transactions} <= corpus
 
 
 # ── three systems ───────────────────────────────────────────────────────────────

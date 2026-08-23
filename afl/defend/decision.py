@@ -98,6 +98,24 @@ class DecisionPolicy:
         return self
 
 
+def assert_one_operating_point(calibrate_to_fpr: float | None, fixed_fpr: float) -> None:
+    """The action bands and the reported metric are one decision, so they take one number.
+
+    `defend.supervised.decision.calibrate_to_fpr` places the bands; `eval.fixed_fpr` is where
+    recall is read off. Two different values means the table's `recall@1%FPR` column and its
+    `evasion_rate` column describe two different systems — which is the sort of discrepancy
+    nobody notices until they are asked to explain it on a slide.
+    """
+    if calibrate_to_fpr is None:  # calibration off; the fixed bands in config stand
+        return
+    if float(calibrate_to_fpr) != float(fixed_fpr):
+        raise ValueError(
+            f"two operating points: the bands are calibrated to {calibrate_to_fpr} but recall is "
+            f"reported at {fixed_fpr}. Set defend.supervised.decision.calibrate_to_fpr and "
+            "eval.fixed_fpr to the same number, or set the former to null to keep fixed bands."
+        )
+
+
 def total_cost(
     scores: list[DetectorScore],
     amounts: dict[str, float],

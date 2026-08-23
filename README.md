@@ -24,14 +24,20 @@ a synthetic placeholder so a fresh clone works with nothing to download, and any
 run prints is stamped as a pipeline check.
 
 The **feature table is now built for that data** rather than for the synthetic placeholder —
-56 causal features, each with a rationale, measured per anchor in `docs/features.md`. The
-detector on top of it is still the skeleton's, so real-anchor numbers are a *first reading*
-rather than a result: ticket 08 is what turns them into one.
+56 causal features, each with a rationale, measured per anchor in `docs/features.md`.
+
+The **detector on top of it is now tuned, and it is genuinely LightGBM** — which it had not been
+before, because libomp was missing and the wheel was silently falling back to sklearn. Its
+reference numbers are committed per anchor in `artifacts/detector/` and written up in
+`docs/detector.md`. That is System A of the hero table: the bar everything else has to clear.
 
 ## Setup
 
-Needs Python 3.11. On macOS, LightGBM wants libomp. Without it, it quietly falls back to a slower
-sklearn path, so install it or your detector isn't the real one.
+Needs Python 3.11. **On macOS, install libomp first.** The LightGBM wheel imports cleanly without
+it and then fails to load its own shared library at fit time, so the code falls back to sklearn
+HistGradientBoosting and keeps running — a different model under a table headed "LightGBM". That
+is not hypothetical: every number in this README before ticket 08 came out of the fallback.
+Every run now records which backend produced it, so you can check rather than assume.
 
 ```bash
 brew install libomp            # macOS only
@@ -50,6 +56,7 @@ make smoke                     # runs the whole loop on dummy data; has to pass
 
 ```bash
 make features    # build the feature table over every anchor; record cost and coverage
+make baseline    # tune the detector on every anchor; commit the reference numbers
 make fidelity    # build the fidelity scorecard, before trusting any generator
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
@@ -135,6 +142,40 @@ Causality is proved, not asserted: the tests check the property directly (append
 never changes an earlier row's features) and cross-check all 56 columns against a brute-force
 reference that shares no code with the implementation.
 
+## The detector
+
+Gradient-boosted trees over those 56 features, tuned per anchor and committed. `docs/detector.md`
+is the write-up; `artifacts/detector/<anchor>.json` is the evidence, carrying the params, the
+backend and version, the split digest and the seed that produced each number.
+
+```bash
+make baseline    # retune from scratch and rewrite both
+```
+
+The same division as the split boundary: **config holds the inputs** — the starting params and
+the search envelope, in `config/defend/lgbm.yaml` — and **the artefact holds the decision**, the
+params 40 Optuna trials landed on. A run on `data=paysim` picks the committed params up on its
+own, so a config that carried them could never drift from the run that justified them.
+
+The search only ever sees a validation tail *inside* the training window, and
+`afl/defend/tuning.py` raises rather than warns if that tail is not strictly after the rows it
+fitted on. The action bands are calibrated on the same tail. An operating point chosen on the
+window it is reported from is not an operating point, it is a result.
+
+Two things worth knowing before quoting a number from it.
+
+**A baseline is only "strong" relative to how hard the anchor is,** so every artefact carries an
+`amount_only` floor: rank the rows by amount, no model, no features, no training, direction
+chosen on train. On PaySim the floor reaches PR-AUC 0.057 against the detector's 0.152. On AMLSim
+it reaches **0.456, with precision@100 of 1.00** — because every alerted row in that file is a
+sub-20 amount against legit traffic reaching 21.5M, so 78% of the negatives are excluded before
+anything is fitted. **AMLSim's near-perfect column is the generator being legible, not the
+detector being good.** PaySim is the anchor to read.
+
+**Tuning was not a formality.** On PaySim, same features, same seed, same boundary: PR-AUC
+0.060 → 0.152, recall@1%FPR 0.371 → 0.478, precision@100 0.14 → 0.48. Both sides are committed,
+so the claim that the search earned its keep is checkable rather than asserted.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -149,7 +190,8 @@ afl/loop         where attack meets defend; the closed loop lives here
 afl/evaluation   out-of-time split, leave-one-attack-out, three-system table         [blue]
 serve            FastAPI + Streamlit demo
 config           Hydra configs; experiment/{baseline,smote,adaptive}
-scripts          run_experiment, build_splits, build_features, build_fidelity, make_figures
+scripts          run_experiment, build_splits, build_features, build_baseline, build_fidelity,
+                 make_figures
 ```
 
 ## How it's scored
@@ -167,15 +209,46 @@ almost nothing.
 
 Two regimes, and they do not go in the same table. The real anchors run at ~0.13% fraud and the
 synthetic default at 4.74%; `recall@1%FPR` and `precision@100` are not the same measurement at
-those two rates.
+those two rates. All of these came out of LightGBM 4.5.0, and every artefact says so.
 
-### On the real anchors — first reading, not a result
+### The detector's own reference — on each anchor's real, labelled fraud
+
+Out of time at the committed boundary, tuned on a validation tail inside the training window.
+This is the bar; `docs/detector.md` and `artifacts/detector/` are the full record.
+
+```
+                 PR-AUC   recall@1%FPR   precision@100
+paysim   tuned    0.152      0.478           0.48
+         stock    0.060      0.371           0.14     <- same detector, untuned params
+         floor    0.057      0.212           0.23     <- amount alone, no model at all
+
+amlsim   tuned    1.000      1.000           1.00
+         stock    0.305      0.697           0.65
+         floor    0.456      0.474           1.00     <- read this row before the one above it
+```
+
+```bash
+make baseline
+```
+
+- **Read PaySim, not AMLSim.** Every alerted row in the AMLSim dump is a sub-20 amount against
+  legit traffic reaching 21.5M, so sorting on amount alone — no model, no features, no training —
+  already fills the entire top-100 queue. AMLSim's perfect column is the generator being legible.
+  PaySim's fraud spans the whole amount range, so its detector has to earn every point.
+- **Tuning was not a formality.** PaySim PR-AUC 0.060 → 0.152 and precision@100 0.14 → 0.48, with
+  the features, the seed and the boundary held fixed. Anything ever compared against the untuned
+  detector was compared against a straw man.
+- **The validation tail is thin** — 46 fraud rows on PaySim, 196 on AMLSim. `n_val_positives` sits
+  next to the score in the artefact because a search maximised against 46 positives has variance
+  nobody should read past.
+
+### On the M3 leave-one-attack-out fold — still not a claim
 
 Held out on M3, System A only, at the committed split:
 
 ```
-paysim   PR-AUC 0.006   recall@1%FPR 0.040   precision@100 0.00      (was 0.025 / 0.243 / 0.00)
-amlsim   PR-AUC 0.040   recall@1%FPR 0.160   precision@100 0.24      (was 0.007 / 0.067 / 0.08)
+paysim   PR-AUC 0.007   recall@1%FPR 0.043   precision@100 0.00     (was 0.006 / 0.040 / 0.00)
+amlsim   PR-AUC 0.167   recall@1%FPR 0.173   precision@100 0.25     (was 0.040 / 0.160 / 0.24)
 ```
 
 ```bash
@@ -183,44 +256,39 @@ python scripts/run_experiment.py data=paysim experiment=baseline run_name=paysim
 python scripts/run_experiment.py data=amlsim experiment=baseline run_name=amlsim_baseline
 ```
 
-The bracketed figures are the same command before ticket 07's feature table landed. AMLSim went
-up and PaySim went down, and the second one is the more informative of the two:
+The bracketed figures are the same command before this ticket: untuned params, and the
+sklearn fallback rather than LightGBM, because libomp was missing.
 
-- **This fold cannot carry a claim on a real anchor, and finding that out is the useful part.**
-  Every positive in the M3 holdout is an injected synthetic row and every negative is a real one,
-  so the number partly measures how far the injected family sits from the real distribution
-  rather than how well the detector finds first-party fraud. The committed fidelity scorecards
-  say how far that is: on PaySim, KS 0.86 on log-amount and 0.89 on the inter-transaction gap,
-  and a TSTR ratio of 0.03. A classifier told to sort real rows from injected M3 rows on either
-  feature table does it at AUC 1.00. Neither 0.025 nor 0.006 is evidence about detection.
-  **Ticket 11** is where the fold has to say this itself; **ticket 15** is where the generator
-  closes the distance.
-- **On each anchor's own labelled fraud — same haystack, same labels — the features do move the
-  number.** With the model, the seed and the committed boundary held fixed, the table went from
-  35 columns to 56: AMLSim PR-AUC 0.83 → 0.95, recall@1%FPR 0.93 → 0.97, precision@100 0.98 →
-  1.00; PaySim PR-AUC 0.14 → 0.13 with precision@100 0.38 → 0.47. That split is exactly what the
-  anchors are: AMLSim has real sender *and* beneficiary histories for the new directional and
-  graph features to read, and PaySim has almost none — 17 of the 56 columns never take a second
-  value there. AMLSim is itself a simulator with a deliberately distinctive fan-in / cycle
-  topology, so read its near-perfect column as "graph features find graph fraud", not as a
-  production number. See `docs/features.md` and the ticket 07 carry-out.
-- **It is not LightGBM.** libomp was missing, so both runs fell back to sklearn
-  HistGradientBoosting. The run artefact records which backend produced each number.
-- **`precision@100 = 0.00` on PaySim is the honest headline.** The calibrated bands apply
-  friction to 16% of holdout traffic, and the top 100 ranked rows still contain no M3 fraud at
-  all. Blanket friction is not detection, and the ranking is what ticket 08 has to fix.
+- **A 2.5x better detector moved PaySim's fold by nothing, and that is the finding.** Every
+  positive in the M3 holdout is an injected synthetic row and every negative is a real one, so
+  the number measures how far the injected family sits from the real distribution as much as it
+  measures detection. The committed fidelity scorecards say how far: on PaySim, KS 0.86 on
+  log-amount, 0.89 on the inter-transaction gap, TSTR ratio 0.03, and a classifier told to sort
+  real rows from injected M3 rows does it at AUC 1.00. A better detector cannot fix a fold that
+  is not measuring detection. **Ticket 11** is where the fold has to say this itself; **ticket
+  15** is where the generator closes the distance.
+- **These rows are the ensemble, not the reference above.** `defend.unsupervised.ensemble` is on
+  by default, so every system here is the supervised detector blended with an isolation forest at
+  weight 0.7. The model card in `metrics.json` names both halves.
 
 ### On the synthetic placeholder — pipeline check, not comparable
 
 ```
-A_baseline   PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63
-B_smote      PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63
-C_adaptive   PR-AUC 0.187   recall@1%FPR 0.000   precision@100 0.04
+A_baseline   PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63   friction 57%
+B_smote      PR-AUC 0.574   recall@1%FPR 0.255   precision@100 0.63   friction 62%
+C_adaptive   PR-AUC 0.183   recall@1%FPR 0.000   precision@100 0.17   friction 91%
 ```
 
 The adaptive system lands below both controls. That is the weak-side reading the design predicts
 when the loop searches a single vector against a detector that already generalises to the holdout,
 and widening the search is ticket 12's job.
+
+**Ignore the `evasion_rate` column for now.** It reads 0.00 for all three systems, which sounds
+like every attack was stopped; the friction column says what actually happened. Calibration places
+`decline_at` at the target FPR and then puts the three softer bands at fixed ratios beneath it,
+so almost everything picks up *some* friction and nothing is technically "allowed". Blanket
+friction on 91% of traffic is not detection. **Ticket 09** replaces those ratios with bands chosen
+by expected cost, and that is the column to re-read afterwards.
 
 M3 is no longer a proxy — it is genuine first-party fraud, where no device changes, no new operator
 appears and no new beneficiary is ever paid, so none of the signals a supervised model leans on

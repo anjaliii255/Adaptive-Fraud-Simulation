@@ -13,6 +13,11 @@ artifacts/**
 # number in a document that traces to nothing is a number nobody can check.
 !artifacts/features/
 !artifacts/features/**
+# the committed baseline is the reference every later ticket is measured against, and it carries
+# the params, the backend and the split digest that produced it. Same reason as the split: a
+# baseline that lives only in a README paragraph is a baseline that quietly drifts.
+!artifacts/detector/
+!artifacts/detector/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/

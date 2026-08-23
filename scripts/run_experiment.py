@@ -26,7 +26,8 @@ from afl.attack.templates import registry
 from afl.contract.schema import Transaction
 from afl.data import loaders
 from afl.data.splits import committed_split_for, out_of_time_split
-from afl.defend.decision import DecisionPolicy
+from afl.defend import baseline
+from afl.defend.decision import DecisionPolicy, assert_one_operating_point
 from afl.defend.features import FeatureBuilder
 from afl.defend.models.anomaly import AnomalyDetector, EnsembleDetector
 from afl.defend.models.lgbm import LGBMDetector
@@ -69,9 +70,30 @@ def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) ->
     )
 
 
+def detector_params(cfg: DictConfig) -> tuple[dict, str]:
+    """The supervised params for this run, and where they came from.
+
+    `config/defend/lgbm.yaml` holds the *inputs* — the starting point and the search envelope.
+    `artifacts/detector/<anchor>.json` holds the *decision*, the params `make baseline` landed
+    on for that anchor, committed next to the numbers they produced. Same division as the
+    committed split: a config that carried the tuned params would drift from the run that
+    justified them the first time either was edited alone.
+    """
+    base = OmegaConf.to_container(cfg.defend.supervised.params) or {}
+    if not bool(cfg.defend.supervised.get("use_committed_params", True)):
+        return base, "config (use_committed_params=false)"
+    tuned, source = baseline.tuned_params(str(cfg.data.name))
+    if not tuned:
+        log.info("no committed baseline for %s — using the configured params", cfg.data.name)
+        return base, source
+    log.info("using the committed tuned params for %s from %s", cfg.data.name, source)
+    return {**base, **tuned}, source
+
+
 def build_detector_factory(cfg: DictConfig):
     sup, uns = cfg.defend.supervised, cfg.defend.unsupervised
     dec = sup.decision
+    params, params_source = detector_params(cfg)
 
     def factory():
         policy = DecisionPolicy(
@@ -87,10 +109,11 @@ def build_detector_factory(cfg: DictConfig):
                 stateful=bool(sup.features.stateful),
                 windows_s=tuple(int(w) for w in sup.features.windows_s),
             ),
-            params=OmegaConf.to_container(sup.params),
+            params=params,
             seed=int(cfg.seed),
             replay_weight=float(sup.replay_weight),
             explain=bool(sup.explain),
+            params_source=params_source,
         )
         if bool(uns.ensemble.enabled):
             return EnsembleDetector(
@@ -149,11 +172,35 @@ def calibrate(detector, train: list[Transaction], target_fpr: float, embargo_day
     fit_rows, val_rows = out_of_time_split(train, train_frac=0.8, embargo_days=embargo_days)
     if len(val_rows) < 50 or not any(t.is_fraud for t in fit_rows):
         log.warning("not enough validation rows to calibrate — keeping configured bands")
+        detector.fit(train)
         return
     detector.fit(fit_rows)
     y, s = protocol.align(val_rows, protocol.score_transactions(detector, val_rows, "calibration"))
     detector.policy.calibrate_to_fpr(s, y, target_fpr=target_fpr)
     detector.fit(train)
+
+
+def build_fit(cfg: DictConfig):
+    """How every system in this run is trained — one function, applied to all of them.
+
+    The operating point is not only `fixed_fpr` and `k` in the metric; it is also where the
+    action bands sit, because `evasion_rate` in the same table is a function of them. Before
+    this was a hook, `experiment=baseline` calibrated and `make compare` did not, so System A
+    appeared in two tables at two operating points under one name.
+    """
+    target_fpr = float(cfg.eval.fixed_fpr)
+    embargo_days = float(cfg.eval.embargo_days)
+    configured = cfg.defend.supervised.decision.get("calibrate_to_fpr")
+    assert_one_operating_point(configured, target_fpr)
+    enabled = configured is not None
+
+    def fit(detector, rows: list[Transaction]) -> None:
+        if enabled:
+            calibrate(detector, rows, target_fpr, embargo_days)
+        else:
+            detector.fit(rows)
+
+    return fit
 
 
 def is_pipeline_check(cfg: DictConfig) -> bool:
@@ -223,6 +270,7 @@ def main(cfg: DictConfig) -> None:
         backend=str(cfg.attack.optimiser.backend),
     )
 
+    fit_detector = build_fit(cfg)
     if cfg.experiment.system == "adaptive" or cfg.experiment.compare:
         results = three_system.run_three_systems(
             pool=pool,
@@ -238,10 +286,16 @@ def main(cfg: DictConfig) -> None:
             tracker=tracker,
             real_vectors=tuple(cfg.data.get("known_fraud_vectors") or ()),
             split=split,
+            fixed_fpr=float(cfg.eval.fixed_fpr),
+            k=int(cfg.eval.k),
+            fit_detector=fit_detector,
         )
     else:
-        results = _single_system(cfg, pool, detector_factory, split)
+        results = _single_system(cfg, pool, detector_factory, split, fit_detector)
 
+    backends = sorted({r.backend for r in results if r.backend})
+    log.info("detector backend: %s", ", ".join(backends) or "unknown")
+    tracker.log_params({"detector_backend": ", ".join(backends)})
     for r in results:
         tracker.log(system=r.name, **r.metrics.model_dump(), **r.operational)
 
@@ -258,7 +312,14 @@ def main(cfg: DictConfig) -> None:
                 "n_real_rows": len(real),
                 "real_base_rate": loaders.base_rate(real),
                 "split": split.to_dict() if split else None,
-                "systems": [{**r.row(), **r.operational} for r in results],
+                "operating_point": {"fixed_fpr": float(cfg.eval.fixed_fpr), "k": int(cfg.eval.k)},
+                # which library produced these numbers, per system. On macOS the LightGBM wheel
+                # imports and then fails to load libomp, so "LightGBM" is a claim about the run
+                # that only the run can settle.
+                "backend": backends,
+                "systems": [
+                    {**r.row(), **r.operational, "model_card": r.model_card} for r in results
+                ],
             },
             indent=2,
         )
@@ -291,10 +352,8 @@ def main(cfg: DictConfig) -> None:
         print("\n" + banner(str(cfg.data.name)))
 
 
-def _single_system(cfg: DictConfig, pool, detector_factory, split=None):
+def _single_system(cfg: DictConfig, pool, detector_factory, split=None, fit_detector=None):
     """Systems A and B on their own, when `experiment.compare` is off."""
-    from afl.evaluation.three_system import SystemResult
-
     evaluator, train = loao.LeaveOneAttackOut.from_pool(
         pool,
         held_out_vector=str(cfg.eval.held_out_vector),
@@ -312,17 +371,8 @@ def _single_system(cfg: DictConfig, pool, detector_factory, split=None):
         )
 
     detector = detector_factory()
-    detector.fit(rows)
-    calibrate(detector, rows, float(cfg.eval.fixed_fpr), float(cfg.eval.embargo_days))
-    return [
-        SystemResult(
-            name=f"{cfg.experiment.system}",
-            metrics=evaluator.leave_one_attack_out(detector),
-            operational=evaluator.operational(detector),
-            n_train=len(rows),
-            n_train_fraud=sum(1 for t in rows if t.is_fraud),
-        )
-    ]
+    (fit_detector or build_fit(cfg))(detector, rows)
+    return [three_system.measure(str(cfg.experiment.system), detector, evaluator, rows)]
 
 
 def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path, split=None) -> None:
@@ -350,6 +400,8 @@ def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path, split
         ),
         seed=int(cfg.seed),
         meta={"run_name": str(cfg.run_name), "data": str(cfg.data.name)},
+        fixed_fpr=float(cfg.eval.fixed_fpr),
+        k=int(cfg.eval.k),
     )
     card.save(artifact_dir)
     print(f"\nfidelity verdict: {card.verdict} ({card.score})")

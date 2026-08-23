@@ -12,13 +12,14 @@ from afl.evaluation.protocol import (
     precision_at_k,
     recall_at_fixed_fpr,
 )
-from afl.evaluation.three_system import run_three_systems, smote_transactions
+from afl.evaluation.three_system import measure, run_three_systems, smote_transactions
 
 __all__ = [
     "LeaveOneAttackOut",
     "evaluate",
     "evaluate_detector",
     "make_splits",
+    "measure",
     "operational_rates",
     "pr_auc",
     "precision_at_k",
