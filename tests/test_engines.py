@@ -267,6 +267,79 @@ def test_card_testing_settles_on_the_card_rail():
     assert {t.rail for t in batch.fraud_transactions} == {Rail.CARD}
 
 
+# ── M3: first-party fraud, the holdout family ───────────────────────────────────
+# `user == fraudster`, so the tells every other family leaks must all be absent.
+M3_SEED = 7
+
+
+def m3_batch(seed: int = M3_SEED):
+    sim = Simulator(seed=seed, n_entities=300, n_background=1500, n_episodes=4)
+    return sim.generate(registry.get("M3").to_attack_params())
+
+
+def owners(batch):
+    return sorted({t.src for t in batch.fraud_transactions})
+
+
+def test_first_party_labels_only_the_abuse_not_the_history():
+    """Genuine history stays legit; only the abuse is fraud, as an investigator would call it."""
+    batch = m3_batch()
+    assert_valid_attack(batch.transactions, "M3")
+    for owner in owners(batch):
+        rows = sorted((t for t in batch.transactions if t.src == owner), key=lambda t: t.ts)
+        first_abuse = next(i for i, t in enumerate(rows) if t.is_fraud)
+        # a long genuine history has to precede the abuse, or it is not first-party
+        assert sum(not t.is_fraud for t in rows[:first_abuse]) >= 20
+        assert all(t.is_fraud for t in rows[first_abuse:] if t.attack_run_id)
+
+
+def test_first_party_never_changes_device_or_operator():
+    """No compromised device and no new operator — the two signals a takeover would leak."""
+    batch = m3_batch()
+    for owner in owners(batch):
+        abuse = [t for t in batch.fraud_transactions if t.src == owner]
+        prior = {t.device_id for t in batch.transactions if t.src == owner and not t.is_fraud}
+        assert {t.device_id for t in abuse} <= prior, "abuse introduced an unseen device"
+        assert {t.src for t in abuse} == {owner}, "abuse came from a second operator"
+
+
+def test_first_party_pays_nobody_new():
+    """A fresh beneficiary is a ring tell. The owner keeps paying the people they already pay."""
+    batch = m3_batch()
+    for owner in owners(batch):
+        abuse = {t.dst for t in batch.fraud_transactions if t.src == owner}
+        established = {t.dst for t in batch.transactions if t.src == owner and not t.is_fraud}
+        assert abuse <= established, f"{owner} paid {abuse - established} for the first time"
+
+
+def test_first_party_is_anomalous_only_against_its_own_baseline():
+    """Elevated against the account's own history, ordinary against the population."""
+    import numpy as np
+
+    batch = m3_batch()
+    population = np.median([t.amount for t in batch.transactions if not t.is_fraud])
+    for owner in owners(batch):
+        abuse = [t.amount for t in batch.fraud_transactions if t.src == owner]
+        baseline = [t.amount for t in batch.transactions if t.src == owner and not t.is_fraud]
+        assert np.mean(abuse) > np.mean(baseline), "no drift at all"
+        assert np.mean(abuse) < 20 * population, "a population-level outlier is not first-party"
+
+
+def test_first_party_is_not_caught_by_a_hand_rolled_rule():
+    """If a one-line amount rule catches it, the holdout measures the rule, not generalisation."""
+    import numpy as np
+
+    batch = m3_batch()
+    amounts = np.array([t.amount for t in batch.transactions])
+    is_fraud = np.array([t.is_fraud for t in batch.transactions])
+    threshold = np.quantile(amounts[~is_fraud], 0.99)  # a naive "big amount" rule at 1% FPR
+    assert float((amounts[is_fraud] > threshold).mean()) < 0.25
+
+
+def test_first_party_batches_are_realistic():
+    assert realism.check(m3_batch()).violations == []
+
+
 def test_same_seed_same_batch():
     params = registry.get("S1").to_attack_params()
     a = Simulator(seed=99, n_entities=100, n_background=150, n_episodes=2).generate(params)

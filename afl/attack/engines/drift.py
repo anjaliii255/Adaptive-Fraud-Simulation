@@ -34,6 +34,9 @@ def generate(
       amount_shift    multiplicative jump in typical amount after the event
       new_device      whether the post-event tail uses an unseen device
       dormancy_s      quiet gap between baseline and event (dormant mule wakes up)
+      beneficiary_reuse  share of post-event payments going back to a beneficiary the account
+                      already used. 1.0 = never a new counterparty, which is the first-party shape
+      pace_factor     how much faster the tail transacts at full escalation (0 = no speed-up)
       label_baseline  if True the pre-event rows are labelled fraud too (usually wrong —
                       keep False so the label matches what an investigator would call it)
     """
@@ -44,20 +47,25 @@ def generate(
     new_device = bool(params.get("new_device", True))
     dormancy_s = float(params.get("dormancy_s", 7 * 86_400.0))
     label_baseline = bool(params.get("label_baseline", False))
+    beneficiary_reuse = float(params.get("beneficiary_reuse", 0.0))
+    pace_factor = float(params.get("pace_factor", 4.0))
     rail = actor.rails[0] if actor.rails else Rail.CARD
 
     txns: list[Transaction] = []
+    known_dsts: list[str] = []  # the account's established counterparties
     ts = start_ts
     device = f"dev-{run_id[-4:]}-base"
 
     for i in range(n_baseline):
         ts += timedelta(seconds=float(max(1.0, rng.exponential(actor.interarrival_mean_s))))
+        dst = str(rng.choice(benign_dst_pool))
+        known_dsts.append(dst)
         txns.append(
             Transaction(
                 txn_id=f"{run_id}-d{i:05d}",
                 ts=ts,
                 src=src,
-                dst=str(rng.choice(benign_dst_pool)),
+                dst=dst,
                 amount=round(float(rng.lognormal(actor.amount_mu, actor.amount_sigma)), 2),
                 rail=rail,
                 device_id=device,
@@ -75,14 +83,17 @@ def generate(
         # ramp=0 → full shift immediately; ramp=1 → shift arrives linearly across the tail
         progress = 1.0 if ramp <= 0 else min(1.0, (j + 1) / max(1, n_post) / ramp)
         shift = 1.0 + (amount_shift - 1.0) * progress
-        pace = actor.interarrival_mean_s / (1.0 + 4.0 * progress)
+        pace = actor.interarrival_mean_s / (1.0 + pace_factor * progress)
         ts += timedelta(seconds=float(max(1.0, rng.exponential(pace))))
+        # cash-out to a fresh counterparty is a ring tell; reuse keeps the account looking itself
+        reuse = beneficiary_reuse > 0 and known_dsts and rng.random() < beneficiary_reuse
+        dst = str(rng.choice(known_dsts)) if reuse else str(rng.choice(cashout_pool))
         txns.append(
             Transaction(
                 txn_id=f"{run_id}-d{n_baseline + j:05d}",
                 ts=ts,
                 src=src,
-                dst=str(rng.choice(cashout_pool)),
+                dst=dst,
                 amount=round(float(rng.lognormal(actor.amount_mu, actor.amount_sigma)) * shift, 2),
                 rail=rail,
                 device_id=device,

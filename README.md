@@ -23,7 +23,7 @@ works, but out of the box it runs on a synthetic placeholder config so a fresh c
 nothing to download.
 
 The numbers you get from that default are a smoke test, not a result. Real numbers come once we
-anchor on a real dataset (PaySim / IEEE-CIS). Anything a synthetic run prints is labelled as a
+anchor on a real dataset (PaySim / AMLSim). Anything a synthetic run prints is labelled as a
 pipeline check.
 
 ## Setup
@@ -94,18 +94,20 @@ On the synthetic placeholder config, held out on M3, the adaptive system lands b
 baselines:
 
 ```
-baseline   PR-AUC 0.736   recall@1%FPR 0.546
-SMOTE      PR-AUC 0.748   recall@1%FPR 0.600
-adaptive   PR-AUC 0.239   recall@1%FPR 0.167
+baseline   PR-AUC 0.508   recall@1%FPR 0.233
+SMOTE      PR-AUC 0.499   recall@1%FPR 0.233
+adaptive   PR-AUC 0.312   recall@1%FPR 0.185
 ```
 
 Produced on the sklearn HistGradientBoosting fallback, not LightGBM, because libomp was missing on
 the machine that ran it. Install libomp before quoting any of it.
 
-These are lower than the pre-freeze numbers, and nothing regressed to cause that. Freezing the
-taxonomy changed which families get generated and changed what the holdout *is* — M3 went from
-gradual behavioural drift to first-party fraud, which is a harder family on purpose. The old figures
-are not comparable and were replaced rather than kept alongside.
+These are lower again than the post-freeze numbers, and nothing regressed to cause it. M3 stopped
+being a proxy: it is now genuine first-party fraud, where no device changes, no new operator appears
+and no new beneficiary is ever paid, so none of the signals a supervised model leans on fire at all.
+A harder holdout is the point of the holdout. Each regime supersedes the last rather than sitting
+beside it, and a fourth arrives the moment real data lands — see
+`docs/adr/0002-dataset-anchors.md`, because the real base rate is ~130x lower than this one.
 
 That's the untuned output. Nobody massaged it. It's the weak-side reading the design itself
 predicts when the loop searches a single vector against a detector that already generalises to the
@@ -133,7 +135,7 @@ Nine vectors, three engines. The ids match the architecture doc and are frozen; 
 | C3 | Instant-A2A pass-through | graph | mechanism | common | template |
 | M1 | Boundary probing / paced evasion | velocity | model-attack | mid | template |
 | M2 | Synthetic-identity lifecycle | drift | enabler | mid | planned |
-| M3 | First-party / friendly fraud | drift | mechanism | mid | template · **holdout** |
+| M3 | First-party / friendly fraud | drift | mechanism | mid | built · **holdout** |
 
 `level` is the taxonomy level and never gets flattened: mechanisms are the fraud, enablers are what
 make it possible, and M1 is an attack against our own model. `tier` is the role in the build: the
@@ -150,10 +152,11 @@ declares:
 - **planned** — cannot be generated. `Simulator.generate` raises and names the ticket, because a
   family that silently emits nothing looks exactly like a family the detector caught.
 
-So three of the nine are done and six still owe work, and the file says which and why. **M3 is
-the leave-one-attack-out holdout** because `user == fraudster` breaks the legit-vs-attacker assumption every supervised
-feature rests on — and it is `template` today, so the headline number is currently measured on a
-proxy for first-party fraud rather than the real thing.
+So four of the nine are done and five still owe work, and the file says which and why. **M3 is
+the leave-one-attack-out holdout** because `user == fraudster` breaks the legit-vs-attacker
+assumption every supervised feature rests on, and it is `built`: the abuse runs on the owner's own
+device, to beneficiaries the account already pays, elevated only against that account's own history.
+A one-line amount rule at 1% FPR catches 3% of it, which is the point.
 
 ## What we're not claiming
 
