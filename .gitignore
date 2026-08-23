@@ -29,3 +29,6 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+.agents/
+.claude/
+skills-lock.json

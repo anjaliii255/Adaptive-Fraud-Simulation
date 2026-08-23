@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adaptive Fraud Simulation Lab — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1015;
+    --panel:#121A21;
+    --panel-2:#0F161C;
+    --paper:#E7EBEE;
+    --mute:#8B98A4;
+    --faint:#5A6670;
+    --line:rgba(139,152,164,.16);
+    --line-strong:rgba(139,152,164,.32);
+    --attack:#FF5A47;   /* red team */
+    --defend:#4CC2FF;   /* blue team */
+    --gold:#E8B84B;     /* held-out / crown-jewel */
+    --grid:rgba(76,194,255,.06);
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:17px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:44px 44px;
+    background-position:center top;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--mute);
+  }
+  h1,h2,h3{font-family:"Archivo",sans-serif;font-weight:800;letter-spacing:-.02em;line-height:1.02;margin:0}
+  a{color:var(--defend);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* NAV */
+  nav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,16,21,.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .navrow{display:flex;align-items:center;justify-content:space-between;height:56px}
+  .brand{font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.14em;color:var(--paper)}
+  .brand b{color:var(--attack)}
+  .navlinks{display:flex;gap:22px;flex-wrap:wrap}
+  .navlinks a{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--mute);
+  }
+  .navlinks a:hover{color:var(--paper);text-decoration:none}
+  @media(max-width:820px){.navlinks{display:none}}
+
+  /* SECTION SHELL */
+  section{padding:96px 0;border-bottom:1px solid var(--line)}
+  .sec-head{display:flex;gap:20px;align-items:baseline;margin-bottom:14px}
+  .sec-num{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--attack);letter-spacing:.1em;white-space:nowrap}
+  .sec-title{font-size:clamp(30px,4.4vw,52px)}
+  .lead{color:var(--mute);font-size:clamp(17px,2vw,20px);max-width:70ch;margin-top:18px}
+
+  /* HERO */
+  .hero{padding:70px 0 86px;border-bottom:1px solid var(--line)}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  @media(max-width:940px){.hero-grid{grid-template-columns:1fr;gap:40px}}
+  .kicker{color:var(--attack);margin-bottom:26px}
+  .hero h1{font-size:clamp(44px,7vw,92px);font-weight:900}
+  .hero h1 .red{color:var(--attack)}
+  .hero h1 .blue{color:var(--defend)}
+  .hero p.sub{color:var(--mute);font-size:clamp(17px,2vw,20px);max-width:52ch;margin:26px 0 30px}
+  .tags{display:flex;flex-wrap:wrap;gap:10px}
+  .tag{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--mute);border:1px solid var(--line-strong);border-radius:2px;padding:7px 11px;
+  }
+
+  /* SCOPE trace */
+  .scope{
+    background:var(--panel-2);
+    border:1px solid var(--line-strong);
+    border-radius:4px;padding:18px 18px 14px;
+    position:relative;
+  }
+  .scope-cap{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .scope-cap span{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .legend{display:flex;gap:16px}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:1px;margin-right:6px;vertical-align:middle}
+  .legend .l-a{background:var(--attack)}
+  .legend .l-d{background:var(--defend)}
+  .legend span{color:var(--mute)}
+  .scope svg{display:block;width:100%;height:auto}
+  .draw{stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw 2.6s ease forwards}
+  .draw.d2{animation-delay:.5s}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion:reduce){.draw{animation:none;stroke-dashoffset:0}}
+
+  /* STATS strip */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-top:56px}
+  @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{padding:22px 20px;border-right:1px solid var(--line);background:var(--panel-2)}
+  .stat:last-child{border-right:none}
+  .stat .n{font-family:"Archivo";font-weight:800;font-size:26px;letter-spacing:-.02em}
+  .stat .n.a{color:var(--attack)} .stat .n.d{color:var(--defend)} .stat .n.g{color:var(--gold)}
+  .stat .k{color:var(--mute);font-size:13.5px;margin-top:6px;line-height:1.4}
+
+  /* LOOP schematic */
+  .loop{
+    border:1px solid var(--line-strong);border-radius:4px;background:var(--panel-2);
+    padding:30px;margin-top:38px;overflow-x:auto;
+  }
+  .loop svg{display:block;min-width:720px;width:100%;height:auto}
+
+  /* VECTOR groups */
+  .grp{margin-top:46px}
+  .grp-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:5px 10px;border-radius:2px}
+  .chip.strong{background:rgba(232,184,75,.14);color:var(--gold);border:1px solid rgba(232,184,75,.4)}
+  .chip.common{background:rgba(139,152,164,.12);color:var(--paper);border:1px solid var(--line-strong)}
+  .chip.mid{background:rgba(76,194,255,.12);color:var(--defend);border:1px solid rgba(76,194,255,.4)}
+  .grp-note{color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.04em}
+  .vgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+  @media(max-width:900px){.vgrid{grid-template-columns:1fr 1fr}}
+  @media(max-width:620px){.vgrid{grid-template-columns:1fr}}
+  .vcard{
+    border:1px solid var(--line);border-radius:4px;background:var(--panel);
+    padding:20px;position:relative;transition:border-color .2s,transform .2s;
+  }
+  .vcard:hover{border-color:var(--line-strong);transform:translateY(-2px)}
+  .vcard.s{border-top:2px solid var(--gold)}
+  .vcard.c{border-top:2px solid var(--faint)}
+  .vcard.m{border-top:2px solid var(--defend)}
+  .vtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+  .vid{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--faint);letter-spacing:.08em}
+  .veng{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border:1px solid var(--line);border-radius:2px;padding:3px 7px}
+  .vcard h3{font-size:19px;font-weight:700;margin-bottom:10px;line-height:1.14}
+  .vmech{color:var(--mute);font-size:14.5px;margin-bottom:14px}
+  .vwhy{font-size:14.5px;line-height:1.55;border-top:1px solid var(--line);padding-top:12px}
+  .vwhy b{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:5px}
+  .vcard.m .vwhy b{color:var(--defend)}
+  .vcard.c .vwhy b{color:var(--mute)}
+
+  /* generic panels grid */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:38px}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:26px}
+  .panel h3{font-size:20px;font-weight:700;margin-bottom:16px}
+  .rowline{display:flex;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .rowline:last-child{border-bottom:none;padding-bottom:0}
+  .rowline .lbl{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--attack);min-width:104px;flex-shrink:0;padding-top:2px}
+  .rowline .lbl.d{color:var(--defend)} .rowline .lbl.g{color:var(--gold)} .rowline .lbl.n{color:var(--mute)}
+  .rowline .txt{font-size:15px;color:var(--paper)}
+  .rowline .txt small{color:var(--mute);display:block;margin-top:3px;font-size:13.5px}
+
+  /* fidelity ladder */
+  .ladder{margin-top:38px;display:flex;flex-direction:column;gap:12px}
+  .rung{display:grid;grid-template-columns:120px 1fr;gap:20px;border:1px solid var(--line);border-left:3px solid var(--defend);border-radius:4px;background:var(--panel);padding:20px 24px}
+  .rung.top{border-left-color:var(--gold)}
+  .rung .lvl{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.06em;color:var(--mute)}
+  .rung .lvl b{display:block;font-family:"Archivo";font-weight:800;font-size:34px;color:var(--paper);letter-spacing:-.02em}
+  .rung.top .lvl b{color:var(--gold)}
+  .rung h3{font-size:18px;font-weight:700;margin-bottom:6px}
+  .rung p{color:var(--mute);font-size:14.5px;margin:0}
+  .rung .metrics{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--defend);margin-top:9px;letter-spacing:.02em}
+  .rung.top .metrics{color:var(--gold)}
+
+  /* defence stack */
+  .stack{margin-top:38px;display:flex;flex-direction:column}
+  .layer{display:grid;grid-template-columns:44px 200px 1fr 120px;gap:18px;align-items:center;padding:18px 20px;border:1px solid var(--line);border-top:none;background:var(--panel)}
+  .layer:first-child{border-top:1px solid var(--line);border-radius:4px 4px 0 0}
+  .layer:last-child{border-radius:0 0 4px 4px}
+  @media(max-width:820px){.layer{grid-template-columns:34px 1fr;gap:10px}.layer .ldesc,.layer .lrole{grid-column:1 / -1;margin-left:44px}}
+  .layer .lnum{font-family:"IBM Plex Mono",monospace;color:var(--faint);font-size:13px}
+  .layer h3{font-size:17px;font-weight:700}
+  .layer .ldesc{color:var(--mute);font-size:14px}
+  .layer .lrole{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;text-align:right}
+  .role-core{color:var(--paper)} .role-earn{color:var(--gold)} .role-exp{color:var(--defend)}
+  @media(max-width:820px){.layer .lrole{text-align:left}}
+
+  /* comparison table */
+  .cmp{margin-top:34px;width:100%;border-collapse:collapse;font-size:15px}
+  .cmp th,.cmp td{text-align:left;padding:15px 16px;border-bottom:1px solid var(--line)}
+  .cmp thead th{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  .cmp thead th.hot{color:var(--gold)}
+  .cmp tbody td:first-child{color:var(--paper)}
+  .cmp .hotcol{color:var(--gold);font-family:"IBM Plex Mono",monospace}
+  .cmp tr.win td{background:rgba(232,184,75,.06)}
+  .cmp .muted{color:var(--faint);font-family:"IBM Plex Mono",monospace}
+
+  /* tech grid */
+  .tech{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:38px}
+  @media(max-width:820px){.tech{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.tech{grid-template-columns:1fr}}
+  .tcard{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:18px 20px}
+  .tcard .th{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--attack);margin-bottom:10px}
+  .tcard ul{margin:0;padding:0;list-style:none}
+  .tcard li{font-size:14px;padding:5px 0;color:var(--paper);border-bottom:1px solid var(--line)}
+  .tcard li:last-child{border-bottom:none}
+  .tcard li small{color:var(--mute)}
+
+  /* checklist / guardrails */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:38px}
+  @media(max-width:820px){.two{grid-template-columns:1fr}}
+  .check li{list-style:none;padding:11px 0 11px 30px;position:relative;border-bottom:1px solid var(--line);font-size:15px}
+  .check ul{margin:0;padding:0}
+  .check li:before{content:"✓";position:absolute;left:0;color:var(--defend);font-family:"IBM Plex Mono";font-weight:600}
+  .guard li{list-style:none;padding:11px 0 11px 30px;position:relative;border-bottom:1px solid var(--line);font-size:15px;color:var(--paper)}
+  .guard ul{margin:0;padding:0}
+  .guard li:before{content:"!";position:absolute;left:0;color:var(--attack);font-family:"IBM Plex Mono";font-weight:700}
+  .guard li small{color:var(--mute)}
+
+  /* team */
+  .team{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:38px}
+  .team.two-up{grid-template-columns:1fr 1fr}
+  @media(max-width:820px){.team,.team.two-up{grid-template-columns:1fr}}
+  .member{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:22px}
+  .member .who{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--defend);margin-bottom:8px}
+  .member h3{font-size:18px;font-weight:700;margin-bottom:10px}
+  .member p{color:var(--mute);font-size:14px;margin:0 0 12px}
+  .member .owns{font-family:"IBM Plex Mono";font-size:12px;color:var(--attack);letter-spacing:.04em}
+
+  .cut{margin-top:26px;border:1px dashed var(--line-strong);border-radius:4px;padding:20px 24px;background:var(--panel-2)}
+  .cut .clab{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .cut p{margin:0;color:var(--mute);font-size:14.5px}
+
+  /* closing */
+  .close{padding:110px 0}
+  .close .eyebrow{color:var(--attack);margin-bottom:26px}
+  .close blockquote{margin:0;font-family:"Archivo";font-weight:700;font-size:clamp(24px,3.4vw,40px);line-height:1.25;letter-spacing:-.02em;max-width:24ch}
+  .close blockquote .blue{color:var(--defend)}
+  .close blockquote .gold{color:var(--gold)}
+  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--faint);font-family:"IBM Plex Mono";font-size:12px;letter-spacing:.08em;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+  :focus-visible{outline:2px solid var(--defend);outline-offset:3px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap navrow">
+    <div class="brand">ADAPTIVE FRAUD LAB · <b>RED</b>×BLUE · GFF 2026</div>
+    <div class="navlinks">
+      <a href="#loop">Loop</a>
+      <a href="#vectors">Vectors</a>
+      <a href="#attack">Attack</a>
+      <a href="#fidelity">Fidelity</a>
+      <a href="#defend">Defend</a>
+      <a href="#results">Results</a>
+      <a href="#stack">Stack</a>
+      <a href="#build">Build</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="kicker eyebrow">Mastercard Innovation Challenge · AI Defense Lab</div>
+      <h1>Make the <span class="red">attacker</span> and the <span class="blue">defender</span> co-adapt.</h1>
+      <p class="sub">One closed loop that generates adaptive payment attacks, learns where the detector is blind, and proves it caught an attack family it was never trained on — reproducibly.</p>
+      <div class="tags">
+        <span class="tag">9 vectors · 3 engines</span>
+        <span class="tag">Leave-one-attack-out</span>
+        <span class="tag">Card · UPI · A2A</span>
+        <span class="tag">One-command reproduce</span>
+      </div>
+    </div>
+
+    <div class="scope reveal">
+      <div class="scope-cap">
+        <span>Co-adaptation trace · evasion vs recall</span>
+        <div class="legend mono" style="font-size:11px">
+          <span><i class="l-a"></i>Attacker evasion</span>
+          <span><i class="l-d"></i>Defender recall</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 520 300" role="img" aria-label="Convergence curve: attacker evasion rate and defender recall co-adapting and stabilising over training rounds.">
+        <!-- grid -->
+        <g stroke="rgba(139,152,164,.14)" stroke-width="1">
+          <line x1="40" y1="40" x2="40" y2="260"/>
+          <line x1="40" y1="260" x2="500" y2="260"/>
+          <line x1="40" y1="205" x2="500" y2="205" stroke-dasharray="3 5"/>
+          <line x1="40" y1="150" x2="500" y2="150" stroke-dasharray="3 5"/>
+          <line x1="40" y1="95" x2="500" y2="95" stroke-dasharray="3 5"/>
+        </g>
+        <g fill="var(--faint)" font-family="IBM Plex Mono" font-size="10">
+          <text x="10" y="99">75</text>
+          <text x="10" y="209">25</text>
+          <text x="46" y="276">R0</text>
+          <text x="160" y="276">R1</text>
+          <text x="275" y="276">R2</text>
+          <text x="390" y="276">R3</text>
+          <text x="470" y="276">R4</text>
+        </g>
+        <!-- attacker evasion: spikes when it finds evasions, driven down after each retrain -->
+        <polyline class="draw" fill="none" stroke="var(--attack)" stroke-width="2.5"
+          stroke-linejoin="round" stroke-linecap="round"
+          points="50,150 108,96 165,150 223,110 280,158 338,128 395,168 452,150"/>
+        <!-- defender recall: recovers after each retrain, trends up -->
+        <polyline class="draw d2" fill="none" stroke="var(--defend)" stroke-width="2.5"
+          stroke-linejoin="round" stroke-linecap="round"
+          points="50,205 108,210 165,150 223,158 280,120 338,128 395,104 452,110"/>
+        <!-- retrain markers -->
+        <g fill="var(--defend)">
+          <circle cx="165" cy="150" r="3"/><circle cx="280" cy="120" r="3"/><circle cx="395" cy="104" r="3"/>
+        </g>
+      </svg>
+      <div style="font-family:'IBM Plex Mono';font-size:11px;color:var(--faint);letter-spacing:.04em;margin-top:8px">
+        ● retrain point — evasion logged → detector retrained → recall recovers
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats reveal">
+      <div class="stat"><div class="n g">3</div><div class="k">simulation engines power all nine vectors</div></div>
+      <div class="stat"><div class="n a">3</div><div class="k">strong vectors run the full adaptive loop</div></div>
+      <div class="stat"><div class="n d">1</div><div class="k">falsifiable hypothesis the whole system tests</div></div>
+      <div class="stat"><div class="n">5</div><div class="k">attack surfaces covered + first-party fraud</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- 00 THESIS / LOOP -->
+<section id="loop">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">00 / THESIS</div>
+      <h2 class="sec-title">Three pillars, one loop</h2>
+    </div>
+    <p class="lead">Identify, generate and defend are not three deliverables — they are one feedback loop. The attacks we generate become the defender's training set; the defender's blind spots become the attacker's next brief. The single claim the whole system exists to test:</p>
+    <p class="lead" style="color:var(--paper);border-left:3px solid var(--gold);padding-left:20px;margin-top:24px">
+      <em>Adaptive adversarial simulation improves detection recall on a <b style="color:var(--gold)">held-out attack family</b> versus real-only training and non-adaptive synthetic augmentation — and we can show exactly why.</em>
+    </p>
+
+    <div class="loop reveal">
+      <svg viewBox="0 0 760 240" role="img" aria-label="Closed loop schematic: anchor data to features to attack simulator to detector to evasion analyser to adaptive optimiser and back to the simulator, with a retrain path to the detector and a held-out evaluation output.">
+        <defs>
+          <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="#8B98A4"/>
+          </marker>
+          <marker id="arwR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="#FF5A47"/>
+          </marker>
+          <marker id="arwB" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="#4CC2FF"/>
+          </marker>
+        </defs>
+        <g font-family="IBM Plex Mono" font-size="11.5" fill="#E7EBEE" text-anchor="middle">
+          <!-- nodes -->
+          <g>
+            <rect x="20" y="30" width="120" height="46" rx="3" fill="#121A21" stroke="rgba(139,152,164,.32)"/>
+            <text x="80" y="50">Anchor data</text><text x="80" y="65" fill="#8B98A4" font-size="10">+ features</text>
+          </g>
+          <g>
+            <rect x="200" y="30" width="140" height="46" rx="3" fill="#121A21" stroke="#FF5A47"/>
+            <text x="270" y="50" fill="#FF5A47">Attack simulator</text><text x="270" y="65" fill="#8B98A4" font-size="10">3 engines · 9 vectors</text>
+          </g>
+          <g>
+            <rect x="400" y="30" width="140" height="46" rx="3" fill="#121A21" stroke="#4CC2FF"/>
+            <text x="470" y="50" fill="#4CC2FF">Detector</text><text x="470" y="65" fill="#8B98A4" font-size="10">LGBM · graph · anomaly</text>
+          </g>
+          <g>
+            <rect x="600" y="30" width="140" height="46" rx="3" fill="#121A21" stroke="rgba(139,152,164,.32)"/>
+            <text x="670" y="50">Evasion log</text><text x="670" y="65" fill="#8B98A4" font-size="10">which escaped · why</text>
+          </g>
+          <g>
+            <rect x="290" y="150" width="180" height="46" rx="3" fill="#121A21" stroke="#FF5A47"/>
+            <text x="380" y="170" fill="#FF5A47">Adaptive optimiser</text><text x="380" y="185" fill="#8B98A4" font-size="10">Bayesian / evolutionary</text>
+          </g>
+          <g>
+            <rect x="560" y="150" width="180" height="46" rx="3" fill="#121A21" stroke="#E8B84B"/>
+            <text x="650" y="170" fill="#E8B84B">Held-out eval</text><text x="650" y="185" fill="#8B98A4" font-size="10">leave-one-attack-out</text>
+          </g>
+        </g>
+        <!-- edges -->
+        <g fill="none" stroke="#8B98A4" stroke-width="1.5">
+          <line x1="140" y1="53" x2="196" y2="53" marker-end="url(#arw)"/>
+          <line x1="340" y1="53" x2="396" y2="53" marker-end="url(#arw)"/>
+          <line x1="540" y1="53" x2="596" y2="53" marker-end="url(#arw)"/>
+        </g>
+        <!-- evasion -> optimiser (red) -->
+        <path d="M670,76 L670,120 L470,120 L400,150" fill="none" stroke="#FF5A47" stroke-width="1.5" marker-end="url(#arwR)"/>
+        <!-- optimiser -> simulator (red, harder variants) -->
+        <path d="M290,173 L200,173 L200,80" fill="none" stroke="#FF5A47" stroke-width="1.5" marker-end="url(#arwR)"/>
+        <!-- optimiser -> detector retrain (blue) -->
+        <path d="M470,150 L470,120 L500,120 L500,78" fill="none" stroke="#4CC2FF" stroke-width="1.5" marker-end="url(#arwB)"/>
+        <!-- optimiser -> held-out (gold) -->
+        <path d="M470,173 L556,173" fill="none" stroke="#E8B84B" stroke-width="1.5" marker-end="url(#arwB)"/>
+      </svg>
+    </div>
+    <p class="lead" style="font-size:15px;color:var(--faint);margin-top:16px">
+      Red edges = the attacker adapting. Blue edge = the defender retraining on logged evasions. Gold = the honesty check: does it generalise to a family held out of training entirely.
+    </p>
+  </div>
+</section>
+
+<!-- 01 VECTORS -->
+<section id="vectors">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">01 / IDENTIFY</div>
+      <h2 class="sec-title">Nine vectors, and why each is here</h2>
+    </div>
+    <p class="lead">Breadth is a judged criterion, so we carry nine. But nine configurations collapse onto three engines — graph, velocity, drift — so the build cost stays near three. Only the strong three carry the adaptive machinery; the rest are templates or held-out tests.</p>
+
+    <!-- STRONG -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="chip strong">Strong · run the full loop</span>
+        <span class="grp-note">held-out evaluation lives here</span>
+      </div>
+      <div class="vgrid">
+        <div class="vcard s reveal">
+          <div class="vtop"><span class="vid">S1</span><span class="veng">Graph engine</span></div>
+          <h3>Mule network &amp; layering</h3>
+          <p class="vmech">Fan-out → consolidation, layering chains, rapid pass-through, distributed multi-device mule clusters.</p>
+          <div class="vwhy"><b>Why</b>The richest structure we have: network behaviour reveals fraud even when every single transaction looks legitimate. Perfect substrate for graph features and the adaptive loop — and directly relevant to India's mule-account crackdown.</div>
+        </div>
+        <div class="vcard s reveal">
+          <div class="vtop"><span class="vid">S2</span><span class="veng">Velocity engine</span></div>
+          <h3>Card testing / BIN enumeration</h3>
+          <p class="vmech">Automated validation of generated card numbers: high velocity → low-and-slow → randomised intervals → distributed across cards and merchants.</p>
+          <div class="vwhy"><b>Why</b>Adaptation is visually legible — a judge watches the attacker literally walk around a static threshold. Trivial to evaluate, and the cleanest live demonstration of the loop working.</div>
+        </div>
+        <div class="vcard s reveal">
+          <div class="vtop"><span class="vid">S3</span><span class="veng">Drift engine</span></div>
+          <h3>Account takeover via drift</h3>
+          <p class="vmech">Post-compromise behavioural change: new device, new beneficiary, changed velocity — sudden (easy) versus gradual drift (hard).</p>
+          <div class="vwhy"><b>Why</b>The sudden-vs-gradual axis is what makes a sequence model earn its seat instead of decorating the deck. Covers the account-compromise surface both expert reviews flagged as missing.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMMON -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="chip common">Common · must-catch load</span>
+        <span class="grp-note">templates in training + fixed benchmarks</span>
+      </div>
+      <div class="vgrid">
+        <div class="vcard c reveal">
+          <div class="vtop"><span class="vid">C1</span><span class="veng">Drift engine</span></div>
+          <h3>Bust-out</h3>
+          <p class="vmech">Long clean tenure, then a sudden utilisation spike across correlated accounts before cash-out.</p>
+          <div class="vwhy"><b>Why</b>A dominant real-loss category and a pure sequence problem. Shares the drift engine with ATO, so near-zero marginal build for a whole extra family.</div>
+        </div>
+        <div class="vcard c reveal">
+          <div class="vtop"><span class="vid">C2</span><span class="veng">Velocity + payee</span></div>
+          <h3>UPI collect-request / APP scam</h3>
+          <p class="vmech">Social-engineered push payment: first-time payee, atypical amount, rapid drain, elderly-account profile.</p>
+          <div class="vwhy"><b>Why</b>The dominant India account-to-account scam class. First-time-payee and rapid-drain features are cheap and high-signal, and it keeps the submission on-rail for a Mastercard / GFF audience.</div>
+        </div>
+        <div class="vcard c reveal">
+          <div class="vtop"><span class="vid">C3</span><span class="veng">Graph + velocity</span></div>
+          <h3>Instant-A2A pass-through</h3>
+          <p class="vmech">New payee plus immediate onward drain, cross-institution velocity on rails with no chargeback.</p>
+          <div class="vwhy"><b>Why</b>Exploits the exact irrevocability property that makes real-time payments hard to defend. Reuses graph and velocity primitives already built for S1 and S2.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MID -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="chip mid">Mid · emerging / novelty</span>
+        <span class="grp-note">held-out or free-by-construction</span>
+      </div>
+      <div class="vgrid">
+        <div class="vcard m reveal">
+          <div class="vtop"><span class="vid">M1</span><span class="veng">Is the mechanism</span></div>
+          <h3>Boundary probing / paced evasion</h3>
+          <p class="vmech">Activity deliberately clustered just under known limits; the attacker maps the model's approve/decline boundary and walks along the safe side.</p>
+          <div class="vwhy"><b>Why</b>It costs nothing — it <em>is</em> the adaptive optimiser's search strategy. It is also the cleanest "attack against your own model," which upgrades the taxonomy's rigor.</div>
+        </div>
+        <div class="vcard m reveal">
+          <div class="vtop"><span class="vid">M2</span><span class="veng">Drift → bust-out</span></div>
+          <h3>Synthetic-identity lifecycle</h3>
+          <p class="vmech">Identity fabrication → new-account onboarding → seasoning → payment/credit abuse.</p>
+          <div class="vwhy"><b>Why</b>Covers the onboarding surface and models fraud that begins <em>before</em> the first transaction. Built as a template that hands off into the bust-out engine rather than needing its own.</div>
+        </div>
+        <div class="vcard m reveal">
+          <div class="vtop"><span class="vid">M3</span><span class="veng">Anomaly / drift</span></div>
+          <h3>First-party / friendly fraud</h3>
+          <p class="vmech">Legitimate owner abusing the product: chargeback abuse, intentional default, refund abuse.</p>
+          <div class="vwhy"><b>Why</b>The single biggest omission a domain judge will probe. User == fraudster breaks the legit-vs-attacker assumption and is the perfect held-out stress test for the anomaly layer.</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="lead" style="font-size:15px;color:var(--faint);margin-top:34px">
+      Taxonomy hygiene: we present three <em>levels</em>, never flattened — fraud mechanisms (S1, S3, C1, C3), fraud enablers (C2, M2), and attacks against our own AI (M1). Surface coverage: identity/onboarding · account compromise · payment manipulation · network/behavioural · model-level, plus first-party.
+    </p>
+  </div>
+</section>
+
+<!-- 02 ATTACK -->
+<section id="attack">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">02 / GENERATE</div>
+      <h2 class="sec-title">The attack system</h2>
+    </div>
+    <p class="lead">Structure comes from actors and graphs; local realism comes from a generative model used sparingly; adaptivity comes from search, not reinforcement learning. The LLM proposes scenarios inside a schema — it never emits transactions.</p>
+
+    <div class="cols">
+      <div class="panel reveal">
+        <h3>Actors &amp; two-tier generation</h3>
+        <div class="rowline"><div class="lbl n">Actors</div><div class="txt">Normal user · fraudster · mule · merchant — each a parameter bundle, not an autonomous agent.<small>Params: amount dist, frequency, inter-arrival, counterparty diversity, account age, shared devices, fan-in/out, cash-out speed.</small></div></div>
+        <div class="rowline"><div class="lbl n">Tier 1</div><div class="txt">Deterministic / probabilistic templates for all nine vectors — cheap, reproducible, form the baseline training and fixed benchmarks.</div></div>
+        <div class="rowline"><div class="lbl">Tier 2</div><div class="txt">Adaptive optimiser wraps only S1–S3. This is the novel part.</div></div>
+      </div>
+
+      <div class="panel reveal">
+        <h3>Adaptive optimiser — not RL</h3>
+        <div class="rowline"><div class="lbl">Search</div><div class="txt">Bayesian optimisation (Optuna) or evolutionary search (GA / CMA-ES). Easier to build, debug and explain than RL, and better for a short sprint.</div></div>
+        <div class="rowline"><div class="lbl">Fitness</div><div class="txt mono" style="font-size:14px;color:var(--gold)">evasion_success − λ · realism_penalty</div></div>
+        <div class="rowline"><div class="lbl d">Realism</div><div class="txt">Schema validation, empirical distribution bounds, graph-validity rules. The attacker never gets unconstrained freedom — that is the answer to "how do you stop unrealistic attacks?"</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 FIDELITY -->
+<section id="fidelity">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">03 / PROVE IT</div>
+      <h2 class="sec-title">Fidelity, measured before the generator</h2>
+    </div>
+    <p class="lead">The biggest risk is synthetic data that looks right column-by-column and is useless for training. So realism is defined explicitly across three levels — and utility, not appearance, is the bar.</p>
+
+    <div class="ladder">
+      <div class="rung reveal">
+        <div class="lvl">Level<b>1</b>Statistical</div>
+        <div><h3>Local statistical fidelity</h3><p>Do feature distributions and dependencies survive?</p><div class="metrics">KS · Wasserstein · correlation-matrix delta · mutual-information delta</div></div>
+      </div>
+      <div class="rung reveal">
+        <div class="lvl">Level<b>2</b>Structural</div>
+        <div><h3>Behavioural &amp; structural fidelity</h3><p>Do velocity, inter-arrival, amount transitions and graph motifs — fan-in, fan-out, cycles, path length — reproduce? More important here than Level 1.</p><div class="metrics">motif frequency · velocity match · α-precision / β-recall</div></div>
+      </div>
+      <div class="rung top reveal">
+        <div class="lvl">Level<b>3</b>Utility</div>
+        <div><h3>Functional utility — the bar that counts</h3><p>Does training on it improve detection on a <em>held-out</em> attack family and on <em>future</em> time periods? A beautiful KS score that does not lift recall is a failure.</p><div class="metrics">TSTR gap · held-out recall @ fixed FPR · leave-one-attack-out lift</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 DEFEND -->
+<section id="defend">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">04 / DEFEND</div>
+      <h2 class="sec-title">A stack where every layer earns its seat</h2>
+    </div>
+    <p class="lead">Each attack family leaves a different trace: mule rings are a graph problem, bust-out is a sequence problem, card testing is a velocity problem, and a held-out family is, by definition, not a supervised problem at all.</p>
+
+    <div class="stack">
+      <div class="layer reveal">
+        <div class="lnum">01</div>
+        <div><h3>LightGBM baseline</h3></div>
+        <div class="ldesc">Over velocity windows, RFM features, time-since-last-event and graph-derived features. The hard baseline to beat on tabular fraud and the fastest thing to explain.</div>
+        <div class="lrole role-core">Workhorse</div>
+      </div>
+      <div class="layer reveal">
+        <div class="lnum">02</div>
+        <div><h3>Anomaly layer</h3></div>
+        <div class="ldesc">Isolation forest / autoencoder. The only thing with a chance on a leave-one-attack-out family with no labels — promote it to headline if supervised recall collapses.</div>
+        <div class="lrole role-core">Zero-day</div>
+      </div>
+      <div class="layer reveal">
+        <div class="lnum">03</div>
+        <div><h3>Sequence model</h3></div>
+        <div class="ldesc">GRU or small transformer over per-entity history, self-supervised on unlabelled history first. Only for the drift arc — ATO and bust-out. If it doesn't lift, that is a reported result.</div>
+        <div class="lrole role-earn">Earn it</div>
+      </div>
+      <div class="layer reveal">
+        <div class="lnum">04</div>
+        <div><h3>Temporal GNN</h3></div>
+        <div class="ldesc">Graph attention over the account-device-beneficiary graph. Baseline is graph-features + LightGBM; the GNN is kept only if it shows statistically meaningful lift.</div>
+        <div class="lrole role-exp">Experiment</div>
+      </div>
+      <div class="layer reveal">
+        <div class="lnum">05</div>
+        <div><h3>Decision &amp; explainability</h3></div>
+        <div class="ldesc">Graded action — step-up / hold / review / decline — not a binary block, cost-weighted since false declines dominate. SHAP reason codes from day one.</div>
+        <div class="lrole role-core">Governance</div>
+      </div>
+    </div>
+
+    <div class="panel reveal" style="margin-top:22px">
+      <h3>Evaluation protocol — the part that decides "research vs demo"</h3>
+      <div class="rowline"><div class="lbl d">Report</div><div class="txt">PR-AUC · recall @ fixed FPR · precision@k framed as an analyst alert budget.</div></div>
+      <div class="rowline"><div class="lbl">Never</div><div class="txt">Accuracy or ROC-AUC alone — at a 0.1–2% base rate both flatter a model that catches nothing.</div></div>
+      <div class="rowline"><div class="lbl">Split</div><div class="txt">Out-of-time, never random. Random splits leak the future and inflate every number.</div></div>
+      <div class="rowline"><div class="lbl g">Hero</div><div class="txt">Leave-one-attack-out. Train without a family, then measure recall on it. This is the number that proves generalisation.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 RESULTS -->
+<section id="results">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">05 / EVIDENCE</div>
+      <h2 class="sec-title">The slide that beats a bigger team</h2>
+    </div>
+    <p class="lead">Three systems, one evaluation. If our system only improves on attacks it generated itself, the evidence is weak. If it improves on the held-out column, the argument is hard to dismiss.</p>
+
+    <table class="cmp reveal">
+      <thead>
+        <tr>
+          <th>System</th>
+          <th>Known attacks</th>
+          <th class="hot">Unseen attacks — the column that matters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Real-only baseline</td><td class="muted">reference</td><td class="hotcol">low</td></tr>
+        <tr><td>SMOTE / standard synthetic</td><td class="muted">≈ baseline</td><td class="hotcol">marginal</td></tr>
+        <tr class="win"><td>Adaptive adversarial loop</td><td class="muted">≥ baseline</td><td class="hotcol">↑ must be highest here</td></tr>
+      </tbody>
+    </table>
+    <p class="lead" style="font-size:15px;color:var(--faint);margin-top:18px">
+      The hero artifact is the convergence curve from the header — evasion logged, detector retrained, recall recovering across rounds. The numbers need not be spectacular; a measurable adaptive loop <em>existing</em> is the win.
+    </p>
+  </div>
+</section>
+
+<!-- 06 STACK -->
+<section id="stack">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">06 / STACK</div>
+      <h2 class="sec-title">Tech, kept deliberately small</h2>
+    </div>
+    <div class="tech">
+      <div class="tcard reveal"><div class="th">Detection</div><ul>
+        <li>Python 3.11 · pandas / polars</li>
+        <li>LightGBM <small>— headline detector</small></li>
+        <li>scikit-learn · imbalanced-learn <small>(SMOTE baseline)</small></li>
+        <li>SHAP <small>— reason codes</small></li>
+      </ul></div>
+      <div class="tcard reveal"><div class="th">Simulation &amp; search</div><ul>
+        <li>numpy parameterised generation</li>
+        <li>networkx <small>— graph features</small></li>
+        <li>Optuna <small>(Bayesian)</small> or DEAP <small>(GA)</small></li>
+        <li>LLM <small>— constrained scenario proposer, optional</small></li>
+      </ul></div>
+      <div class="tcard reveal"><div class="th">Graph / sequence (if earned)</div><ul>
+        <li>PyTorch</li>
+        <li>PyTorch Geometric <small>— temporal GNN</small></li>
+        <li>GRU / small transformer</li>
+      </ul></div>
+      <div class="tcard reveal"><div class="th">Fidelity harness</div><ul>
+        <li>scipy <small>(KS / Wasserstein)</small></li>
+        <li>sdmetrics</li>
+        <li>SDV <small>— CTGAN/TabDDPM, one baseline generator</small></li>
+      </ul></div>
+      <div class="tcard reveal"><div class="th">Reproducibility</div><ul>
+        <li>Hydra / OmegaConf configs · fixed seeds</li>
+        <li>MLflow or W&amp;B tracking</li>
+        <li>DVC or hashed, versioned data</li>
+        <li>saved attack-param JSON + metrics</li>
+      </ul></div>
+      <div class="tcard reveal"><div class="th">Serving &amp; demo</div><ul>
+        <li>FastAPI backend</li>
+        <li>Streamlit frontend <small>— React only if safe</small></li>
+        <li>Docker Compose · one-command run</li>
+      </ul></div>
+    </div>
+
+    <div class="cut reveal">
+      <div class="clab">Reusing ScamShield — bolt-on, not spine</div>
+      <p>Two clean uses: reuse its FastAPI + Qdrant scaffold as the serving skeleton to save setup time, and reuse its LLM-explanation pattern to narrate "why flagged" for the APP vector (C2) on top of SHAP. Rule: the experiment must fully run and reproduce with ScamShield removed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 07 BUILD -->
+<section id="build">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">07 / BUILD</div>
+      <h2 class="sec-title">Reproducibility, honesty, ownership</h2>
+    </div>
+
+    <div class="two">
+      <div class="panel check reveal">
+        <h3>Reproducibility checklist — our real differentiator</h3>
+        <ul>
+          <li><code>docker compose up</code> or <code>python run_experiment.py --config</code> reproduces a headline number</li>
+          <li>Global seed set; deterministic where possible</li>
+          <li>Every attack run saves its parameter set and resulting metrics</li>
+          <li>Out-of-time split committed, never regenerated randomly</li>
+          <li>Convergence curve + three-system table regenerate from logs</li>
+          <li>Public repo · pinned deps · README with exact commands</li>
+          <li>Backup recording of the live demo</li>
+        </ul>
+      </div>
+      <div class="panel guard reveal">
+        <h3>Honesty guardrails — what moves us 7 → 9</h3>
+        <ul>
+          <li>C2ST is a diagnostic near chance under our protocol <small>— not proof of realism</small></li>
+          <li>DCR / MIA are evidence against memorisation <small>— not proof of privacy</small></li>
+          <li>Synthetic-only reduces exposure <small>— not automatic DPDP compliance</small></li>
+          <li>Latency budget depends on the decision point <small>— don't assert a fixed sub-50ms fact</small></li>
+          <li>AI-risk classification depends on deployment context <small>— don't claim a blanket carve-out</small></li>
+          <li>Projected losses labelled as projections <small>— never as realised figures</small></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="team two-up">
+      <div class="member reveal">
+        <div class="who">Person A · red side + product</div>
+        <h3>Attack engine &amp; integration</h3>
+        <p>Attack schema, actor params, the three engines, template vectors and the adaptive optimiser — plus all wiring: FastAPI/Streamlit, Docker, experiment tracking, the closed-loop handshake and the convergence demo.</p>
+        <div class="owns">ATTACK → EVADE → MUTATE → WIRE → REPRODUCE</div>
+      </div>
+      <div class="member reveal">
+        <div class="who">Person B · blue side + evaluation</div>
+        <h3>Detection &amp; methodology</h3>
+        <p>Feature engineering, LightGBM baseline, graph features, anomaly baseline, the sequence/GNN experiments, and — most important — leave-one-attack-out folds, the out-of-time split and the three-system comparison.</p>
+        <div class="owns">TRAIN → DETECT → MEASURE</div>
+      </div>
+    </div>
+    <div class="cut reveal">
+      <div class="clab">The shared seam — do this together, first</div>
+      <p>With two owners the loop only closes where they meet. Agree the schema + metrics contract on day one, then wire an end-to-end skeleton that <em>runs</em> with dummy numbers before either side goes deep. A hollow loop that runs beats two polished halves that never connect.</p>
+    </div>
+
+    <div class="cut reveal">
+      <div class="clab">Cut on purpose — stated as future extension</div>
+      <p>Multimodal / deepfake detection · LLM social-engineering generator · multiple tabular generators (keep one baseline) · mandatory GNN · full RL · agent-swarm simulation. Naming these as deliberate scope decisions reads as maturity, not gaps.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSING -->
+<section class="close" style="border-bottom:none">
+  <div class="wrap">
+    <div class="eyebrow">The story that wins</div>
+    <blockquote>
+      Not "we built an AI fraud platform." Instead: we tested whether a <span class="blue">closed attacker–defender loop</span> makes a detector more robust to attacks it has <span class="gold">never seen</span> — and here is the reproducible curve that shows both sides co-adapting.
+    </blockquote>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px;padding:0">
+    <span>ADAPTIVE FRAUD SIMULATION LAB</span>
+    <span>MASTERCARD INNOVATION CHALLENGE · GFF 2026</span>
+    <span>RED × BLUE · CLOSED LOOP</span>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var els = document.querySelectorAll('.reveal');
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target);} });
+    },{threshold:.12});
+    els.forEach(function(e){io.observe(e)});
+  })();
+</script>
+</body>
+</html>
