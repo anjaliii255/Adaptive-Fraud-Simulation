@@ -1,16 +1,85 @@
+# B's behavioural anchor: baseline detector, features, evaluation, three-system table.
+
 name: paysim
 loader: paysim
+kind: real                     # real rows carry NO provenance (vector_id=None); loader enforces
+is_pipeline_check: false       # a real anchor, so numbers from this config are reportable
 
-# null → data/raw/paysim.csv, or $AFL_DATA_DIR/paysim.csv
-path: null
-# PaySim is 6.3M rows; the loop does not need all of them to produce a stable number
-limit: 200000
+source:
+  url: https://www.kaggle.com/datasets/ealaxi/paysim1
+  file: PS_20174392719_1491204439457_log.csv
+  place_in: data/raw/          # verified: csv sits directly in data/raw/, no subdirectory
+  download: manual             # kaggle; not committed (data/** is gitignored)
+  license: "CC BY-SA 4.0"
 
-train_frac: 0.7
-embargo_days: 1.0
+# --- dataset column -> contract Transaction field ---
+schema_map:
+  txn_id: __row_index__        # PaySim has no txn id; loader synthesises a stable "paysim_{i}"
+  ts: step                     # integer hour, converted to datetime via `time.epoch`
+  src: nameOrig
+  dst: nameDest
+  amount: amount
+  rail: __const__:a2a          # mobile-money A2A; constant rail (contract Rail enum)
+  is_fraud: isFraud
 
-# Real labelled fraud is present, so System A needs no synthetic stand-in.
-known_fraud_vectors: []
+time:
+  column: step
+  unit: hours                  # verified: steps run 1..743, so 1 step = 1 hour over ~31 days
+  epoch: "2023-01-01T00:00:00" # fixed anchor so step -> timestamp is deterministic
 
-# A real anchor dataset: numbers from this config are reportable.
-is_pipeline_check: false
+fraud:
+  positive_label: 1
+  # verified: all 8213 fraud rows are TRANSFER (4097) or CASH_OUT (4116)
+  occurs_only_in: [TRANSFER, CASH_OUT]
+  note: >
+    Other types (CASH_IN, DEBIT, PAYMENT) are always legit. Keep them: they are the legitimate
+    background the detector learns "normal" against.
+
+# --- leak handling: the part that keeps the detector honest ---
+leakage:
+  drop_columns:
+    - isFlaggedFraud           # naive >200k rule proxy, not ground truth. Pure label leak.
+
+  identifier_columns:          # build graph/velocity features FROM these; never raw features
+    - nameOrig
+    - nameDest                 # 'C...' customer, 'M...' merchant (PAYMENT only)
+
+  balance_columns:
+    - oldbalanceOrg
+    - newbalanceOrig
+    - oldbalanceDest
+    - newbalanceDest
+  # Fraud empties the account, so amount == oldbalanceOrg and newbalanceOrig == 0 for most fraud.
+  # A generation artifact that does not transfer to real data: including it lets the model win on
+  # arithmetic instead of behaviour. Alternative `error_features` derives
+  # errorBalanceOrig = newbalanceOrig + amount - oldbalanceOrg and drops the raw four.
+  balance_policy: exclude      # exclude | error_features
+
+keep_types: all                # every txn type is background; do NOT filter to fraud types only
+
+# --- out-of-time split: computed once, committed, reused ---
+split:
+  strategy: out_of_time
+  time_column: step
+  train_end_step: 500          # steps 1..500   -> train (~67%)
+  embargo_steps: 24            # steps 501..524 -> dropped
+  test_start_step: 525         # steps 525..743 -> test (~30%)
+  random: false                # NEVER random
+  commit_to: artifacts/splits/paysim_oot.json
+  embargo_rationale: >
+    Velocity features look back up to 24h. A 24-step embargo stops a test row's features being
+    computed over train-side rows, and stops a fraud ring straddling the boundary.
+
+data_card:
+  rows: 6362620                # verified
+  fraud_base_rate: 0.0012908   # verified: 8213 / 6362620
+  time_span: "743 hourly steps (~31 days)"
+  quirks:
+    - "Fraud only in TRANSFER / CASH_OUT."
+    - "Balance columns are a generation artifact (leak); see balance_policy."
+    - "isFlaggedFraud is a naive rule, not ground truth."
+    - "No merchant / geo / device fields."
+  cannot_tell_us:
+    - "Nothing about card rails, UPI or agentic commerce; those enter only via injected vectors."
+    - "Base rate 0.13% is ~130x below the synthetic default's ~17%, so operating points set on
+       synthetic traffic do not carry over. See docs/adr/0002-dataset-anchors.md."

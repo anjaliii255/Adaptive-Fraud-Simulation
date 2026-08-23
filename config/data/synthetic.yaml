@@ -2,7 +2,7 @@
 #
 # PIPELINE CHECK - NOT A RESULT. Good enough to run the whole pipeline end to end on a fresh
 # clone; not good enough to report from. Any headline number must be produced on paysim or
-# ieee_cis. Runs against this config stamp that banner into the logs, the artefacts and the
+# amlsim. Runs against this config stamp that banner into the logs, the artefacts and the
 # figures, so a synthetic number cannot be mistaken for a result later.
 name: synthetic
 loader: null

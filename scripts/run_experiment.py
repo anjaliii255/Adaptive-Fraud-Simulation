@@ -154,7 +154,7 @@ def banner(data_name: str) -> str:
         f"{'=' * 78}\n"
         f"PIPELINE CHECK - NOT A RESULT\n"
         f"data={data_name}: no real anchor dataset, so these numbers verify that the pipeline\n"
-        f"runs, nothing more. Reportable numbers need data=paysim or data=ieee_cis.\n"
+        f"runs, nothing more. Reportable numbers need data=paysim or data=amlsim.\n"
         f"{'=' * 78}"
     )
 
