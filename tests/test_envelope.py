@@ -14,12 +14,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from afl.attack import actors
-from afl.attack.envelope import (
-    TRIVIAL_SEPARATION,
-    AnchorEnvelope,
-    audit,
-    weighted_pool,
-)
+from afl.attack.envelope import TRIVIAL_SEPARATION, AnchorEnvelope, audit
 from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
 from afl.contract.schema import Rail, Transaction
@@ -178,10 +173,13 @@ def test_an_anchored_simulator_pays_the_anchors_own_merchants():
     assert {t.dst for t in m3} <= {t.dst for t in real}, "paid a beneficiary the anchor never uses"
 
 
-def test_the_merchant_pool_carries_the_anchors_own_proportions():
+def test_the_payee_pool_carries_the_anchors_own_proportions():
     """BankSim sends 85% of payments to one merchant; drawing evenly gets the category mix wrong."""
-    weights = {"M0": 0.85, "M1": 0.10, "M2": 0.05}
-    pool = weighted_pool(weights, 400)
-    assert set(pool) == set(weights), "a real beneficiary dropped out of the pool entirely"
+    skewed = anchor_rows(n=2_000, senders=40)
+    skewed = [
+        t.model_copy(update={"dst": "M0" if i % 100 else f"M{i % 7}"}) for i, t in enumerate(skewed)
+    ]
+    pool = AnchorEnvelope.measure(skewed, "skewed").payee_pool
     share = pool.count("M0") / len(pool)
-    assert 0.75 < share < 0.95, f"dominant beneficiary got {share:.0%} of the pool"
+    assert 0.90 < share < 1.0, f"dominant beneficiary got {share:.0%} of the pool"
+    assert len(set(pool)) > 1, "the tail vanished entirely"

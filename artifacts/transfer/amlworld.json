@@ -1,0 +1,83 @@
+{
+  "anchor": "amlworld",
+  "holdout": "M3",
+  "seed": 1337,
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100
+  },
+  "split_digest": "f5e33a878d68b792",
+  "commensurability": {
+    "signals": {
+      "log_amount": 0.0002,
+      "hour_of_day": 0.0002,
+      "rail": 0.0002,
+      "sender_in_anchor": 0.0002,
+      "payee_in_anchor": 0.0002,
+      "payee_popularity": 0.0002,
+      "has_device": 0.0002
+    },
+    "worst": "log_amount",
+    "score": 0.0002,
+    "base_rate": 0.0002,
+    "trivially_separable": false
+  },
+  "results": {
+    "real": {
+      "real_GATHER-SCATTER": {
+        "pr_auc": 0.05052,
+        "recall_at_fixed_fpr": 0.393064,
+        "precision_at_k": 0.12,
+        "n_positives": 173
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.000914,
+        "recall_at_fixed_fpr": 0.0,
+        "precision_at_k": 0.0,
+        "n_positives": 300
+      }
+    },
+    "synthetic": {
+      "real_GATHER-SCATTER": {
+        "pr_auc": 0.000532,
+        "recall_at_fixed_fpr": 0.0,
+        "precision_at_k": 0.52,
+        "n_positives": 173
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.000923,
+        "recall_at_fixed_fpr": 0.0,
+        "precision_at_k": 0.0,
+        "n_positives": 300
+      }
+    },
+    "both": {
+      "real_GATHER-SCATTER": {
+        "pr_auc": 0.072522,
+        "recall_at_fixed_fpr": 0.473988,
+        "precision_at_k": 0.25,
+        "n_positives": 173
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.000923,
+        "recall_at_fixed_fpr": 0.0,
+        "precision_at_k": 0.0,
+        "n_positives": 300
+      }
+    },
+    "amount_floor": {
+      "real_GATHER-SCATTER": {
+        "pr_auc": 0.001329,
+        "recall_at_fixed_fpr": 0.011561,
+        "precision_at_k": 0.0,
+        "n_positives": 173
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.0012,
+        "recall_at_fixed_fpr": 0.0,
+        "precision_at_k": 0.0,
+        "n_positives": 300
+      }
+    }
+  }
+}

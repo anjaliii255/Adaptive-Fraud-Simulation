@@ -96,6 +96,12 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--data", default="amlsim", help="anchor to test transfer against")
     p.add_argument("--holdout", default="M3")
+    p.add_argument(
+        "--holdout-typology",
+        default=None,
+        help="hold out a REAL laundering typology (AMLworld only), e.g. CYCLE. The held-out "
+        "family is then an unseen real attack shape rather than a synthetic stand-in.",
+    )
     p.add_argument("--episodes", type=int, default=12)
     p.add_argument("--seed", type=int, default=1337)
     p.add_argument("--fixed-fpr", type=float, default=0.01)
@@ -165,6 +171,26 @@ def main() -> int:
     )
 
     params = dict(lgbm_cfg.get("params") or {})
+    real_label = "real_fraud"
+    if args.holdout_typology:
+        # a real unseen attack SHAPE, not a synthetic stand-in: train on every other laundering
+        # typology, then measure on the one held out entirely
+        typology = loaders.amlworld_typology_by_txn()
+        held = {k for k, v in typology.items() if v == args.holdout_typology}
+        if not held:
+            raise SystemExit(f"no rows carry typology {args.holdout_typology!r}")
+        real_train = [t for t in real_train if t.txn_id not in held]
+        real_legit_train = [t for t in real_legit_train if t.txn_id not in held]
+        # the fold is about this typology, so other laundering is not a positive here
+        real_test = [t for t in real_test if not t.is_fraud or t.txn_id in held]
+        real_label = f"real_{args.holdout_typology}"
+        log.info(
+            "held-out typology %s: %d rows removed from training, %d positives in the test window",
+            args.holdout_typology,
+            len(held),
+            sum(t.is_fraud for t in real_test),
+        )
+
     training_sets = {
         "real": real_train,
         "synthetic": real_legit_train + synth_train,
@@ -172,7 +198,7 @@ def main() -> int:
     }
     # the two questions, on the same models: real fraud in the test window, and our own holdout
     test_sets = {
-        "real_fraud": real_test,
+        real_label: real_test,
         f"synthetic_{args.holdout}": [t for t in real_test if not t.is_fraud] + holdout_rows,
     }
 

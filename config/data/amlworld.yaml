@@ -1,0 +1,76 @@
+# The fourth anchor, and the last one. PaySim has no repeated entities, AMLSim's fraud is
+# amount-trivial, BankSim's is category-shortcuttable. AMLworld is the one structure not yet
+# tried: repeated accounts, and fraud labelled by laundering TYPOLOGY — so a held-out fold can
+# be a real unseen laundering shape rather than a synthetic stand-in.
+
+name: amlworld
+loader: amlworld
+kind: real
+is_pipeline_check: false
+
+source:
+  url: https://www.kaggle.com/datasets/ealaxi/ibm-transactions-for-anti-money-laundering-aml
+  paper: "Altman et al., Realistic Synthetic Financial Transactions for AML Models (IBM)"
+  file: HI-Small_Trans.csv
+  patterns_file: HI-Small_Patterns.txt   # the typology labels; joins on the verbatim row
+  accounts_file: HI-Small_accounts.csv
+  place_in: data/raw/IBM AML Graphs/     # verified: the directory the dump lands in
+  download: manual
+  license: "CC BY-NC-SA 4.0"
+
+# --- verified against the header row ---
+# The file has TWO columns literally named `Account`; pandas renames the second `Account.1`,
+# which is the receiver. Account numbers do not span banks, so no composite key is needed.
+schema_map:
+  txn_id: __row_index__
+  ts: Timestamp                    # verified: real timestamps, 2022/09/01 → 2022/09/18
+  src: Account
+  dst: Account.1
+  amount: Amount Paid
+  rail: __const__:a2a              # interbank transfer; Payment Format is not a contract rail
+  is_fraud: Is Laundering
+
+# Amounts are quoted in the payment currency, so a mixed frame is not one scale. Keeping a single
+# currency is what makes every amount comparison after this point mean anything.
+currency: US Dollar                # 37% of rows, the largest share
+drop_self_transfers: true          # 11.6% of rows, 0.21% of laundering: self-loops, not payments
+
+extra_features_available: [Payment Format, Receiving Currency, Amount Received, From Bank, To Bank]
+
+fraud:
+  positive_label: 1
+  # 370 labelled laundering attempts over 8 typologies, 3209 rows, all joining verbatim
+  typology_source: HI-Small_Patterns.txt
+  typologies_present: [GATHER-SCATTER, SCATTER-GATHER, STACK, FAN-OUT, FAN-IN, CYCLE, BIPARTITE, RANDOM]
+
+# --- the real held-out family: an unseen laundering shape, not a synthetic one ---
+holdout_typology: CYCLE            # 287 rows over 54 attempts; the rest are trainable
+
+leakage:
+  identifier_columns: [Account, Account.1]
+  drop_columns: []
+
+split:
+  strategy: out_of_time
+  time_column: Timestamp
+  train_frac: 0.7
+  embargo_steps: 1                 # steps are days here; one day covers the widest lookback
+  random: false
+  commit_to: artifacts/splits/amlworld_oot.json
+  embargo_rationale: >
+    Velocity features look back up to seven days and the span is only eighteen, so the embargo is
+    kept to one day: enough to stop a test row's window being computed over training rows without
+    spending a week of an eighteen-day file on the gap.
+
+data_card:
+  rows: 5078345                    # verified, before the currency and self-transfer filters
+  laundering: 5177                 # 0.1019%
+  time_span: "2022-09-01 to 2022-09-18 (18 days, real timestamps)"
+  quirks:
+    - "Two columns named `Account`; the receiver is the second one."
+    - "Amounts are multi-currency; the loader keeps US Dollar so amount is one scale."
+    - "11.6% of rows are an account paying itself, almost all Reinvestment."
+    - "Only 3209 of 5177 laundering rows carry a typology; the rest are unlabelled laundering."
+  cannot_tell_us:
+    - "Nothing about card or UPI behaviour; it is interbank transfer traffic."
+    - "It is still generated data, not observed traffic — a better generator, not real fraud."

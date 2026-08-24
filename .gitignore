@@ -51,3 +51,6 @@ htmlcov/
 .agents/
 .claude/
 skills-lock.json
+
+# spike run logs; the artefact under artifacts/ is the record, not the console output
+*.log

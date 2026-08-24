@@ -14,16 +14,13 @@ from afl.attack import actors as actor_lib
 from afl.attack.engines import drift as drift_engine
 from afl.attack.engines import graph as graph_engine
 from afl.attack.engines import velocity as velocity_engine
-from afl.attack.envelope import AnchorEnvelope, weighted_pool
+from afl.attack.envelope import AnchorEnvelope
 from afl.attack.templates import registry
 from afl.contract.schema import AttackBatch, AttackParams, Entity, EntityRole, Transaction
 from afl.utils.seed import child_seed
 from afl.utils.seed import rng as make_rng
 
 DEFAULT_START = datetime(2024, 1, 1)
-
-#: Slots in the anchored merchant sampling pool. Large enough to carry a skewed category mix.
-MERCHANT_POOL_SIZE = 400
 
 
 class Simulator:
@@ -50,9 +47,8 @@ class Simulator:
         self.window_days = envelope.window_days if envelope else window_days
         self._round = 0
         self.entities = self._build_population(make_rng(child_seed(seed, "population")))
-        self._merchant_pool: list[str] = (
-            weighted_pool(envelope.payee_weights, MERCHANT_POOL_SIZE) if envelope else []
-        )
+        self._merchant_pool: list[str] = list(envelope.payee_pool) if envelope else []
+        self._relay_pool: list[str] = list(envelope.relays) if envelope else []
 
     # ── population ──────────────────────────────────────────────────────────────
     def _build_population(self, r) -> list[Entity]:
@@ -65,18 +61,22 @@ class Simulator:
         # from their own pool: the two sides are different namespaces, and paying a customer
         # instead of a merchant is a row no real payment looks like.
         payees = list(self.envelope.active_payees) if self.envelope else []
+        relays = sorted(set(self.envelope.relays)) if self.envelope else []
         senders = list(self.envelope.active_senders) if self.envelope else []
         taken = 0
         for i in range(self.n_entities):
             if i < n_merchant:
                 role, pool, index = EntityRole.MERCHANT, payees, i
+            elif i < n_merchant + n_mule:
+                # a mule receives money and forwards it, so it has to be an account the anchor
+                # is also seen paying — drawing one from sender-space alone pays a stranger
+                role, pool, index = EntityRole.MULE, relays, i - n_merchant
             else:
-                if i < n_merchant + n_mule:
-                    role = EntityRole.MULE
-                elif i < n_merchant + n_mule + n_fraudster:
-                    role = EntityRole.FRAUDSTER
-                else:
-                    role = EntityRole.NORMAL
+                role = (
+                    EntityRole.FRAUDSTER
+                    if i < n_merchant + n_mule + n_fraudster
+                    else EntityRole.NORMAL
+                )
                 pool, index = senders, taken
                 taken += 1
             ents.append(
@@ -94,6 +94,8 @@ class Simulator:
         # beneficiary id carries matches the traffic the attack is hiding in
         if role is EntityRole.MERCHANT and self._merchant_pool:
             return self._merchant_pool
+        if role is EntityRole.MULE and self._relay_pool:
+            return self._relay_pool
         return [e.entity_id for e in self.entities if e.role == role]
 
     # ── background ──────────────────────────────────────────────────────────────

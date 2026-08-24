@@ -252,6 +252,120 @@ def load_paysim(
     )
 
 
+# ── AMLworld (IBM HI-Small) ─────────────────────────────────────────────────────
+AMLWORLD_COLUMNS = [
+    "Timestamp",
+    "Account",
+    "Account.1",
+    "Amount Paid",
+    "Payment Currency",
+    "Payment Format",
+    "Is Laundering",
+]
+
+#: The laundering typologies AMLworld labels, recovered from the patterns file.
+AMLWORLD_TYPOLOGIES = (
+    "FAN-IN",
+    "FAN-OUT",
+    "GATHER-SCATTER",
+    "SCATTER-GATHER",
+    "CYCLE",
+    "BIPARTITE",
+    "STACK",
+    "RANDOM",
+)
+
+
+def amlworld_typologies(patterns_path: str | Path) -> dict[str, str]:
+    """Raw transaction line → laundering typology, parsed from the patterns file.
+
+    The typology is the reason to use this dataset: it is a *real* attack family label, so a
+    held-out fold can be an unseen laundering shape rather than a synthetic stand-in. The
+    patterns file repeats whole transaction lines verbatim between BEGIN/END markers, and all
+    3,209 of them match a row in the transactions file exactly, so the line itself is the join.
+    """
+    typology, rows = None, {}
+    for raw in Path(patterns_path).read_text().splitlines():
+        line = raw.strip()
+        if line.startswith("BEGIN LAUNDERING ATTEMPT"):
+            typology = line.split(" - ", 1)[1].split(":")[0].strip()
+        elif line.startswith("END LAUNDERING ATTEMPT"):
+            typology = None
+        elif typology and line:
+            rows[line] = typology
+    return rows
+
+
+def amlworld_typology_by_txn(
+    path: str | Path | None = None, patterns_path: str | Path | None = None
+) -> dict[str, str]:
+    """txn_id → laundering typology, so a fold can hold out a real unseen laundering shape.
+
+    `load_amlworld` names rows by their position in the file, which is what lets the patterns
+    file join back after the frame has been filtered.
+    """
+    path = Path(path or DATA_DIR / "IBM AML Graphs" / "HI-Small_Trans.csv")
+    patterns_path = Path(patterns_path or path.parent / "HI-Small_Patterns.txt")
+    by_line = amlworld_typologies(patterns_path)
+    out: dict[str, str] = {}
+    with open(path) as handle:
+        next(handle)
+        for i, line in enumerate(handle):
+            typology = by_line.get(line.strip())
+            if typology:
+                out[f"amlworld-{i}"] = typology
+    return out
+
+
+def load_amlworld(
+    path: str | Path | None = None,
+    *,
+    limit: int | None = None,
+    sample_fraction: float = 1.0,
+    sample_by: str = "Account",
+    source: Mapping | None = None,
+    currency: str = "US Dollar",
+    drop_self_transfers: bool = True,
+) -> list[Transaction]:
+    """AMLworld HI-Small: bank-to-bank transfers with laundering typologies.
+
+    Unlike the other three anchors this one ships real timestamps, so there is no step index to
+    anchor on an epoch.
+
+    Two filters, both about making `amount` mean one thing:
+
+    `currency` keeps a single currency. Amounts are quoted in the payment currency, so a mixed
+    frame puts 5.7M US Dollars beside 2,848 Euros on one axis and every amount comparison after
+    that is meaningless. US Dollar is the largest share at 37%.
+
+    `drop_self_transfers` removes rows where an account pays itself — 11.6% of the file, almost
+    all Reinvestment, and only 0.21% of the laundering rows. They are self-loops rather than
+    payments between entities, and they would dominate the graph features with edges to nowhere.
+    """
+    path = Path(path or DATA_DIR / "IBM AML Graphs" / "HI-Small_Trans.csv")
+    _require(path, "amlworld", source)
+
+    df = pd.read_csv(path, usecols=AMLWORLD_COLUMNS)
+    if currency:
+        df = df[df["Payment Currency"] == currency]
+    if drop_self_transfers:
+        df = df[df["Account"] != df["Account.1"]]
+    df = sample_by_entity(df, sample_by, sample_fraction)
+    if limit:
+        df = df.head(limit)
+
+    return _to_transactions(
+        dataset="amlworld",
+        txn_ids=[f"amlworld-{i}" for i in df.index.to_numpy()],
+        timestamps=pd.to_datetime(df["Timestamp"], format="%Y/%m/%d %H:%M").to_numpy(),
+        src=df["Account"].tolist(),
+        dst=df["Account.1"].tolist(),
+        amounts=_amounts(df["Amount Paid"], "amlworld"),
+        rail=Rail.A2A,  # interbank transfers; the payment format is not a contract rail
+        is_fraud=df["Is Laundering"].to_numpy().astype(bool),
+    )
+
+
 # ── BankSim ─────────────────────────────────────────────────────────────────────
 BANKSIM_COLUMNS = ["step", "customer", "merchant", "category", "amount", "fraud"]
 
@@ -362,7 +476,12 @@ def amlsim_typologies(directory: str | Path | None = None) -> dict[str, str]:
 
 
 # ── the config-driven entry point ───────────────────────────────────────────────
-LOADERS = {"paysim": load_paysim, "amlsim": load_amlsim, "banksim": load_banksim}
+LOADERS = {
+    "paysim": load_paysim,
+    "amlsim": load_amlsim,
+    "banksim": load_banksim,
+    "amlworld": load_amlworld,
+}
 
 #: Config keys `load_from_config` forwards to a loader. Anything else in a data config is for
 #: the split, the data card or the feature side, and is deliberately not the loader's business.

@@ -1,0 +1,29 @@
+{
+  "anchor": "amlworld",
+  "holdout": "M3",
+  "split_digest": "f5e33a878d68b792",
+  "envelope": {
+    "sender_reuse_rate": 0.929735,
+    "supports_behavioural_vectors": true,
+    "time_granularity_s": 1,
+    "carries_devices": false,
+    "rail_mix": {
+      "a2a": 1.0
+    },
+    "n_active_senders": 500,
+    "n_active_payees": 3874
+  },
+  "signals": {
+    "log_amount": 0.0002,
+    "hour_of_day": 0.0002,
+    "rail": 0.0002,
+    "sender_in_anchor": 0.0002,
+    "payee_in_anchor": 0.0002,
+    "payee_popularity": 0.0002,
+    "has_device": 0.0002
+  },
+  "worst": "log_amount",
+  "score": 0.0002,
+  "base_rate": 0.0002,
+  "trivially_separable": false
+}

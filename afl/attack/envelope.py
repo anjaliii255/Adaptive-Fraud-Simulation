@@ -47,8 +47,12 @@ class AnchorEnvelope:
     device_coverage: float
     time_granularity_s: int
     active_senders: list[str]
-    active_payees: list[str]
-    payee_weights: dict[str, float]
+    #: A frequency-proportional sample of beneficiaries, so a uniform draw over it reproduces the
+    #: anchor's own payee distribution — hubs often, the long tail rarely.
+    payee_pool: list[str]
+    #: Accounts the anchor shows both sending and receiving. A mule receives money and forwards
+    #: it, so drawing one from sender-space alone pays an account the anchor never pays.
+    relay_pool: list[str]
     version: int = ENVELOPE_VERSION
 
     @property
@@ -73,6 +77,20 @@ class AnchorEnvelope:
         families cannot be posed as a detection problem on an anchor like that.
         """
         return self.sender_reuse_rate > 0.5
+
+    @property
+    def relays(self) -> list[str]:
+        """Where a mule can plausibly sit. Falls back to payees when no account does both.
+
+        BankSim has none: every payment runs customer to merchant and nothing sends after
+        receiving, so a forwarding account is not a thing that anchor contains.
+        """
+        return self.relay_pool or self.payee_pool
+
+    @property
+    def active_payees(self) -> list[str]:
+        """The distinct beneficiaries in the pool, for building the entity population."""
+        return sorted(set(self.payee_pool))
 
     @property
     def rails(self) -> tuple[Rail, ...]:
@@ -123,6 +141,7 @@ class AnchorEnvelope:
     def measure(cls, txns: list[Transaction], dataset: str) -> AnchorEnvelope:
         """Fit to real rows. Legit only: fraud is the thing being imitated, not the baseline."""
         legit = [t for t in txns if not t.is_fraud] or list(txns)
+        senders = {t.src for t in legit}  # hoisted: rebuilding this per row is quadratic
         amounts = np.array([t.amount for t in legit], dtype=float)
         amounts = amounts[amounts > 0]
         logs = np.log(amounts)
@@ -144,13 +163,16 @@ class AnchorEnvelope:
             device_coverage=sum(t.device_id is not None for t in legit) / max(len(legit), 1),
             time_granularity_s=_granularity([t.ts for t in legit]),
             active_senders=_busiest(legit, lambda t: t.src),
-            active_payees=_busiest(legit, lambda t: t.dst),
-            payee_weights=_shares([t.dst for t in legit]),
+            payee_pool=_proportional_sample([t.dst for t in legit]),
+            relay_pool=_proportional_sample([t.dst for t in legit if t.dst in senders]),
         )
 
 
 #: Accounts carried into the simulated population so attacks happen on real, seasoned accounts.
 MAX_ACTIVE_ENTITIES = 500
+
+#: Rows sampled to form the beneficiary pool. Large enough to carry both hubs and tail.
+PAYEE_POOL_SIZE = 4_000
 
 
 def _busiest(txns: list[Transaction], side, limit: int = MAX_ACTIVE_ENTITIES) -> list[str]:
@@ -169,21 +191,20 @@ def _busiest(txns: list[Transaction], side, limit: int = MAX_ACTIVE_ENTITIES) ->
     return [entity for entity, n in ranked[:limit] if n > 1]
 
 
-def weighted_pool(weights: dict[str, float], size: int) -> list[str]:
-    """A sampling list whose composition matches `weights`, for engines that pick uniformly.
+def _proportional_sample(values: list[str], size: int = PAYEE_POOL_SIZE) -> list[str]:
+    """Sample the values themselves, keeping their natural repetition.
 
-    BankSim sends 85% of its payments to one merchant. Drawing evenly over the merchant list
-    gives a category mix the anchor never produces, so the shape is carried in the pool itself
-    rather than by changing how every engine samples. Each payee keeps at least one slot, so no
-    real beneficiary disappears entirely.
+    Counting distinct entities and weighting them cannot represent a long tail: BankSim sends
+    85% of its payments to one of 50 merchants, AMLworld spreads over 118,000 beneficiaries with
+    a few hubs. Capping to the busiest and weighting those over-represents the hubs; keeping one
+    slot each flattens the skew. Sampling rows gets both right for free, because a row is already
+    drawn from the distribution we are trying to copy.
     """
-    if not weights:
+    if not values:
         return []
-    ranked = sorted(weights.items(), key=lambda kv: (-kv[1], kv[0]))
-    pool = [name for name, _ in ranked]  # one each, so the long tail survives
-    for name, share in ranked:
-        pool.extend([name] * int(share * max(size - len(ranked), 0)))
-    return pool
+    rng = np.random.default_rng(0)  # fixed: the pool is part of the envelope, not of a run
+    picks = rng.choice(len(values), size=min(size, len(values)), replace=False)
+    return [values[int(i)] for i in picks]
 
 
 def _granularity(stamps: list[datetime]) -> int:

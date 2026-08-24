@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "dataset": "amlworld",
+  "digest": "f5e33a878d68b792",
+  "train_end": "2022-09-07T22:43:00",
+  "test_start": "2022-09-08T22:43:00",
+  "embargo_seconds": 86400,
+  "embargo_rationale": "Velocity features look back up to seven days and the span is only eighteen, so the embargo is kept to one day: enough to stop a test row's window being computed over training rows without spending a week of an eighteen-day file on the gap.",
+  "train_frac": 0.7,
+  "time_unit": "iso",
+  "epoch": null,
+  "train_end_step": null,
+  "test_start_step": null,
+  "stats": {
+    "full": {
+      "rows": 1670437,
+      "fraud": 1912,
+      "base_rate": 0.00114461
+    },
+    "span": {
+      "start": "2022-09-01 00:00:00",
+      "end": "2022-09-18 16:18:00"
+    },
+    "partition": {
+      "train": {
+        "rows": 1169395,
+        "row_share": 0.7001,
+        "fraud": 1108,
+        "base_rate": 0.0009475
+      },
+      "test": {
+        "rows": 325350,
+        "row_share": 0.1948,
+        "fraud": 623,
+        "base_rate": 0.00191486
+      }
+    },
+    "filters": {
+      "currency": "US Dollar",
+      "drop_self_transfers": true
+    },
+    "synthetic_base_rate": 0.040313,
+    "synthetic_base_rate_data_config": 0.014097,
+    "base_rate_ratio_vs_synthetic": 0.028393
+  }
+}
