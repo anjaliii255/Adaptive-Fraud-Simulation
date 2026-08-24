@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import sys
 from pathlib import Path
 
@@ -20,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+from afl.attack.envelope import AnchorEnvelope
+from afl.attack.envelope import audit as envelope_audit
 from afl.attack.optimiser import AttackOptimiser
 from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
@@ -49,16 +52,28 @@ def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) ->
     fraud row lands a year after every real row, so the out-of-time split degenerates into
     "real = train, synthetic = test" and the held-out family is separable by timestamp alone.
     An attack has to happen inside the traffic it is hiding in.
+
+    The same argument applies to size. PaySim's median payment is ~67,000 and the actor bundles
+    were authored around ~25, so uncalibrated attacks land three orders of magnitude below every
+    real row: 99.7% of them below the anchor's 1st percentile. Sorting on amount alone then scores
+    PR-AUC 0.80 against that holdout, beating every trained model in the run. So the anchor's
+    measured envelope sets both the window and the amount scale.
     """
     from datetime import datetime
 
     e = cfg.attack.engines
+    envelope = None
     start = datetime.fromisoformat(str(e.start_ts))
     window = int(e.window_days)
     if anchor:
-        start = min(t.ts for t in anchor)
-        window = max(1, int((max(t.ts for t in anchor) - start).total_seconds() // 86_400))
-        log.info("simulator window aligned to the anchor: %s + %d days", start, window)
+        envelope = AnchorEnvelope.measure(anchor, str(cfg.data.name))
+        log.info(
+            "simulator anchored to %s: %s + %d days, amount median %.0f",
+            envelope.dataset,
+            envelope.start,
+            envelope.window_days,
+            math.exp(envelope.amount_log_mu),
+        )
 
     return Simulator(
         seed=cfg.seed,
@@ -67,6 +82,7 @@ def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) ->
         start_ts=start,
         window_days=window,
         n_episodes=int(e.n_episodes),
+        envelope=envelope,
     )
 
 
@@ -219,6 +235,51 @@ def banner(data_name: str) -> str:
     )
 
 
+def commensurability_audit(cfg: DictConfig, real, pool) -> dict | None:
+    """Check the injected attacks are not separable from the anchor by one field alone.
+
+    A held-out family that a single contract field picks out is measuring which generator wrote
+    the row, not whether the detector generalises. Three versions of that shipped before this
+    check existed, so it runs on every anchored run and says so in the log.
+    """
+    if not real:
+        return None
+    held_out = str(cfg.eval.held_out_vector)
+    synth = [t for t in pool if t.vector_id == held_out]
+    envelope = AnchorEnvelope.measure(real, str(cfg.data.name))
+    report = envelope_audit(real, synth)
+    report["anchor"] = {
+        "supports_behavioural_vectors": envelope.supports_behavioural_vectors,
+        "sender_reuse_rate": round(envelope.sender_reuse_rate, 6),
+        "time_granularity_s": envelope.time_granularity_s,
+        "carries_devices": envelope.carries_devices,
+    }
+
+    if not envelope.supports_behavioural_vectors:
+        log.warning(
+            "%s has a sender reuse rate of %.4f — almost no account transacts twice, so velocity "
+            "and drift families have no history to be anomalous against and every src_* feature "
+            "is structurally zero. Behavioural numbers on this anchor are not measurable.",
+            cfg.data.name,
+            envelope.sender_reuse_rate,
+        )
+    if report["trivially_separable"]:
+        log.warning(
+            "COMMENSURABILITY: %r separates held-out %s from %s traffic at PR-AUC %.4f against a "
+            "base rate of %.4f. That number measures provenance, not generalisation.",
+            report["worst"],
+            held_out,
+            cfg.data.name,
+            report["score"],
+            report["base_rate"],
+        )
+    else:
+        log.info(
+            "commensurability ok: worst single field %r at %.4f", report["worst"], report["score"]
+        )
+    return report
+
+
 # ── the run ─────────────────────────────────────────────────────────────────────
 @hydra.main(version_base=None, config_path="../config", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -248,6 +309,10 @@ def main(cfg: DictConfig) -> None:
     detector_factory = build_detector_factory(cfg)
     pool = build_pool(cfg, simulator, real)
     log.info("pool: %d rows, %d fraud", len(pool), sum(1 for t in pool if t.is_fraud))
+
+    audit = commensurability_audit(cfg, real, pool)
+    if audit:
+        (artifact_dir / "commensurability.json").write_text(json.dumps(audit, indent=2))
 
     # The boundary is read, never re-derived. Absent (synthetic default) the fraction is used
     # and the run is a pipeline check anyway.

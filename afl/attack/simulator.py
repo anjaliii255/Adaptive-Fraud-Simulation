@@ -14,6 +14,7 @@ from afl.attack import actors as actor_lib
 from afl.attack.engines import drift as drift_engine
 from afl.attack.engines import graph as graph_engine
 from afl.attack.engines import velocity as velocity_engine
+from afl.attack.envelope import AnchorEnvelope
 from afl.attack.templates import registry
 from afl.contract.schema import AttackBatch, AttackParams, Entity, EntityRole, Transaction
 from afl.utils.seed import child_seed
@@ -33,13 +34,17 @@ class Simulator:
         start_ts: datetime = DEFAULT_START,
         window_days: int = 30,
         n_episodes: int = 5,
+        envelope: AnchorEnvelope | None = None,
     ) -> None:
         self.seed = seed
         self.n_entities = n_entities
         self.n_background = n_background
-        self.start_ts = start_ts
-        self.window_days = window_days
         self.n_episodes = n_episodes
+        # an anchored run lives inside the real traffic's own window and amount scale, so an
+        # attack cannot be picked out by its timestamp or its order of magnitude
+        self.envelope = envelope
+        self.start_ts = envelope.start if envelope else start_ts
+        self.window_days = envelope.window_days if envelope else window_days
         self._round = 0
         self.entities = self._build_population(make_rng(child_seed(seed, "population")))
 
@@ -49,6 +54,9 @@ class Simulator:
         n_merchant = max(1, int(self.n_entities * 0.10))
         n_mule = max(1, int(self.n_entities * 0.05))
         n_fraudster = max(1, int(self.n_entities * 0.02))
+        # anchored runs stage attacks on the anchor's own busy accounts, so a synthetic sender
+        # carries the same history a real one does instead of appearing from nowhere
+        real_ids = list(self.envelope.active_senders) if self.envelope else []
         for i in range(self.n_entities):
             if i < n_merchant:
                 role = EntityRole.MERCHANT
@@ -60,7 +68,7 @@ class Simulator:
                 role = EntityRole.NORMAL
             ents.append(
                 Entity(
-                    entity_id=f"e{i:05d}",
+                    entity_id=real_ids[i] if i < len(real_ids) else f"e{i:05d}",
                     role=role,
                     opened_at=self.start_ts - timedelta(days=int(r.integers(30, 2_000))),
                     country="IN",
@@ -82,7 +90,7 @@ class Simulator:
         """
         normals = self._pool(EntityRole.NORMAL)
         merchants = self._pool(EntityRole.MERCHANT)
-        actor = actor_lib.NORMAL
+        actor = self.envelope.rescale(actor_lib.NORMAL) if self.envelope else actor_lib.NORMAL
         default_end = self.start_ts + timedelta(days=self.window_days)
         span_s = int((max(end_ts or default_end, default_end) - self.start_ts).total_seconds())
         out: list[Transaction] = []
@@ -136,6 +144,8 @@ class Simulator:
 
         # per-vector actor retune: card testing settles on the card rail, not on the shared default
         actor = actor_lib.get_actor(spec.actor, **spec.actor_overrides)
+        if self.envelope:
+            actor = self.envelope.rescale(actor)
         victims = self._pool(EntityRole.NORMAL)
         mules = self._pool(EntityRole.MULE)
         cashout = self._pool(EntityRole.MERCHANT) + mules
@@ -207,6 +217,21 @@ class Simulator:
                 raise ValueError(f"unknown engine {spec.engine!r}")
 
             fraud += self._fit_into_window(episode)
+
+        # the anchor has no device column, so the simulator does not invent one: a device id on
+        # every synthetic row and none on every real row separates the two perfectly
+        if self.envelope and not self.envelope.carries_devices:
+            for t in fraud:
+                t.device_id = None
+
+        # and land on the anchor's own clock: AMLSim's rows are whole days, so traffic spread
+        # across the hours is separable on hour-of-day alone
+        if self.envelope and self.envelope.time_granularity_s > 1:
+            daily = self.envelope.time_granularity_s >= 86_400
+            for t in fraud:
+                t.ts = t.ts.replace(
+                    minute=0, second=0, microsecond=0, **({"hour": 0} if daily else {})
+                )
 
         latest_fraud = max((t.ts for t in fraud), default=None)
         txns = self._background(r, run_id, end_ts=latest_fraud) + fraud
