@@ -31,6 +31,7 @@ def generate(
     params: dict,
     src: str,
     dst_pool: list[str],
+    device: str | None = None,
 ) -> list[Transaction]:
     """Emit one velocity-shaped attack episode.
 
@@ -42,6 +43,11 @@ def generate(
       threshold        reporting ceiling to stay under (None = ignore)
       device_rotation  probability of a fresh device per attempt
       amount_jitter    lognormal sigma around the target amount
+      n_payees         distinct beneficiaries the run spreads across (0 = a fresh pick each time).
+                       1 is the authorised-push-payment shape: one payee, paid repeatedly
+      amount_shift     multiplier on the drawn amount, for a run that is atypical for the payer.
+                       Ignored when `threshold` is set, where staying under the ceiling is the point
+      device           the payer's own device; None mints a run-scoped one
     """
     n_txns = int(params.get("n_txns", 12))
     burst_size = max(1, int(params.get("burst_size", 4)))
@@ -50,11 +56,21 @@ def generate(
     threshold = params.get("threshold", THRESHOLDS[-1])
     device_rotation = float(params.get("device_rotation", 1.0 - actor.device_stickiness))
     amount_jitter = float(params.get("amount_jitter", 0.15))
+    n_payees = int(params.get("n_payees", 0))
+    amount_shift = float(params.get("amount_shift", 1.0))
     rail = actor.rails[0] if actor.rails else Rail.UPI
+
+    # a fixed payee set, drawn once, so the run keeps paying the same beneficiary
+    payees: list[str] = []
+    if n_payees > 0:
+        options = [d for d in dst_pool if d != src]
+        payees = [
+            str(d) for d in rng.choice(options, size=min(n_payees, len(options)), replace=False)
+        ]
 
     txns: list[Transaction] = []
     ts = start_ts
-    device = f"dev-{run_id[-4:]}-0"
+    device = device or f"dev-{run_id[-4:]}-0"
     for i in range(n_txns):
         if i and i % burst_size == 0:
             ts += timedelta(seconds=float(max(1.0, rng.exponential(burst_gap_s))))
@@ -68,14 +84,14 @@ def generate(
             amount = _just_under(float(threshold), rng) * float(rng.lognormal(0.0, amount_jitter))
             amount = min(amount, float(threshold) * 0.999)
         else:
-            amount = float(rng.lognormal(actor.amount_mu, actor.amount_sigma))
+            amount = float(rng.lognormal(actor.amount_mu, actor.amount_sigma)) * amount_shift
 
         txns.append(
             Transaction(
                 txn_id=f"{run_id}-v{i:05d}",
                 ts=ts,
                 src=src,
-                dst=choose_other(rng, dst_pool, src),
+                dst=str(rng.choice(payees)) if payees else choose_other(rng, dst_pool, src),
                 amount=round(max(0.01, amount), 2),
                 rail=rail,
                 device_id=device,

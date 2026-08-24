@@ -62,6 +62,8 @@ def generate(
       hold_time_s     mean dwell time before money moves on — the knob that trades
                       detectability for realism (instant pass-through is loud)
       leak            fraction skimmed at each hop, so amounts are not a perfect chain
+      fresh_beneficiary  exit into the mule pool instead of established cash-out points, so the
+                      final payee has no prior inbound at all — the instant-relay signature
     """
     motif = params.get("motif", "fan_in")
     n_sources = int(params.get("n_sources", 6))
@@ -69,6 +71,8 @@ def generate(
     split_ratio = float(params.get("split_ratio", 1.0))
     hold_time_s = float(params.get("hold_time_s", 900.0))
     leak = float(params.get("leak", 0.05))
+    fresh_beneficiary = bool(params.get("fresh_beneficiary", False))
+    exit_pool = mule_pool if fresh_beneficiary else cashout_pool
     rail = actor.rails[0] if actor.rails else Rail.A2A
 
     txns: list[Transaction] = []
@@ -97,7 +101,7 @@ def generate(
             hop_src = collector
             for hop in range(n_hops):
                 ts = step(hold_time_s)
-                nxt = choose_other(rng, mule_pool if hop < n_hops - 1 else cashout_pool, hop_src)
+                nxt = choose_other(rng, mule_pool if hop < n_hops - 1 else exit_pool, hop_src)
                 pot *= 1.0 - leak
                 if split_ratio < 1.0:  # break the pot into uneven legs
                     legs = max(2, int(round(1.0 / max(split_ratio, 1e-3))))
@@ -142,7 +146,7 @@ def generate(
     elif motif == "fan_out":
         source = str(rng.choice(mule_pool))
         pot = float(rng.lognormal(actor.amount_mu + 1.5, actor.amount_sigma))
-        pool = [d for d in cashout_pool if d != source]
+        pool = [d for d in exit_pool if d != source]
         dests = list(rng.choice(pool, size=min(n_sources, len(pool)), replace=False))
         weights = rng.dirichlet([split_ratio * 5] * len(dests))
         for d, w in zip(dests, weights, strict=False):

@@ -141,6 +141,7 @@ class Simulator:
         cashout = self._pool(EntityRole.MERCHANT) + mules
 
         fraud: list[Transaction] = []
+        minted: list[Entity] = []  # accounts this run had to invent, e.g. a fabricated identity
         for ep in range(self.n_episodes):
             ep_rng = make_rng(child_seed(seed, "episode", ep))
             start = self.start_ts + timedelta(
@@ -161,6 +162,13 @@ class Simulator:
                     cashout_pool=cashout,
                 )
             elif spec.engine == "velocity":
+                # who pays decides the endpoints: an APP-scam victim pays out of their own account
+                # to a hostile payee, an attacker probing a rail pays out of one they control
+                if spec.actor == "normal":
+                    v_src, v_dsts = str(ep_rng.choice(victims)), mules
+                    v_device = f"dev-{v_src}"
+                else:
+                    v_src, v_dsts, v_device = str(ep_rng.choice(mules)), cashout, None
                 episode += velocity_engine.generate(
                     rng=ep_rng,
                     run_id=ep_run,
@@ -168,10 +176,22 @@ class Simulator:
                     actor=actor,
                     start_ts=start,
                     params=knobs,
-                    src=str(ep_rng.choice(mules)),
-                    dst_pool=cashout,
+                    src=v_src,
+                    dst_pool=v_dsts,
+                    device=v_device,
                 )
             elif spec.engine == "drift":
+                # a fabricated identity has no history to drift away from, so it gets an account
+                # the population has never transacted with; every other vector drifts on a real one
+                if knobs.get("new_account"):
+                    d_src = f"{ep_run}-acct"
+                    minted.append(
+                        Entity(
+                            entity_id=d_src, role=EntityRole.NORMAL, opened_at=start, country="IN"
+                        )
+                    )
+                else:
+                    d_src = str(ep_rng.choice(victims))
                 episode += drift_engine.generate(
                     rng=ep_rng,
                     run_id=ep_run,
@@ -179,7 +199,7 @@ class Simulator:
                     actor=actor,
                     start_ts=start,
                     params=knobs,
-                    src=str(ep_rng.choice(victims)),
+                    src=d_src,
                     benign_dst_pool=self._pool(EntityRole.MERCHANT),
                     cashout_pool=cashout,
                 )
@@ -191,9 +211,10 @@ class Simulator:
         latest_fraud = max((t.ts for t in fraud), default=None)
         txns = self._background(r, run_id, end_ts=latest_fraud) + fraud
         txns.sort(key=lambda t: t.ts)
-        # every fraud row must carry the run id, so evasions stay traceable to their params
+        # every row an episode emitted carries the run id, so evasions and the synthesised
+        # history around them stay traceable to the params that produced them
         for t in txns:
-            if t.is_fraud:
+            if t.attack_run_id:  # set by an engine, so this row came from an episode
                 t.attack_run_id = run_id
 
         self._round += 1
@@ -202,5 +223,5 @@ class Simulator:
             params=AttackParams(vector_id=spec.vector_id, engine=spec.engine, params=knobs),
             transactions=txns,
             seed=seed,
-            entities=self.entities,
+            entities=self.entities + minted,
         )

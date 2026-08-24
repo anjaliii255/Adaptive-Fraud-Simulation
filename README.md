@@ -94,9 +94,9 @@ On the synthetic placeholder config, held out on M3, the adaptive system lands b
 baselines:
 
 ```
-baseline   PR-AUC 0.508   recall@1%FPR 0.233
-SMOTE      PR-AUC 0.499   recall@1%FPR 0.233
-adaptive   PR-AUC 0.312   recall@1%FPR 0.185
+baseline   PR-AUC 0.522   recall@1%FPR 0.241
+SMOTE      PR-AUC 0.520   recall@1%FPR 0.227
+adaptive   PR-AUC 0.210   recall@1%FPR 0.120
 ```
 
 Produced on the sklearn HistGradientBoosting fallback, not LightGBM, because libomp was missing on
@@ -105,9 +105,10 @@ the machine that ran it. Install libomp before quoting any of it.
 These are lower again than the post-freeze numbers, and nothing regressed to cause it. M3 stopped
 being a proxy: it is now genuine first-party fraud, where no device changes, no new operator appears
 and no new beneficiary is ever paid, so none of the signals a supervised model leans on fire at all.
-A harder holdout is the point of the holdout. Each regime supersedes the last rather than sitting
-beside it, and a fourth arrives the moment real data lands — see
-`docs/adr/0002-dataset-anchors.md`, because the real base rate is ~130x lower than this one.
+A harder holdout is the point of the holdout. Training now also carries the five commodity families,
+which moves the baselines again. Each regime supersedes the last rather than sitting beside it, and
+a further one arrives the moment real data lands — see `docs/adr/0002-dataset-anchors.md`, because
+the real base rate is ~130x lower than this one.
 
 That's the untuned output. Nobody massaged it. It's the weak-side reading the design itself
 predicts when the loop searches a single vector against a detector that already generalises to the
@@ -130,11 +131,11 @@ Nine vectors, three engines. The ids match the architecture doc and are frozen; 
 | S1 | Mule network & layering | graph | mechanism | strong | built |
 | S2 | Card testing / BIN enumeration | velocity | mechanism | strong | built |
 | S3 | Account takeover via drift | drift | mechanism | strong | built |
-| C1 | Bust-out | drift | mechanism | common | template |
-| C2 | UPI collect-request / APP scam | velocity | enabler | common | planned |
-| C3 | Instant-A2A pass-through | graph | mechanism | common | template |
+| C1 | Bust-out | drift | mechanism | common | built |
+| C2 | UPI collect-request / APP scam | velocity | enabler | common | built |
+| C3 | Instant-A2A pass-through | graph | mechanism | common | built |
 | M1 | Boundary probing / paced evasion | velocity | model-attack | mid | template |
-| M2 | Synthetic-identity lifecycle | drift | enabler | mid | planned |
+| M2 | Synthetic-identity lifecycle | drift | enabler | mid | built |
 | M3 | First-party / friendly fraud | drift | mechanism | mid | built · **holdout** |
 
 `level` is the taxonomy level and never gets flattened: mechanisms are the fraud, enablers are what
@@ -152,11 +153,16 @@ declares:
 - **planned** — cannot be generated. `Simulator.generate` raises and names the ticket, because a
   family that silently emits nothing looks exactly like a family the detector caught.
 
-So four of the nine are done and five still owe work, and the file says which and why. **M3 is
-the leave-one-attack-out holdout** because `user == fraudster` breaks the legit-vs-attacker
-assumption every supervised feature rests on, and it is `built`: the abuse runs on the owner's own
-device, to beneficiaries the account already pays, elevated only against that account's own history.
-A one-line amount rule at 1% FPR catches 3% of it, which is the point.
+So eight of the nine are done. Only M1 still owes work, and it arrives free as the optimiser's
+own boundary walk. **M3 is the leave-one-attack-out holdout** because `user == fraudster` breaks
+the legit-vs-attacker assumption every supervised feature rests on: the abuse runs on the owner's
+own device, to beneficiaries the account already pays, elevated only against that account's own
+history. A one-line amount rule at 1% FPR catches 3% of it, which is the point.
+
+The commodity families are the mirror image and are meant to be caught. C1 spikes 7-10x against
+its own tenure, C2 pays a first-time payee in plain sight, C3 relays money onward in under two
+minutes. They are training load and fixed benchmarks, never the holdout. See
+`docs/adr/0003-template-vectors.md`.
 
 ## What we're not claiming
 

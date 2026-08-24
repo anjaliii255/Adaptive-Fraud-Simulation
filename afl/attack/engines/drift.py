@@ -71,7 +71,8 @@ def generate(
                 device_id=device,
                 is_fraud=label_baseline,
                 vector_id=vector_id if label_baseline else None,
-                attack_run_id=run_id if label_baseline else None,
+                # legit, but synthesised: traceable to its run without carrying a fraud label
+                attack_run_id=run_id,
             )
         )
 

@@ -7,6 +7,7 @@ capable of failing.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 
 import pytest
@@ -14,9 +15,9 @@ import pytest
 from afl.attack import actors, realism
 from afl.attack.engines import drift, graph, velocity
 from afl.attack.optimiser import AttackOptimiser
-from afl.attack.simulator import Simulator
+from afl.attack.simulator import DEFAULT_START, Simulator
 from afl.attack.templates import registry
-from afl.contract.schema import Transaction
+from afl.contract.schema import Rail, Transaction
 from afl.utils.seed import rng as make_rng
 
 START = datetime(2024, 1, 1)
@@ -33,7 +34,7 @@ def assert_valid_attack(rows: list[Transaction], vector_id: str) -> None:
         if t.is_fraud:
             assert t.vector_id == vector_id and t.attack_run_id
         else:
-            assert t.vector_id is None and t.attack_run_id is None
+            assert t.vector_id is None, "a legit row must never carry a family label"
     assert len({t.txn_id for t in rows}) == len(rows)
 
 
@@ -250,9 +251,21 @@ def test_simulator_generates_every_generatable_vector(vector_id):
     assert batch.params.vector_id == vector_id
 
 
+def test_a_planned_vector_refuses_loudly_instead_of_generating_nothing(monkeypatch):
+    """An attack family that silently emits nothing reads exactly like one the detector caught.
+
+    Driven off a stand-in rather than off PLANNED, so the guard keeps being tested once every
+    declared vector is built — an empty parametrize would skip and take the guard with it.
+    """
+    planned = replace(registry.get("S1"), status="planned", gap="stand-in, ticket 99")
+    monkeypatch.setattr(registry, "get", lambda vid: planned)
+    sim = Simulator(seed=11, n_entities=60, n_background=50, n_episodes=1)
+    with pytest.raises(NotImplementedError, match="declared but not implemented"):
+        sim.generate(planned.to_attack_params())
+
+
 @pytest.mark.parametrize("vector_id", PLANNED)
-def test_a_planned_vector_refuses_loudly_instead_of_generating_nothing(vector_id):
-    """An attack family that silently emits nothing reads exactly like one the detector caught."""
+def test_every_declared_planned_vector_refuses(vector_id):
     sim = Simulator(seed=11, n_entities=60, n_background=50, n_episodes=1)
     with pytest.raises(NotImplementedError, match="declared but not implemented"):
         sim.generate(registry.get(vector_id).to_attack_params())
@@ -260,11 +273,155 @@ def test_a_planned_vector_refuses_loudly_instead_of_generating_nothing(vector_id
 
 def test_card_testing_settles_on_the_card_rail():
     """A card-testing vector that settles on UPI is not a card-testing vector."""
-    from afl.contract.schema import Rail
-
     sim = Simulator(seed=12, n_entities=120, n_background=100, n_episodes=1)
     batch = sim.generate(registry.get("S2").to_attack_params())
     assert {t.rail for t in batch.fraud_transactions} == {Rail.CARD}
+
+
+# ── C1 and M2: bust-out, and the same ending on an account that was never real ──
+def drift_batch(vector_id: str, seed: int = 3):
+    sim = Simulator(seed=seed, n_entities=300, n_background=1500, n_episodes=4)
+    return sim.generate(registry.get(vector_id).to_attack_params())
+
+
+def history_of(batch, owner):
+    return [t for t in batch.transactions if t.src == owner and not t.is_fraud]
+
+
+def test_bust_out_spikes_visibly_against_its_own_tenure():
+    """C1 is must-catch load, not a holdout. If it were subtle it would not be doing its job."""
+    import numpy as np
+
+    batch = drift_batch("C1")
+    assert_valid_attack(batch.transactions, "C1")
+    assert {t.rail for t in batch.fraud_transactions} == {Rail.CARD}
+    for owner in sorted({t.src for t in batch.fraud_transactions}):
+        spike = [t.amount for t in batch.fraud_transactions if t.src == owner]
+        tenure = [t.amount for t in history_of(batch, owner)]
+        assert len(tenure) >= 30, "a bust-out needs a long clean tenure behind it"
+        assert np.mean(spike) > 3 * np.mean(tenure), "the spike has to be visible"
+
+
+def test_synthetic_identity_busts_out_of_an_account_that_was_never_real():
+    """C1 is a real old account going bad. M2's account never existed before the run minted it."""
+    batch = drift_batch("M2")
+    assert_valid_attack(batch.transactions, "M2")
+    opened = {e.entity_id: e.opened_at for e in batch.entities}
+    for owner in sorted({t.src for t in batch.fraud_transactions}):
+        assert opened[owner] >= DEFAULT_START, "a fabricated identity is not decades old"
+        # thin file: every row this account has is one the run synthesised
+        assert all(t.attack_run_id for t in history_of(batch, owner))
+
+
+def test_synthetic_identity_seasons_before_it_busts():
+    batch = drift_batch("M2")
+    for owner in sorted({t.src for t in batch.fraud_transactions}):
+        rows = sorted((t for t in batch.transactions if t.src == owner), key=lambda t: t.ts)
+        first_abuse = next(i for i, t in enumerate(rows) if t.is_fraud)
+        assert first_abuse >= 10, "seasoning is what makes the account look usable"
+        assert all(not t.is_fraud for t in rows[:first_abuse])
+
+
+def test_seasoning_is_legit_but_still_traceable_to_its_run():
+    """Labelling seasoning as fraud teaches the wrong thing; losing its run id loses the trail."""
+    batch = drift_batch("M2")
+    seasoning = [t for t in batch.transactions if not t.is_fraud and t.attack_run_id]
+    assert seasoning
+    assert all(t.vector_id is None for t in seasoning)
+    assert {t.attack_run_id for t in seasoning} == {batch.run_id}
+
+
+@pytest.mark.parametrize("vector_id", ["C1", "M2"])
+def test_drift_families_are_realistic(vector_id):
+    assert realism.check(drift_batch(vector_id)).violations == []
+
+
+# ── C3: the instant-A2A relay. One hop, near-zero dwell, in ≈ out ───────────────
+def c3_batch(seed: int = 9):
+    sim = Simulator(seed=seed, n_entities=300, n_background=1500, n_episodes=4)
+    return sim.generate(registry.get("C3").to_attack_params())
+
+
+def c3_relays(batch):
+    """One (inbound, outbound) pair per episode, keyed off the run id inside each txn_id."""
+    episodes: dict[str, list] = {}
+    for t in batch.fraud_transactions:
+        episodes.setdefault(t.txn_id.split("-g")[0], []).append(t)
+    for rows in episodes.values():
+        relay = ({t.dst for t in rows} & {t.src for t in rows}).pop()
+        yield [t for t in rows if t.dst == relay], [t for t in rows if t.src == relay]
+
+
+def test_pass_through_moves_what_it_receives_and_holds_almost_nothing():
+    """In ≈ out with near-zero dwell is the signature; a relay that keeps the money is not one."""
+    batch = c3_batch()
+    assert_valid_attack(batch.transactions, "C3")
+    assert {t.rail for t in batch.fraud_transactions} == {Rail.A2A}
+    for inbound, outbound in c3_relays(batch):
+        ratio = sum(t.amount for t in outbound) / sum(t.amount for t in inbound)
+        dwell = (min(t.ts for t in outbound) - max(t.ts for t in inbound)).total_seconds()
+        assert 0.9 < ratio <= 1.0, f"pass-through ratio {ratio:.2f} is not a pass-through"
+        assert 0 <= dwell < 600, f"dwell {dwell:.0f}s is a hold, not a relay"
+
+
+def test_pass_through_is_one_hop_not_a_mule_network():
+    """S1 is the multi-hop layering vector. If C3 grows hops the two stop being distinguishable."""
+    for _, outbound in c3_relays(c3_batch()):
+        assert len(outbound) == 1
+
+
+def test_pass_through_exits_to_an_account_with_no_prior_inbound():
+    batch = c3_batch()
+    ever_paid = {t.dst for t in batch.transactions if not t.is_fraud}
+    for _, outbound in c3_relays(batch):
+        assert not ({t.dst for t in outbound} & ever_paid)
+
+
+def test_pass_through_batches_are_realistic():
+    assert realism.check(c3_batch()).violations == []
+
+
+# ── C2: the APP scam. Allowed to be catchable — it is training load, not a holdout ──
+def c2_batch(seed: int = 5):
+    sim = Simulator(seed=seed, n_entities=300, n_background=1500, n_episodes=4)
+    return sim.generate(registry.get("C2").to_attack_params())
+
+
+def test_app_scam_pays_a_payee_the_victim_has_never_paid():
+    """Payee novelty is the whole signal: the victim authorised it, so nothing else looks wrong."""
+    batch = c2_batch()
+    assert_valid_attack(batch.transactions, "C2")
+    for victim in sorted({t.src for t in batch.fraud_transactions}):
+        scam = {t.dst for t in batch.fraud_transactions if t.src == victim}
+        paid_before = {t.dst for t in batch.transactions if t.src == victim and not t.is_fraud}
+        assert scam and not (scam & paid_before), f"{victim} had already paid {scam & paid_before}"
+
+
+def test_app_scam_keeps_the_victims_own_device_and_account():
+    """The victim is real. Only the destination is hostile, so no device or operator tell."""
+    batch = c2_batch()
+    for victim in sorted({t.src for t in batch.fraud_transactions}):
+        scam = [t for t in batch.fraud_transactions if t.src == victim]
+        assert {t.device_id for t in scam} == {f"dev-{victim}"}
+
+
+def test_app_scam_drains_in_minutes_on_upi():
+    import numpy as np
+
+    batch = c2_batch()
+    assert {t.rail for t in batch.fraud_transactions} == {Rail.UPI}
+    for victim in sorted({t.src for t in batch.fraud_transactions}):
+        scam = sorted((t for t in batch.fraud_transactions if t.src == victim), key=lambda t: t.ts)
+        drain_s = (scam[-1].ts - scam[0].ts).total_seconds()
+        assert drain_s < 3600, "a scam that takes hours is not a rapid drain"
+    # atypical for the payer, still ordinary for the rail
+    legit = np.median([t.amount for t in batch.transactions if not t.is_fraud])
+    scam_mean = np.mean([t.amount for t in batch.fraud_transactions])
+    assert legit < scam_mean < 40 * legit
+
+
+def test_app_scam_batches_are_realistic():
+    assert realism.check(c2_batch()).violations == []
 
 
 # ── M3: first-party fraud, the holdout family ───────────────────────────────────

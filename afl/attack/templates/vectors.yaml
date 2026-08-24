@@ -109,21 +109,21 @@ vectors:
     level: mechanism
     tier: common
     maturity: mature
-    status: template
-    gap: >-
-      One account only. The defining tell — a correlated utilisation spike across several
-      accounts run by the same operator — is not modelled yet. Ticket 06.
+    status: built
     why: >-
       Long clean tenure, then a sudden utilisation spike before cash-out. A dominant real-loss
       category and a pure sequence problem. It shares the drift engine with S3, so a whole extra
-      family costs almost nothing to carry.
+      family costs almost nothing to carry. Deliberately loud: this is must-catch commodity load,
+      the exact inverse of M3, and a detector that misses it is not credible. Modelled one account
+      at a time; a ring of accounts busting out together is S1's territory, not a second C1.
     params: {n_baseline: 60, n_post: 10, ramp: 0.2, amount_shift: 8.0, new_device: false,
-             dormancy_s: 0}
+             dormancy_s: 0, pace_factor: 6.0}
     search_space:
       n_baseline: {type: int, low: 30, high: 120}
       n_post: {type: int, low: 3, high: 20}
       amount_shift: {type: float, low: 3.0, high: 15.0}
-      ramp: {type: float, low: 0.0, high: 0.6}
+      ramp: {type: float, low: 0.0, high: 0.6}          # low: the spike is an event, not a drift
+      pace_factor: {type: float, low: 3.0, high: 10.0}  # utilisation accelerates into the drain
 
   C2:
     name: UPI collect-request / APP scam
@@ -132,23 +132,21 @@ vectors:
     level: enabler
     tier: common
     maturity: mature
-    status: planned
-    gap: >-
-      The velocity engine spreads payments across a pool of beneficiaries. This vector needs the
-      opposite: one first-time payee, the victim's own prior history to be atypical against, and
-      a drain measured in minutes. Ticket 04.
+    status: built
     why: >-
       The dominant India account-to-account scam class, and the one where the victim authorises
       the payment themselves — so there is no compromised credential to find. First-time-payee
       and rapid-drain features are cheap and high-signal, and it keeps the submission on-rail for
-      a Mastercard / GFF audience.
-    params: {n_txns: 4, burst_size: 4, burst_gap_s: 60, intra_burst_s: 120, threshold: null,
-             device_rotation: 0.0, amount_jitter: 0.3}
+      a Mastercard / GFF audience. The victim's own device and account are used throughout;
+      only the destination is hostile, and the payee is a mule the account has never paid.
+    params: {n_txns: 3, burst_size: 3, burst_gap_s: 60, intra_burst_s: 150, threshold: null,
+             device_rotation: 0.0, amount_jitter: 0.3, n_payees: 1, amount_shift: 5.0}
     actor_overrides: {rails: [upi]}
     search_space:
       n_txns: {type: int, low: 1, high: 8}
       intra_burst_s: {type: float, low: 30, high: 3600, log: true}
       amount_jitter: {type: float, low: 0.05, high: 0.5}
+      amount_shift: {type: float, low: 2.0, high: 12.0}   # atypical for the payer, not for the rail
 
   C3:
     name: Instant-A2A pass-through
@@ -157,19 +155,19 @@ vectors:
     level: mechanism
     tier: common
     maturity: mature
-    status: template
-    gap: >-
-      No cross-institution marker, and the beneficiary is drawn from the mule pool rather than
-      guaranteed to have no prior inbound history. Ticket 05.
+    status: built
     why: >-
       A new payee plus immediate onward drain, on rails with no chargeback. It exploits the exact
       irrevocability property that makes real-time payments hard to defend, and it reuses the
-      graph and velocity primitives already built for S1 and S2.
+      graph and velocity primitives already built for S1 and S2. One relay hop only: the
+      multi-hop version is S1, and the two must stay distinguishable. Cross-institution is the
+      one part of the signature the contract cannot carry — there is no institution field, and
+      adding one is a joint decision, so the relay is modelled without it.
     params: {motif: pass_through, n_sources: 3, n_hops: 1, split_ratio: 1.0, hold_time_s: 30,
-             leak: 0.01}
+             leak: 0.01, fresh_beneficiary: true}
     search_space:
       n_sources: {type: int, low: 1, high: 8}
-      hold_time_s: {type: float, low: 5, high: 3600, log: true}
+      hold_time_s: {type: float, low: 5, high: 900, log: true}   # dwell stays a relay, not a hold
       leak: {type: float, low: 0.0, high: 0.05}
 
   # ── MID · emerging, novelty, and the holdout ─────────────────────────────────────
@@ -204,21 +202,22 @@ vectors:
     level: enabler
     tier: mid
     maturity: emerging
-    status: planned
-    gap: >-
-      The tell is an account with no genuine history — fabricated, onboarded, then seasoned. The
-      simulator gives every entity a real opening date and real traffic, so that absence cannot
-      be expressed yet. Ticket 06.
+    status: built
     why: >-
       Identity fabrication, onboarding, seasoning, then payment abuse. It covers the onboarding
       surface and models fraud that begins *before* the first transaction, then hands off into
-      the bust-out arc rather than needing an engine of its own.
+      the bust-out arc rather than needing an engine of its own. What separates it from C1 is the
+      account, not the ending: C1 is a genuinely old account going bad, M2's was never real. The
+      account is minted for the run, so it has no population history at all — a thin file that
+      seasons fast and then busts out. Only the bust-out is labelled fraud; the seasoning is legit
+      background, because the tell lives in the thinness and the speed, not in the label.
     params: {n_baseline: 25, n_post: 8, ramp: 0.1, amount_shift: 10.0, new_device: false,
-             dormancy_s: 604800}
+             dormancy_s: 604800, new_account: true, pace_factor: 6.0}
     search_space:
       n_baseline: {type: int, low: 10, high: 60}
       n_post: {type: int, low: 2, high: 15}
       dormancy_s: {type: float, low: 86400, high: 15552000, log: true}
+      pace_factor: {type: float, low: 3.0, high: 10.0}
 
   M3:
     name: First-party / friendly fraud
