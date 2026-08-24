@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "dataset": "banksim",
+  "digest": "03535b87e4a90a73",
+  "train_end": "2023-05-12T00:00:00",
+  "test_start": "2023-05-14T00:00:00",
+  "embargo_seconds": 172800,
+  "embargo_rationale": "Steps are days and the widest velocity window is seven of them, so a one-day gap is the minimum that stops a test row's features being computed over training rows.",
+  "train_frac": 0.7,
+  "time_unit": "days",
+  "epoch": "2023-01-01T00:00:00",
+  "train_end_step": 131,
+  "test_start_step": 133,
+  "stats": {
+    "full": {
+      "rows": 594643,
+      "row_share": 1.0,
+      "fraud": 7200,
+      "base_rate": 0.01210811
+    },
+    "span": {
+      "start": "2023-01-01T00:00:00",
+      "end": "2023-06-29T00:00:00",
+      "first_step": 0,
+      "last_step": 179
+    },
+    "partition": {
+      "train": {
+        "rows": 417848,
+        "row_share": 0.7027,
+        "fraud": 5280,
+        "base_rate": 0.01263617
+      },
+      "test": {
+        "rows": 173193,
+        "row_share": 0.2913,
+        "fraud": 1880,
+        "base_rate": 0.01085494
+      },
+      "embargoed": {
+        "rows": 3602,
+        "row_share": 0.0061,
+        "fraud": 40,
+        "base_rate": 0.01110494
+      }
+    },
+    "sample": {
+      "fraction": 1.0,
+      "note": "no sampling; the loader reads every row"
+    },
+    "integrity": {
+      "non_positive_amounts": 52,
+      "non_positive_amount_share": 8.7447e-05,
+      "self_transfers": 0,
+      "self_transfer_share": 0.0
+    },
+    "synthetic_base_rate": 0.040313,
+    "synthetic_base_rate_data_config": 0.014097,
+    "base_rate_ratio_vs_synthetic": 0.3004
+  }
+}

@@ -58,6 +58,8 @@ RAW_COLUMNS = {
         "RECEIVER_ACCOUNT_ID",
     ),
     "paysim": ("step", "isFraud", "nameDest", "amount", "nameOrig", "nameDest"),
+    # BankSim wraps every value in literal single quotes; entity counts are unaffected
+    "banksim": ("step", "fraud", "customer", "amount", "customer", "merchant"),
 }
 
 

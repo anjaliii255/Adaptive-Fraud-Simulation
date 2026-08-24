@@ -1,0 +1,83 @@
+{
+  "anchor": "banksim",
+  "holdout": "M3",
+  "seed": 1337,
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100
+  },
+  "split_digest": "03535b87e4a90a73",
+  "commensurability": {
+    "signals": {
+      "log_amount": 0.001,
+      "hour_of_day": 0.0005,
+      "rail": 0.0005,
+      "sender_in_anchor": 0.0005,
+      "payee_in_anchor": 0.0005,
+      "payee_popularity": 0.0007,
+      "has_device": 0.0005
+    },
+    "worst": "log_amount",
+    "score": 0.001,
+    "base_rate": 0.0005,
+    "trivially_separable": false
+  },
+  "results": {
+    "real": {
+      "real_fraud": {
+        "pr_auc": 0.954362,
+        "recall_at_fixed_fpr": 0.983511,
+        "precision_at_k": 1.0,
+        "n_positives": 1880
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.012611,
+        "recall_at_fixed_fpr": 0.07,
+        "precision_at_k": 0.12,
+        "n_positives": 300
+      }
+    },
+    "synthetic": {
+      "real_fraud": {
+        "pr_auc": 0.237652,
+        "recall_at_fixed_fpr": 0.295745,
+        "precision_at_k": 0.68,
+        "n_positives": 1880
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.934309,
+        "recall_at_fixed_fpr": 0.97,
+        "precision_at_k": 1.0,
+        "n_positives": 300
+      }
+    },
+    "both": {
+      "real_fraud": {
+        "pr_auc": 0.954688,
+        "recall_at_fixed_fpr": 0.979787,
+        "precision_at_k": 1.0,
+        "n_positives": 1880
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.687205,
+        "recall_at_fixed_fpr": 0.826667,
+        "precision_at_k": 1.0,
+        "n_positives": 300
+      }
+    },
+    "amount_floor": {
+      "real_fraud": {
+        "pr_auc": 0.702308,
+        "recall_at_fixed_fpr": 0.753191,
+        "precision_at_k": 1.0,
+        "n_positives": 1880
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.005529,
+        "recall_at_fixed_fpr": 0.07,
+        "precision_at_k": 0.02,
+        "n_positives": 300
+      }
+    }
+  }
+}

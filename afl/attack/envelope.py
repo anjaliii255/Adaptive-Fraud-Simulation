@@ -47,6 +47,8 @@ class AnchorEnvelope:
     device_coverage: float
     time_granularity_s: int
     active_senders: list[str]
+    active_payees: list[str]
+    payee_weights: dict[str, float]
     version: int = ENVELOPE_VERSION
 
     @property
@@ -141,25 +143,47 @@ class AnchorEnvelope:
             sender_reuse_rate=1.0 - len({t.src for t in legit}) / max(len(legit), 1),
             device_coverage=sum(t.device_id is not None for t in legit) / max(len(legit), 1),
             time_granularity_s=_granularity([t.ts for t in legit]),
-            active_senders=_busiest_senders(legit),
+            active_senders=_busiest(legit, lambda t: t.src),
+            active_payees=_busiest(legit, lambda t: t.dst),
+            payee_weights=_shares([t.dst for t in legit]),
         )
 
 
 #: Accounts carried into the simulated population so attacks happen on real, seasoned accounts.
-MAX_ACTIVE_SENDERS = 500
+MAX_ACTIVE_ENTITIES = 500
 
 
-def _busiest_senders(txns: list[Transaction], limit: int = MAX_ACTIVE_SENDERS) -> list[str]:
-    """The anchor's most active accounts, so a synthetic attack has a real history behind it.
+def _busiest(txns: list[Transaction], side, limit: int = MAX_ACTIVE_ENTITIES) -> list[str]:
+    """The anchor's most active entities on one side of the payment, senders or payees.
 
-    Without this the simulator invents its own entity namespace and every attack sender has no
-    anchor history at all, which is a label the moment the anchor's accounts do.
+    The two sides are measured separately because they are separate namespaces. Every BankSim
+    payment goes from a customer to a merchant, so pooling them and drawing a payee from the
+    result pays a customer — a row no real payment ever looks like, and one that carries no
+    merchant category at all.
     """
     counts: dict[str, int] = {}
     for t in txns:
-        counts[t.src] = counts.get(t.src, 0) + 1
+        key = side(t)
+        counts[key] = counts.get(key, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [src for src, n in ranked[:limit] if n > 1]
+    return [entity for entity, n in ranked[:limit] if n > 1]
+
+
+def weighted_pool(weights: dict[str, float], size: int) -> list[str]:
+    """A sampling list whose composition matches `weights`, for engines that pick uniformly.
+
+    BankSim sends 85% of its payments to one merchant. Drawing evenly over the merchant list
+    gives a category mix the anchor never produces, so the shape is carried in the pool itself
+    rather than by changing how every engine samples. Each payee keeps at least one slot, so no
+    real beneficiary disappears entirely.
+    """
+    if not weights:
+        return []
+    ranked = sorted(weights.items(), key=lambda kv: (-kv[1], kv[0]))
+    pool = [name for name, _ in ranked]  # one each, so the long tail survives
+    for name, share in ranked:
+        pool.extend([name] * int(share * max(size - len(ranked), 0)))
+    return pool
 
 
 def _granularity(stamps: list[datetime]) -> int:
@@ -249,15 +273,26 @@ def audit(real: list[Transaction], synth: list[Transaction]) -> dict[str, object
 
     # membership, not activity: an attack is *supposed* to concentrate transactions on an
     # account, so counting them would penalise the behaviour we are trying to generate. What
-    # must not happen is the attack running on accounts the anchor has never seen.
-    anchor_accounts = {t.src for t in real} | {t.dst for t in real}
+    # must not happen is the attack running on entities the anchor has never seen.
+    #
+    # The two sides are checked against their own namespaces. Pooling them hides the case this
+    # check exists for: every BankSim payment goes customer -> merchant, so a synthetic row
+    # paying a customer still passes a combined membership test while being a row no real
+    # payment resembles — and carrying none of the merchant's category.
+    senders = {t.src for t in real}
+    payees = {t.dst for t in real}
+    payee_share = _shares([t.dst for t in real])
 
     signals = {
         "log_amount": np.log([max(t.amount, 1e-9) for t in rows]),
         "hour_of_day": np.array([t.ts.hour for t in rows], dtype=float),
         "rail": np.array([hash(t.rail.value) % 997 for t in rows], dtype=float),
-        "sender_in_anchor": np.array([t.src in anchor_accounts for t in rows], dtype=float),
-        "payee_in_anchor": np.array([t.dst in anchor_accounts for t in rows], dtype=float),
+        "sender_in_anchor": np.array([t.src in senders for t in rows], dtype=float),
+        "payee_in_anchor": np.array([t.dst in payees for t in rows], dtype=float),
+        # how often the anchor itself pays this beneficiary. Category is a function of the
+        # merchant, so a synthetic run that spreads over merchants the anchor rarely uses is a
+        # run whose category mix is wrong, and this is where that shows up.
+        "payee_popularity": np.array([payee_share.get(t.dst, 0.0) for t in rows], dtype=float),
         "has_device": np.array([t.device_id is not None for t in rows], dtype=float),
     }
     scored = {name: round(_pr_auc(labels, v), 4) for name, v in signals.items()}

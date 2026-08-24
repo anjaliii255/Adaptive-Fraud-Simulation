@@ -1,0 +1,72 @@
+# The spike anchor. PaySim has no repeated senders and AMLSim's own fraud is amount-trivial, so
+# neither can validate the held-out claim. BankSim is the cheapest real test of whether any anchor
+# can: repeated customers, merchant and category structure, and fraud that is behavioural.
+
+name: banksim
+loader: banksim
+kind: real
+is_pipeline_check: false
+
+source:
+  url: https://www.kaggle.com/datasets/ealaxi/banksim1
+  file: bs140513_032310.csv
+  place_in: data/raw/BankSim/      # verified: this is the directory the dump lands in
+  download: manual
+  license: "CC BY-SA 4.0"
+
+# --- verified against the header row; every value in the file is single-quoted ---
+schema_map:
+  txn_id: __row_index__            # BankSim has no transaction id
+  ts: step                         # verified: integer days, 0..179 (~6 months)
+  src: customer                    # 'C1093826151' — the repeated entity, 165 txns each
+  dst: merchant                    # 'M348934600' — 50 of them, one category each
+  amount: amount
+  rail: __const__:card             # BankSim is card data, so CARD is correct here
+  is_fraud: fraud
+
+time:
+  column: step
+  unit: days                       # verified: 180 daily steps
+  epoch: "2023-01-01T00:00:00"
+
+fraud:
+  positive_label: 1
+  # verified: fraud concentrates by category, which is what gives it headroom over an amount rule
+  concentrates_in: [es_leisure, es_travel, es_sportsandtoys, es_hotelservices]
+
+# Present in the file and reachable by the feature side, though not contract fields. `category`
+# is the strong real signal here and needs no column of its own: each merchant has exactly one,
+# so the beneficiary id carries it.
+extra_features_available: [category, age, gender, zipMerchant, zipcodeOri]
+
+leakage:
+  identifier_columns: [customer, merchant]
+  drop_columns: []
+  # `category` is not a contract field and does not need to be: each merchant has exactly one
+  # category, so the beneficiary id already carries it.
+
+split:
+  strategy: out_of_time
+  time_column: step
+  train_end_step: 120              # steps 0..120 -> train (~67%)
+  embargo_steps: 1                 # step 121 dropped; >= the widest feature lookback in days
+  test_start_step: 122             # steps 122..179 -> test
+  random: false
+  commit_to: artifacts/splits/banksim_oot.json
+  embargo_rationale: >
+    Steps are days and the widest velocity window is seven of them, so a one-day gap is the
+    minimum that stops a test row's features being computed over training rows.
+
+data_card:
+  rows: 594643
+  customers: 4112
+  merchants: 50
+  fraud_base_rate: 0.012108        # verified: 7200 / 594643
+  time_span: "180 daily steps (~6 months)"
+  quirks:
+    - "Every value is wrapped in literal single quotes; the loader strips them."
+    - "Fraud is category-driven: es_leisure 95%, es_travel 79%, es_sportsandtoys 50%."
+    - "Base rate 1.21% is ~10x PaySim and AMLSim, so operating points do not carry across."
+    - "No device column, as with the other two anchors."
+  cannot_tell_us:
+    - "Nothing about A2A or UPI rails; it is card-present retail traffic only."

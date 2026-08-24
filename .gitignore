@@ -18,6 +18,10 @@ artifacts/**
 # baseline that lives only in a README paragraph is a baseline that quietly drifts.
 !artifacts/detector/
 !artifacts/detector/**
+# the transfer results are the evidence behind the anchor decision in ADR 0004: which
+# gate each dataset failed and by how much. Committed for the same reason as the split.
+!artifacts/transfer/
+!artifacts/transfer/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/

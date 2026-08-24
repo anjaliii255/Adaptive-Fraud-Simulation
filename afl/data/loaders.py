@@ -252,6 +252,51 @@ def load_paysim(
     )
 
 
+# ── BankSim ─────────────────────────────────────────────────────────────────────
+BANKSIM_COLUMNS = ["step", "customer", "merchant", "category", "amount", "fraud"]
+
+
+def load_banksim(
+    path: str | Path | None = None,
+    *,
+    limit: int | None = None,
+    sample_fraction: float = 1.0,
+    sample_by: str = "customer",
+    epoch: datetime = DEFAULT_EPOCH,
+    time_unit: str = "days",
+    source: Mapping | None = None,
+) -> list[Transaction]:
+    """BankSim retail card traffic: repeated customers paying a small set of merchants.
+
+    Every value in the file is wrapped in literal single quotes ('C1093826151'), which have to
+    come off or every entity id carries punctuation into the graph features.
+
+    `category` is not a contract field, but it does not need to be: each of the 50 merchants has
+    exactly one of 15 categories, so the beneficiary id already carries it and the merchant-side
+    features can reach the signal.
+    """
+    path = Path(path or DATA_DIR / "banksim" / "bs140513_032310.csv")
+    _require(path, "banksim", source)
+
+    df = pd.read_csv(path, usecols=BANKSIM_COLUMNS)
+    for column in ("customer", "merchant", "category"):
+        df[column] = df[column].astype(str).str.strip("'")
+    df = sample_by_entity(df, sample_by, sample_fraction)
+    if limit:
+        df = df.head(limit)
+
+    return _to_transactions(
+        dataset="banksim",
+        txn_ids=[f"banksim-{i}" for i in df.index.to_numpy()],
+        timestamps=steps_to_timestamps(df["step"].to_numpy(), time_unit, epoch),
+        src=df["customer"].tolist(),
+        dst=df["merchant"].tolist(),
+        amounts=_amounts(df["amount"], "banksim"),
+        rail=Rail.CARD,  # BankSim is card data, so CARD is the anchor's rail, not a leak
+        is_fraud=df["fraud"].to_numpy().astype(bool),
+    )
+
+
 # ── AMLSim (the IBM example dump) ───────────────────────────────────────────────
 AMLSIM_COLUMNS = ["TX_ID", "SENDER_ACCOUNT_ID", "RECEIVER_ACCOUNT_ID", "TX_AMOUNT", "TIMESTAMP"]
 
@@ -317,7 +362,7 @@ def amlsim_typologies(directory: str | Path | None = None) -> dict[str, str]:
 
 
 # ── the config-driven entry point ───────────────────────────────────────────────
-LOADERS = {"paysim": load_paysim, "amlsim": load_amlsim}
+LOADERS = {"paysim": load_paysim, "amlsim": load_amlsim, "banksim": load_banksim}
 
 #: Config keys `load_from_config` forwards to a loader. Anything else in a data config is for
 #: the split, the data card or the feature side, and is deliberately not the loader's business.

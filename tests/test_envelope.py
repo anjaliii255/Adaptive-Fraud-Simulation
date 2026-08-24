@@ -14,7 +14,12 @@ from datetime import datetime, timedelta
 import pytest
 
 from afl.attack import actors
-from afl.attack.envelope import TRIVIAL_SEPARATION, AnchorEnvelope, audit
+from afl.attack.envelope import (
+    TRIVIAL_SEPARATION,
+    AnchorEnvelope,
+    audit,
+    weighted_pool,
+)
 from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
 from afl.contract.schema import Rail, Transaction
@@ -133,3 +138,50 @@ def test_an_unanchored_simulator_is_left_exactly_as_it_was():
     again = Simulator(seed=11, n_entities=120, n_background=200, n_episodes=2)
     params = registry.get("S1").to_attack_params()
     assert plain.generate(params).model_dump_json() == again.generate(params).model_dump_json()
+
+
+# ── the payee namespace: the bug this section exists for ────────────────────────
+def customer_to_merchant_anchor(n: int = 600) -> list[Transaction]:
+    """An anchor where the two sides of a payment are separate namespaces, as BankSim is."""
+    rows = anchor_rows(n=n, senders=40)
+    return [t.model_copy(update={"dst": f"M{i % 12}"}) for i, t in enumerate(rows)]
+
+
+def test_a_customer_as_payee_fails_the_payee_check():
+    """The false pass that shipped: pooling senders and payees hid a payee no anchor row uses.
+
+    Every real payment goes customer -> merchant. A synthetic row paying a *customer* is a row
+    no real payment resembles, and it carries none of the merchant's category — but a combined
+    membership set contains customers, so it passed.
+    """
+    real = customer_to_merchant_anchor()
+    paying_a_customer = [
+        t.model_copy(update={"txn_id": f"s{i}", "dst": t.src, "is_fraud": True, "vector_id": "M3"})
+        for i, t in enumerate(real[::7])
+    ]
+    report = audit(real, paying_a_customer)
+    assert report["signals"]["payee_in_anchor"] > TRIVIAL_SEPARATION
+    assert report["trivially_separable"], "a customer payee has to fail the payee check"
+    # and the sender side is genuinely fine, so the two must not be conflated
+    assert report["signals"]["sender_in_anchor"] < report["signals"]["payee_in_anchor"]
+
+
+def test_an_anchored_simulator_pays_the_anchors_own_merchants():
+    real = customer_to_merchant_anchor(n=2_000)
+    envelope = AnchorEnvelope.measure(real, "two-sided")
+    assert set(envelope.active_payees) <= {t.dst for t in real}
+    assert not (set(envelope.active_payees) & {t.src for t in real}), "payee pool leaked senders"
+
+    sim = Simulator(seed=5, n_entities=60, n_background=0, n_episodes=4, envelope=envelope)
+    m3 = [t for t in sim.generate(registry.get("M3").to_attack_params()).transactions if t.is_fraud]
+    assert m3
+    assert {t.dst for t in m3} <= {t.dst for t in real}, "paid a beneficiary the anchor never uses"
+
+
+def test_the_merchant_pool_carries_the_anchors_own_proportions():
+    """BankSim sends 85% of payments to one merchant; drawing evenly gets the category mix wrong."""
+    weights = {"M0": 0.85, "M1": 0.10, "M2": 0.05}
+    pool = weighted_pool(weights, 400)
+    assert set(pool) == set(weights), "a real beneficiary dropped out of the pool entirely"
+    share = pool.count("M0") / len(pool)
+    assert 0.75 < share < 0.95, f"dominant beneficiary got {share:.0%} of the pool"

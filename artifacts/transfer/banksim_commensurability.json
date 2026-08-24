@@ -1,0 +1,29 @@
+{
+  "anchor": "banksim",
+  "holdout": "M3",
+  "split_digest": "03535b87e4a90a73",
+  "envelope": {
+    "sender_reuse_rate": 0.993,
+    "supports_behavioural_vectors": true,
+    "time_granularity_s": 86400,
+    "carries_devices": false,
+    "rail_mix": {
+      "card": 1.0
+    },
+    "n_active_senders": 500,
+    "n_active_payees": 50
+  },
+  "signals": {
+    "log_amount": 0.001,
+    "hour_of_day": 0.0005,
+    "rail": 0.0005,
+    "sender_in_anchor": 0.0005,
+    "payee_in_anchor": 0.0005,
+    "payee_popularity": 0.0007,
+    "has_device": 0.0005
+  },
+  "worst": "log_amount",
+  "score": 0.001,
+  "base_rate": 0.0005,
+  "trivially_separable": false
+}

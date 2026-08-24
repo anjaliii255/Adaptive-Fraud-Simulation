@@ -1,0 +1,82 @@
+{
+  "anchor": "amlsim",
+  "holdout": "M3",
+  "seed": 1337,
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100
+  },
+  "split_digest": "0400e45485d9de69",
+  "commensurability": {
+    "signals": {
+      "log_amount": 0.0027,
+      "hour_of_day": 0.0002,
+      "rail": 0.0002,
+      "sender_in_anchor": 0.0002,
+      "payee_in_anchor": 0.0002,
+      "has_device": 0.0002
+    },
+    "worst": "log_amount",
+    "score": 0.0027,
+    "base_rate": 0.0002,
+    "trivially_separable": false
+  },
+  "results": {
+    "real": {
+      "real_fraud": {
+        "pr_auc": 0.593653,
+        "recall_at_fixed_fpr": 0.724265,
+        "precision_at_k": 0.8,
+        "n_positives": 544
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.083003,
+        "recall_at_fixed_fpr": 0.29,
+        "precision_at_k": 0.0,
+        "n_positives": 300
+      }
+    },
+    "synthetic": {
+      "real_fraud": {
+        "pr_auc": 0.419679,
+        "recall_at_fixed_fpr": 0.713235,
+        "precision_at_k": 0.79,
+        "n_positives": 544
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.95709,
+        "recall_at_fixed_fpr": 0.976667,
+        "precision_at_k": 1.0,
+        "n_positives": 300
+      }
+    },
+    "both": {
+      "real_fraud": {
+        "pr_auc": 0.554262,
+        "recall_at_fixed_fpr": 0.571691,
+        "precision_at_k": 0.98,
+        "n_positives": 544
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.372473,
+        "recall_at_fixed_fpr": 0.406667,
+        "precision_at_k": 0.89,
+        "n_positives": 300
+      }
+    },
+    "amount_floor": {
+      "real_fraud": {
+        "pr_auc": 0.455644,
+        "recall_at_fixed_fpr": 0.474265,
+        "precision_at_k": 1.0,
+        "n_positives": 544
+      },
+      "synthetic_M3": {
+        "pr_auc": 0.034172,
+        "recall_at_fixed_fpr": 0.04,
+        "precision_at_k": 0.1,
+        "n_positives": 300
+      }
+    }
+  }
+}

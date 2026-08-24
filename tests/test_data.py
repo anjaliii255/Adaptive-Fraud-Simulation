@@ -264,8 +264,9 @@ def test_the_synthetic_default_loads_nothing_and_raises_nothing():
 
 
 def test_an_unknown_dataset_name_is_a_loud_error():
+    # not "banksim": that was the placeholder here until banksim became a real loader
     with pytest.raises(KeyError, match="unknown dataset"):
-        loaders.load("banksim")
+        loaders.load("no_such_dataset")
 
 
 def test_a_missing_download_says_where_to_get_it(tmp_path):

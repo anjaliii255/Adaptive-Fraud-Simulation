@@ -191,6 +191,30 @@ def main() -> int:
 
     report(results, test_sets, args)
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # standalone, not only embedded below: the commensurability verdict is what licenses reading
+    # the matrix at all, so it has to be findable without parsing the results around it
+    (ARTIFACT_DIR / f"{args.data}_commensurability.json").write_text(
+        json.dumps(
+            {
+                "anchor": args.data,
+                "holdout": args.holdout,
+                "split_digest": split.digest,
+                "envelope": {
+                    "sender_reuse_rate": round(envelope.sender_reuse_rate, 6),
+                    "supports_behavioural_vectors": envelope.supports_behavioural_vectors,
+                    "time_granularity_s": envelope.time_granularity_s,
+                    "carries_devices": envelope.carries_devices,
+                    "rail_mix": envelope.rail_mix,
+                    "n_active_senders": len(envelope.active_senders),
+                    "n_active_payees": len(envelope.active_payees),
+                },
+                **audit,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     out = ARTIFACT_DIR / f"{args.data}.json"
     out.write_text(
         json.dumps(
