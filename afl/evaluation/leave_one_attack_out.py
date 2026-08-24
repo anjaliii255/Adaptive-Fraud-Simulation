@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from afl.contract.metrics import MetricResult
 from afl.contract.schema import Transaction
-from afl.data.splits import assert_no_leakage, out_of_time_split
+from afl.data.splits import CommittedSplit, assert_no_leakage, out_of_time_split
 from afl.evaluation import protocol
 
 log = logging.getLogger(__name__)
@@ -34,12 +34,20 @@ def make_splits(
     held_out_vector: str,
     train_frac: float = 0.7,
     embargo_days: float = 1.0,
+    split: CommittedSplit | None = None,
 ) -> tuple[list[Transaction], list[Transaction]]:
     """(train, holdout) — out-of-time first, then the family carve-out.
 
     The holdout keeps all legit rows: without a haystack, FPR and precision@k mean nothing.
+
+    `split` is the committed boundary for a real anchor. Prefer it: a fraction re-derives the
+    cut from whatever rows it was handed, so the partition moves whenever the pool composition
+    does, and two runs stop being comparable without anything visibly changing.
     """
-    train, test = out_of_time_split(txns, train_frac=train_frac, embargo_days=embargo_days)
+    if split is not None:
+        train, test = split.apply(txns)
+    else:
+        train, test = out_of_time_split(txns, train_frac=train_frac, embargo_days=embargo_days)
     train = [t for t in train if t.vector_id != held_out_vector]
     test = [t for t in test if t.vector_id == held_out_vector or not t.is_fraud]
     return train, test
@@ -62,10 +70,11 @@ class LeaveOneAttackOut:
         held_out_vector: str = DEFAULT_HOLDOUT,
         train_frac: float = 0.7,
         embargo_days: float = 1.0,
+        split: CommittedSplit | None = None,
         **kwargs,
     ) -> tuple[LeaveOneAttackOut, list[Transaction]]:
         """Returns (evaluator, train_rows) so a caller cannot accidentally train on the holdout."""
-        train, holdout = make_splits(txns, held_out_vector, train_frac, embargo_days)
+        train, holdout = make_splits(txns, held_out_vector, train_frac, embargo_days, split)
         assert_no_leakage(train, holdout)
         if not any(t.is_fraud for t in holdout):
             # the out-of-time cut can land after every episode of the held-out family. Every
@@ -105,6 +114,7 @@ def sweep(
     embargo_days: float = 1.0,
     fixed_fpr: float = protocol.DEFAULT_FPR,
     k: int = protocol.DEFAULT_K,
+    split: CommittedSplit | None = None,
 ) -> dict[str, MetricResult]:
     """The full matrix: hold out each family in turn, refit from scratch, score it.
 
@@ -114,7 +124,7 @@ def sweep(
     vectors = vectors or sorted({t.vector_id for t in txns if t.vector_id})
     out: dict[str, MetricResult] = {}
     for vid in vectors:
-        train, holdout = make_splits(txns, vid, train_frac, embargo_days)
+        train, holdout = make_splits(txns, vid, train_frac, embargo_days, split)
         if not any(t.is_fraud for t in holdout) or not any(t.is_fraud for t in train):
             continue  # nothing to learn from, or nothing to be measured on
         detector = detector_factory()

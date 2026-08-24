@@ -1,11 +1,16 @@
 # A's mule-graph anchor: real layering topology for the graph engine to imitate, and typology
 # labels that define a held-out VARIANT inside the S1 mule family.
-# Every column below was verified against the real file; nothing here is a guess.
+# Every column and count below was verified against the real files.
 
 name: amlsim
 loader: amlsim
 kind: real                     # real rows carry NO provenance (vector_id=None)
 is_pipeline_check: false
+
+purpose: >
+  Multi-agent AML simulator output with per-alert typology labels. Its value is the topology and
+  the typology labels, not the rows: they are what makes a leave-one-VARIANT-out test inside the
+  S1 mule family possible at all.
 
 source:
   url: https://www.kaggle.com/datasets/anshankul/ibm-amlsim-example-dataset
@@ -27,33 +32,36 @@ schema_map:
   rail: __const__:a2a          # bank-to-bank transfers; constant rail
   is_fraud: IS_FRAUD
 
-extra_columns:
-  TX_TYPE: tx_type             # kept for analysis; never a raw feature
-
 time:
   column: TIMESTAMP
   unit: days                   # verified: integer steps 0..199, not a timestamp string
   epoch: "2023-01-01T00:00:00"
 
 fraud:
-  positive_label: true         # IS_FRAUD is the string True/False, not 1/0
-  # ALERT_TYPE is NOT in transactions.csv. Join alerts.csv on ALERT_ID to recover the typology.
+  positive_label: true
+  # ALERT_TYPE is NOT in transactions.csv. Join alerts.csv to recover the typology --
+  # on TX_ID, which is unique in both files. NOT on ALERT_ID: the 1,719 alert rows share only
+  # 391 distinct alert ids, so an ALERT_ID join needs a de-duplication step that a TX_ID join
+  # does not. Verified: the join covers all 1,719 fraud rows and no legit row.
   typology_column: ALERT_TYPE
   typology_join:
-    left: ALERT_ID             # transactions.csv
-    right: ALERT_ID            # alerts.csv
+    left: TX_ID                # transactions.csv
+    right: TX_ID               # alerts.csv
   typologies_present: [fan_in, cycle]   # verified: only these two exist in this dump
 
 # --- held-out VARIANT design for S1 ---
 # Strong vectors use leave-one-VARIANT-out: train the mule family on one topology, hold another
 # out entirely, and measure S1 recall on the unseen shape. Collapsed to what the dump contains.
+# The typology is exposed by loaders.amlsim_typologies() as a txn_id -> type map and is
+# deliberately NOT written onto Transaction: it is a label-side annotation, and a real row that
+# gains a vector_id has leaked a label path.
 holdout_variants:
-  train_on: [fan_in]           # 783 alerts
-  hold_out: [cycle]            # 936 alerts, never in training: the "unseen mule shape"
+  train_on: [fan_in]           # 783 rows
+  hold_out: [cycle]            # 936 rows, never in training: the "unseen mule shape"
 
 leakage:
   identifier_columns: [SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID]  # graph features, not raw features
-  drop_columns: [ALERT_ID]     # an alert id is a label path; drop from X after the typology join
+  drop_columns: [ALERT_ID]     # an alert id is a label path; the loader never reads it
 
 # --- realism envelope: stats A's graph engine and realism.py derive bounds from ---
 # The point of a real AML graph is to imitate its shape, not copy its rows.
@@ -66,12 +74,21 @@ envelope:
     - path_length_distribution           # layering chain depth
   commit_to: artifacts/envelopes/amlsim_envelope.json
 
+# --- run-time sampling ---
+# 1.32M rows is tractable whole, so the default reads everything. Senders here have real
+# histories (mean 132 txns each), unlike PaySim -- so if this is ever sampled, it is sampled by
+# sender, which is the entity the layering topology hangs off.
+sample:
+  sample_fraction: 1.0
+  sample_by: SENDER_ACCOUNT_ID
+
+# --- out-of-time split: computed once, committed, reused ---
+# The boundary is derived from train_frac and lives in the artefact, not here.
 split:
   strategy: out_of_time
   time_column: TIMESTAMP
-  train_end_step: 133          # steps 0..133 -> train (~67% of the 0..199 range)
-  embargo_steps: 1             # step 134 dropped; >= the widest graph-feature lookback
-  test_start_step: 135         # steps 135..199 -> test
+  train_frac: 0.70
+  embargo_steps: 1             # one daily step dropped; >= the widest graph-feature lookback
   random: false
   commit_to: artifacts/splits/amlsim_oot.json
   embargo_rationale: >
@@ -79,15 +96,25 @@ split:
     chain being half-trained-on and half-tested-on.
 
 data_card:
-  accounts: ~10000
+  accounts: 10000
   rows: 1323234                # verified
-  sar_base_rate: 0.0012998     # verified: 1719 / 1323234
+  sar_base_rate: 0.0012991     # verified: 1719 / 1323234
   time_span: "200 daily steps"
   quirks:
     - "Synthetic (multi-agent AML simulator): a stand-in for real AML graphs, not real data."
-    - "Only two typologies present (fan_in, cycle), not the seven AMLSim can generate."
-    - "IS_FRAUD is a string True/False in both transactions.csv and accounts.csv."
-    - "Transaction-level and account-level fraud labels both exist; use transaction-level."
+    - "Only two typologies present (fan_in 783, cycle 936), not the seven AMLSim can generate."
+    - "TX_TYPE is TRANSFER on all 1,323,234 rows. The column carries no information and is
+       not read."
+    - "IS_FRAUD is a real boolean in transactions.csv and the lowercase strings true/false in
+       accounts.csv. The loader normalises through str() so either parses."
+    - "alerts.csv has 1,719 rows but only 391 distinct ALERT_ID values; TX_ID is the unique key."
+    - "Every fraud row carries an ALERT_ID (none are -1), so the typology join loses nothing."
+    - "19 rows carry TX_AMOUNT == 0, which the contract rejects. The loader clamps them to 0.01
+       and logs the count rather than dropping them."
+    - "181 rows are self-transfers (sender == receiver). afl/attack/realism.py penalises the
+       generator for emitting one, so on this anchor that rule is a modelling choice rather than
+       a fact about payments. Ticket 14 has to decide which."
   cannot_tell_us:
     - "Nothing about card or UPI behavioural fraud; that is PaySim's job and the injected vectors'."
-    - "Base rate 0.13% matches PaySim, and both sit ~130x below the synthetic default."
+    - "No device, no merchant, no geo beyond a country code on the account."
+    - "Base rate 0.130% matches PaySim, and both sit ~130x below the synthetic default."

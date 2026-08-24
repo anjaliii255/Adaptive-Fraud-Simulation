@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from afl.contract.schema import Transaction
+from afl.evaluation import protocol
 from afl.fidelity import level1_statistical, level2_structural, level3_utility, privacy
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
@@ -117,19 +118,32 @@ def build(
     thresholds: Thresholds | None = None,
     seed: int = 1337,
     meta: dict[str, Any] | None = None,
+    fixed_fpr: float = protocol.DEFAULT_FPR,
+    k: int = protocol.DEFAULT_K,
 ) -> Scorecard:
     """Run every level that has the inputs it needs, then judge.
 
     Levels 3 and privacy need a real train/test split; without one they are skipped and said to
     be skipped, never quietly scored as passing.
+
+    `fixed_fpr` and `k` are the run's operating point. Level 3 compares detectors, so it has to
+    compare them where everything else in the project is compared — a TSTR gap measured at a
+    different threshold from the hero table is not evidence about the hero table.
     """
     card = Scorecard(thresholds=thresholds or Thresholds(), meta=meta or {})
+    card.meta.setdefault("operating_point", {"fixed_fpr": fixed_fpr, "k": k})
     card.levels["level1"] = level1_statistical.report(real, synth)
     card.levels["level2"] = level2_structural.report(real, synth)
 
     if real_train and real_test and detector_factory is not None:
         card.levels["level3"] = level3_utility.report(
-            real_train, real_test, synth, detector_factory, max_gap=card.thresholds.max_tstr_gap
+            real_train,
+            real_test,
+            synth,
+            detector_factory,
+            fixed_fpr=fixed_fpr,
+            k=k,
+            max_gap=card.thresholds.max_tstr_gap,
         )
         card.levels["privacy"] = privacy.report(
             real_train,

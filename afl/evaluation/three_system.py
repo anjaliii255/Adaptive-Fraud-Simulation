@@ -23,6 +23,8 @@ import numpy as np
 
 from afl.contract.metrics import MetricResult
 from afl.contract.schema import Transaction
+from afl.data.splits import CommittedSplit
+from afl.evaluation import protocol
 from afl.evaluation.leave_one_attack_out import DEFAULT_HOLDOUT, LeaveOneAttackOut
 from afl.loop.closed_loop import run_closed_loop
 from afl.tracking import InMemoryTracker
@@ -92,6 +94,9 @@ class SystemResult:
     n_train_fraud: int = 0
     rounds: int = 0
     history: list[dict[str, Any]] = field(default_factory=list)
+    #: Backend, params and what the fit saw — the provenance of this row. Kept out of `row()`
+    #: so it reaches the run artefact without turning the hero table into a config dump.
+    model_card: dict[str, Any] = field(default_factory=dict)
 
     def row(self) -> dict[str, Any]:
         return {
@@ -104,6 +109,12 @@ class SystemResult:
             "train_fraud": self.n_train_fraud,
             "rounds": self.rounds,
         }
+
+    @property
+    def backend(self) -> str:
+        card = self.model_card.get("supervised", self.model_card)
+        b = card.get("backend") or {}
+        return f"{b.get('name', 'unknown')} {b.get('version', '')}".strip()
 
 
 def _confine_to_training_window(simulator, train: list[Transaction]) -> None:
@@ -124,13 +135,34 @@ def _confine_to_training_window(simulator, train: list[Transaction]) -> None:
     inner.window_days = max(1, int(days))
 
 
-def _measure(name: str, detector, evaluator: LeaveOneAttackOut, train, **extra) -> SystemResult:
+def _card(detector) -> dict[str, Any]:
+    """A detector's model card, duck-typed.
+
+    Duck-typed rather than imported: `afl.evaluation` measures detectors, it does not know how
+    any of them are built, and a concrete import here would be the first thread of that coupling.
+    """
+    inner = getattr(detector, "supervised", detector)
+    card = getattr(inner, "model_card", None)
+    if not callable(card):
+        return {"detector": type(detector).__name__}
+    return (
+        card() if inner is detector else {"detector": type(detector).__name__, "supervised": card()}
+    )
+
+
+def plain_fit(detector, rows: list[Transaction]) -> None:
+    """The default `fit_detector`: fit, and leave the configured action bands alone."""
+    detector.fit(rows)
+
+
+def measure(name: str, detector, evaluator: LeaveOneAttackOut, train, **extra) -> SystemResult:
     return SystemResult(
         name=name,
         metrics=evaluator.leave_one_attack_out(detector),
         operational=evaluator.operational(detector),
         n_train=len(train),
         n_train_fraud=sum(1 for t in train if t.is_fraud),
+        model_card=_card(detector),
         **extra,
     )
 
@@ -148,18 +180,37 @@ def run_three_systems(
     seed: int = 1337,
     tracker=None,
     real_vectors: tuple[str, ...] = (),
+    split: CommittedSplit | None = None,
+    fixed_fpr: float = protocol.DEFAULT_FPR,
+    k: int = protocol.DEFAULT_K,
+    fit_detector: Callable[[Any, list[Transaction]], None] = plain_fit,
 ) -> list[SystemResult]:
     """All three systems, same split, same operating point, fresh detector each time.
 
     `pool` is real transactions plus one batch per attack vector; `simulator`/`optimiser` are
     only needed for System C.
 
+    `fixed_fpr` and `k` are the operating point, and they are arguments rather than defaults
+    picked up here so that one config value reaches all three rows. Two systems compared at two
+    thresholds is not a comparison.
+
+    `fit_detector` is how a system is trained, applied identically to all three. It is a hook
+    because calibrating the action bands needs a validation split of the training rows, and a
+    system whose bands were set differently from its neighbour's is not on the same operating
+    point either — even when its metrics are.
+
     `real_vectors` names synthetic families that stand in for "fraud the team already has labels
     for" — needed when there is no labelled real dataset, or System A has nothing to learn from
     and the control is vacuous rather than merely weak.
     """
     evaluator, train = LeaveOneAttackOut.from_pool(
-        pool, held_out_vector=held_out_vector, train_frac=train_frac, embargo_days=embargo_days
+        pool,
+        held_out_vector=held_out_vector,
+        train_frac=train_frac,
+        embargo_days=embargo_days,
+        split=split,
+        fixed_fpr=fixed_fpr,
+        k=k,
     )
     # what a team already had before any of this: real rows plus the families they have labels for
     historical = [t for t in train if t.vector_id is None or t.vector_id in real_vectors]
@@ -171,14 +222,14 @@ def run_three_systems(
     results: list[SystemResult] = []
 
     a = detector_factory()
-    a.fit(historical)
-    results.append(_measure("A_baseline", a, evaluator, historical))
+    fit_detector(a, historical)
+    results.append(measure("A_baseline", a, evaluator, historical))
 
     # B — the same rows, oversampled. It can only oversample what System A actually had.
     smote_train = historical + smote_transactions(historical, ratio=smote_ratio, seed=seed)
     b = detector_factory()
-    b.fit(smote_train)
-    results.append(_measure("B_smote", b, evaluator, smote_train))
+    fit_detector(b, smote_train)
+    results.append(measure("B_smote", b, evaluator, smote_train))
 
     # C — the same starting rows, plus whatever the loop generates. The loop is the only
     # difference between C and A; anything else in the diff would confound the claim.
@@ -190,11 +241,11 @@ def run_three_systems(
             )
         _confine_to_training_window(simulator, historical)
         c = detector_factory()
-        c.fit(historical)
+        fit_detector(c, historical)
         loop_tracker = tracker or InMemoryTracker("system_c")
         run_closed_loop(simulator, optimiser, c, evaluator, rounds=rounds, tracker=loop_tracker)
         results.append(
-            _measure(
+            measure(
                 "C_adaptive", c, evaluator, historical, rounds=rounds, history=loop_tracker.history
             )
         )
@@ -210,7 +261,12 @@ def to_frame(results: list[SystemResult]):
 
 
 def to_markdown(results: list[SystemResult]) -> str:
-    """The table as markdown, ready to paste into the deck."""
+    """The table as markdown, ready to paste into the deck.
+
+    The backend goes underneath it rather than in a column: it is the same for every row, and
+    "LightGBM" naming a table that a fallback actually produced is the misreading ticket 08
+    exists to prevent.
+    """
     rows = [r.row() for r in results]
     if not rows:
         return "_no systems run_"
@@ -218,6 +274,11 @@ def to_markdown(results: list[SystemResult]) -> str:
     lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join("---" for _ in cols) + " |"]
     for r in rows:
         lines.append("| " + " | ".join(f"{r[c]}" for c in cols) + " |")
+
+    backends = sorted({r.backend for r in results if r.backend})
+    if backends:
+        lines.append("")
+        lines.append(f"_detector backend: {', '.join(backends)}_")
     return "\n".join(lines)
 
 

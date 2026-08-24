@@ -21,13 +21,13 @@ blocks the frontier for both lanes.
 | # | Ticket | Owner | Blocked by |
 |---|--------|-------|-----------|
 | 01 | ~~Freeze the seam and the taxonomy~~ **done** | ◆ A+B | — |
-| 02 | Anchor on a real dataset with a committed split | ■ B | — |
+| 02 | ~~Anchor on a real dataset with a committed split~~ **done** | ■ B | — |
 | 03 | M3 — first-party fraud, the holdout family | ▲ A | 01 |
 | 04 | C2 — UPI collect-request / APP scam | ▲ A | 01 |
 | 05 | C3 — instant-A2A pass-through | ▲ A | 01 |
 | 06 | C1 + M2 — bust-out and the synthetic-identity lifecycle | ▲ A | 01 |
-| 07 | Causal features on real anchor data | ■ B | 02 |
-| 08 | LightGBM baseline at a fixed operating point | ■ B | 07 |
+| 07 | ~~Causal features on real anchor data~~ **done** | ■ B | 02 |
+| 08 | ~~LightGBM baseline at a fixed operating point~~ **done** | ■ B | 07 |
 | 09 | Graded decisions and SHAP reason codes | ■ B | 08 |
 | 10 | Anomaly layer scored on the holdout family | ■ B | 08, 03 |
 | 11 | Leave-one-attack-out harness with leakage guards | ■ B | 08, 03 |
@@ -129,7 +129,7 @@ computed over fraud rows, never over all rows.
 and it always runs on the *same* split. Someone re-running the pipeline next week gets numbers
 comparable to today's.
 
-A real dataset (PaySim, IEEE-CIS, or both) enters through the loaders and leaves as
+A real dataset (PaySim, AMLSim, or both) enters through the loaders and leaves as
 `list[Transaction]`. Nothing downstream may know which dataset it came from — that is what makes
 one detector, one feature set and one evaluation run over all three sources unchanged. Real rows
 carry no provenance: a real row that gains a `vector_id` has leaked a label path.
@@ -140,18 +140,75 @@ its known quirks, and what it cannot tell us.
 
 **Blocked by:** None (can start immediately, in parallel with 01).
 
-**Status:** ready-for-agent
+**Status:** done — split artefacts in `artifacts/splits/`, data cards in `docs/data-cards/`,
+decisions of record amended into `docs/adr/0002-dataset-anchors.md`
 
-- [ ] At least one real dataset loads end to end into contract types and the whole pipeline runs
-      on it via a config override, no code change
-- [ ] Real rows have `vector_id=None` and `attack_run_id=None`; a test asserts this
-- [ ] The out-of-time split boundary is committed as an artefact and re-used, and re-running
-      produces an identical partition
-- [ ] The embargo gap is non-zero and its rationale is recorded
-- [ ] A data card exists: source, licence, row count, fraud base rate, time span, quirks, limits
-- [ ] The synthetic placeholder config still works with nothing to download
-- [ ] Fraud base rate on the real anchor is reported; if it differs from the synthetic default by
-      an order of magnitude, that is called out, because every operating point depends on it
+- [x] **Both** real datasets load end to end into contract types and the whole pipeline runs on
+      them via a config override, no code change — `data=paysim` (636k rows, 74s) and
+      `data=amlsim` (1.32M rows, 3m19s)
+- [x] Real rows have `vector_id=None` and `attack_run_id=None`; `loaders.assert_no_provenance`
+      runs inside every loader and three tests assert it, one per failure mode
+- [x] The out-of-time split boundary is committed as an artefact and re-used — `CommittedSplit`
+      stores two timestamps plus a digest, and a test proves the partition does not move when the
+      pool grows, where the fraction-based split does
+- [x] Re-running produces an identical partition — asserted on the real files, txn_id by txn_id,
+      across both the entity sample and the boundary
+- [x] The embargo gap is non-zero and its rationale is recorded — enforced in `__post_init__`:
+      a zero gap and a blank rationale both raise
+- [x] A data card exists per anchor: source, licence, row count, base rate, span, the committed
+      split, sampling, measured integrity checks, quirks, limits — generated from the files by
+      `make splits`, never hand-typed
+- [x] The synthetic placeholder config still works with nothing to download — `make smoke`,
+      `make loop`, `make compare`, `make fidelity`, `make figures` all green, and every synthetic
+      number is byte-identical to pre-change `HEAD`
+- [x] Fraud base rate reported and the gap called out — measured, not quoted: both anchors at
+      ~0.13% against the synthetic default's 4.74%, ~37x, printed as a warning by `make splits`
+      and written into every data card
+- [x] `make test` green (128 passed, up from 85), `ruff` clean
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **PaySim has no sender history, and this is the biggest finding.** `nameOrig` is effectively
+  unique per row — 6,353,307 distinct origins over 6,362,620 rows, mean 1.001. Every `src`-side
+  velocity, RFM and recency feature is *structurally empty* on that anchor. **Ticket 07 has to
+  build on the beneficiary side or it is building on nothing.** `nameDest` is the only entity
+  with a past (mean 2.34, max 113).
+- **Four claims in ADR 0002 did not survive contact with the files** and are corrected in the
+  amendment: the synthetic base rate is 4.74% not ~17% (so 37x, not 130x); the typology join key
+  is `TX_ID` not `ALERT_ID` (1,719 alert rows share only 391 alert ids); a step-fraction split is
+  not a row-fraction split; and BankSim is not on disk at all.
+- **The committed boundary moved, and the old one was wrong.** PaySim's `train_end_step: 500` put
+  95.3% of rows in train and left a 4% test tail, because 341 of its 743 steps carry under 100
+  rows. Boundaries are now derived from the row quantile: PaySim step 323 (70.2%/23.7%), AMLSim
+  step 140 (70.3%/29.2%). `train_end_step` is gone from the configs — the config holds the
+  *inputs*, the artefact holds the *decision*.
+- **The out-of-time cut lands on two different base rates.** PaySim fraud is 3.5x denser in test
+  (0.289%) than train (0.082%). **Ticket 08 inherits this:** a threshold calibrated on a tail of
+  train does not transfer unchanged to test, and every recall figure has to name its side.
+- **Real traffic breaks a realism rule we enforce.** AMLSim has 181 self-transfers and 19
+  zero-amount rows; PaySim has 16 zero-amount rows. `afl/attack/realism.py` penalises the
+  generator for emitting a self-transfer. **Ticket 14** derives its empirical bounds from these
+  files and has to decide whether that rule is a fact or a modelling choice.
+- **Full PaySim is ~7.7 GB as contract rows**, so the default reads a deterministic 10%
+  hash-sample of beneficiaries. Whole entities are kept or dropped, never individual rows — half
+  an account's history is a velocity profile no production scorer would ever see. Base rate holds
+  to within 2.2% relative. `data.sample.sample_fraction=1.0` reads everything.
+- **The simulator's window is now aligned to the anchor.** `engines.yaml` starts on 2024-01-01
+  and PaySim's epoch puts it in January 2023; left alone, every synthetic fraud row landed a year
+  after every real row and the out-of-time split degenerated into "real = train, synthetic =
+  test". An attack has to happen inside the traffic it hides in.
+- **The AMLSim typology is a side-channel, not a wire field.** `loaders.amlsim_typologies()`
+  returns `txn_id → fan_in|cycle`. It is deliberately not on `Transaction`: **ticket 11** reads
+  the map, and writing it into `vector_id` would put provenance on a real row and make the family
+  carve-out treat AMLSim rows as a synthetic family.
+- **The README's adaptive figure was already stale** (0.312; it reproduces at 0.126). Verified
+  against pre-change `HEAD` — nothing in this ticket moved it. Refreshed, and the two number
+  regimes are now quarantined into separate sections as ADR 0002 requires.
+- **First real-anchor reading, and it is weak on purpose:** PaySim PR-AUC 0.025, recall@1%FPR
+  0.243, **precision@100 0.00**; AMLSim 0.007 / 0.067 / 0.08. `caught_rate = 1.0` on PaySim is
+  blanket friction on 14% of traffic, not detection. Features (07) and the tuned detector (08)
+  are what make these mean anything.
+- **Fixed in passing:** `load_ieee_cis` removed as ADR 0002 planned; `make splits` added.
 
 ---
 
@@ -297,16 +354,110 @@ signal was leakage. So causality gets a property test, not a code review.
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** done — feature dictionary in `docs/features.md`, per-anchor cost and coverage in
+`artifacts/features/`, both regenerated by `make features`
 
-- [ ] Features build over the real anchor dataset at a workable speed, and the timing is recorded
-- [ ] Property test: a feature computed for a row does not change when later rows are appended
-- [ ] Test: no forbidden column (`is_fraud`, `vector_id`, `attack_run_id`, `txn_id`) reaches X
-- [ ] Stateful mode carries entity history across batches and a test proves accumulation
-- [ ] Graph features are computed as-of the row's timestamp, never over the full graph
-- [ ] Feature names are stable and human-readable — ticket 09's reason codes depend on them
-- [ ] The feature list, with a one-line rationale each, is written down where the next person
-      will find it
+- [x] Features build over the real anchor dataset at a workable speed, and the timing is recorded
+      — PaySim's 636,409 rows in about 6s and AMLSim's 1,323,234 in about 10s, both for the full
+      56 columns, at over 110k rows/s each. The exact figures live in `docs/features.md`, written
+      there by the script that measured them rather than typed in, and `tests/test_features.py`
+      holds a throughput floor that catches a regression to quadratic
+- [x] Property test: a feature computed for a row does not change when later rows are appended —
+      twice over, on one hand-built probe and on random traffic, plus a brute-force reference
+      that recomputes all 56 columns the obvious way and must agree exactly
+- [x] Test: no forbidden column (`is_fraud`, `vector_id`, `attack_run_id`, `txn_id`) reaches X —
+      and `assert_no_forbidden_columns` runs inside `transform`, with a test that deliberately
+      leaks one to prove the guard fires
+- [x] Stateful mode carries entity history across batches and a test proves accumulation — over
+      four consecutive batches, against a stateless builder that must *not* accumulate
+- [x] Graph features are computed as-of the row's timestamp, never over the full graph — proved
+      by adding twenty later edges and re-scoring the same row
+- [x] Feature names are stable and human-readable — the emitted columns are asserted equal to
+      the registry, in order, and `explain.FEATURE_PHRASES` is asserted to name no column that
+      does not exist
+- [x] The feature list, with a one-line rationale each, is written down where the next person
+      will find it — `docs/features.md`, generated from `feature_specs()`, with the measured
+      per-anchor coverage beside each rationale
+- [x] `make test` green (161 passed, up from 128), `ruff check` and `ruff format` clean, and
+      `make smoke`, `make splits`, `make features`, `make fidelity`, `make loop`, `make compare`
+      and `make figures` all run. `make splits` regenerates the committed boundaries and the data
+      cards byte-identically, so ticket 02's decisions of record did not move
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **The M3 fold on a real anchor cannot carry a claim, and this is the biggest finding.** After
+  the family carve-out, *every positive in the holdout is an injected synthetic row and every
+  negative is a real one*. A classifier told to sort the two apart does it at **AUC 1.00** on
+  PaySim and 0.994 on AMLSim, on either the old or the new feature table — so the fold's recall
+  is partly reporting how far the injected family sits from the real distribution, not how well
+  anything detects first-party fraud. The committed fidelity scorecards agree from the other
+  side: PaySim KS 0.86 on log-amount, 0.89 on the inter-transaction gap, TSTR ratio 0.03.
+  **Ticket 11** needs the fold to say this itself — "too few positives to be meaningful" is not
+  the only way a fold can be meaningless. **Ticket 15's** Level 3 is the gate that closes it.
+- **Direction was the bug, and it was not a small one.** The old builder kept *one* history per
+  entity and appended every transaction to both the sender's and the beneficiary's, so "payments
+  sent in the last hour" also counted payments received, and fan-in and fan-out were literally
+  the same number. Every entity now has two streams, `out` and `in`. The features that matter
+  most are the ones crossing them: `src_seconds_since_last_in` is the dwell time C3 trades
+  against, and `src_passthrough_ratio_3600s` is near 1.0 for a mule and well under it for a real
+  account. Neither is expressible if the directions are added together.
+- **The beneficiary block is the one that works on both anchors, exactly as ticket 02 predicted.**
+  Nine windowed fan-in features plus seven lifetime ones, all on `dst`. On PaySim they run 11-57%
+  informative while the whole `src` block is dead or under 1%.
+- **17 of 56 columns are structurally dead on PaySim, 8 on AMLSim, 1 on synthetic** — measured per
+  anchor and published in `docs/features.md` rather than inferred. PaySim kills the entire
+  `src_out_*` 1h block, `src_amount_z`, the pass-through block and — a new one — the whole
+  `pair_*` block, because a sender that appears once has never paid anyone twice. **Ticket 08**
+  should read that table before it tunes: a fifth of the columns are constant on the anchor it
+  will report from.
+- **The features moved AMLSim and not PaySim, and that is the anchors talking, not the code.**
+  Model, seed and committed boundary held fixed, measured on each anchor's *own* labelled fraud:
+  AMLSim PR-AUC 0.83 → 0.95, recall@1%FPR 0.93 → 0.97, precision@100 0.98 → 1.00; PaySim
+  0.14 → 0.13 with precision@100 0.38 → 0.47. AMLSim has real histories on both sides for the
+  directional and graph features to read; PaySim has almost none. Do not quote AMLSim's column
+  as a production number — it is a simulator whose SAR rows carry a deliberately distinctive
+  fan-in / cycle topology, so what it shows is that graph features find graph fraud. (One-off
+  before/after, model held fixed at sklearn HistGradientBoosting; the old table is in git at
+  `f27b335`.)
+- **Every feature name changed shape, on purpose, and `explain.py` moved with it.** `src_cnt_*`
+  became `src_out_cnt_*`, `dst_cnt_*` became `dst_in_cnt_*`, `dst_is_new_counterparty` became
+  `pair_is_first_payment`. A name now states the entity, the direction and the window. **Ticket
+  09** inherits the vocabulary: 34 of the 56 have an analyst phrase, the rest fall back to the
+  column name with the underscores knocked out, and a test fails if a phrase outlives its column.
+- **`dst_in_degree` changed meaning and its old one was wrong.** It counted inbound *events*
+  while its own reason code said "how many accounts have ever paid this beneficiary". It now
+  counts distinct payers as of the row's timestamp; `dst_in_txn_count` is the event count.
+- **Scoring a batch that predates the committed history is the slow path, and the loop's batches
+  are that shape.** In-order scoring — a detector fitted on train scoring an out-of-time test
+  window — runs at 84-135k rows/s. A batch generated *inside* the traffic it hides in is inserted
+  into the middle of each entity's history instead of appended, which is roughly an order of
+  magnitude slower per row on a deep-history anchor. It is bounded by one entity's history, not by
+  total rows, so it stays workable at the batch sizes **ticket 12** generates — but do not score
+  50,000 old rows against a 1.3M-row history and be surprised.
+- **The amount z-score needed a numerically stable variance, and the naive one was already
+  wrong.** `E[x^2] - E[x]^2` over an account that pays nearly the same amount every time — a
+  subscription, an EMI, a salary — has both terms agreeing to fifteen digits, so what survives is
+  rounding error, and `src_amount_z` divides by it. Measured before the fix: at amounts around
+  1e7 with a spread of 1 the standard deviation was **10% wrong**, and at 1e9 it collapsed to
+  zero and took the z-score with it. The prefix sums are now kept shifted by the stream's first
+  amount, which costs one float per stream, is exact when the amounts are constant, and has two
+  regression tests. Worth knowing because `src_amount_z` is the drift tell behind S3, C1 and M3 —
+  a spurious variance there is a spurious "this account is behaving unusually".
+- **History retention is unbounded on purpose.** `src_out_txn_count`, `dst_in_degree` and the two
+  account ages are exact as-of-the-row *because* nothing is ever dropped; the old builder trimmed
+  to seven days and called the result a lifetime count. The cost is linear in events, two per
+  transaction, and `FeatureBuilder.state_size()` reports it — 2.6M events for AMLSim, 1.3M for
+  the PaySim sample.
+- **`amount_is_round` is constant zero on synthetic traffic and non-zero on both real anchors.**
+  The generator rounds amounts to the paisa and therefore never emits a round-hundred figure,
+  while 0.07% of PaySim and 0.02% of AMLSim rows are. Structuring — the behaviour M1's boundary
+  walk models — is characterised by round numbers, so **ticket 14** has an empirical bound to set
+  here, and it is the kind of tell a fidelity check would otherwise miss.
+- **Two tests moved.** `test_features_do_not_see_the_future` and
+  `test_scoring_does_not_mutate_feature_state` left `tests/test_eval.py` for the new
+  `tests/test_features.py`, which is where the rest of the causality work now lives.
+- **`artifacts/features/` is committed**, like `artifacts/splits/`, so every number in
+  `docs/features.md` traces to the file that produced it — the discipline **ticket 20** audits.
 
 ---
 
@@ -327,17 +478,106 @@ up because they are the expensive examples.
 
 **Blocked by:** 07.
 
-**Status:** ready-for-agent
+**Status:** done — reference in `artifacts/detector/`, written up in `docs/detector.md`, both
+regenerated by `make baseline`
 
-- [ ] Trains and scores on the real anchor through the `score` / `retrain` seam
-- [ ] PR-AUC, recall @ fixed FPR and precision@k reported on the out-of-time split
-- [ ] Accuracy and ROC-AUC are not reported as headline numbers anywhere
-- [ ] The operating point is fixed in config and every comparison uses it
-- [ ] Which backend was used (LightGBM vs sklearn fallback) is recorded in the run artefact
-- [ ] `retrain` accumulates rather than replacing, and a test proves it
-- [ ] Evasions are weighted above ordinary training rows, and the weight is config, not a literal
-- [ ] Baseline numbers are committed as the reference every later ticket compares against
-- [ ] A is told it is ready, because ticket 12 unblocks on it
+- [x] Trains and scores on the real anchor through the `score` / `retrain` seam — `make baseline`
+      fits on the training side of the committed boundary and scores the test side through
+      `detector.score(batch)`; `retrain` is exercised and asserted in `tests/test_detector.py`
+- [x] PR-AUC, recall @ fixed FPR and precision@k reported on the out-of-time split — PaySim
+      **0.152 / 0.478 / 0.48**, AMLSim **1.000 / 1.000 / 1.00**, each on its own labelled fraud
+      at the committed boundary. Read the AMLSim row with the carry-out below, not on its own
+- [x] Accuracy and ROC-AUC are not reported as headline numbers anywhere — enforced rather than
+      promised: `afl/defend/baseline.py` refuses to save an artefact whose metrics contain
+      either, at any depth, and a test tries three spellings including `balanced_accuracy`
+- [x] The operating point is fixed in config and every comparison uses it — `eval.fixed_fpr` and
+      `eval.k` now reach `run_three_systems`, the fidelity scorecard's Level 3 and the baseline
+      script; `decision.assert_one_operating_point` refuses a config that names two
+- [x] Which backend was used (LightGBM vs sklearn fallback) is recorded in the run artefact —
+      a `Backend` record (name, version, why, what the fallback had to drop) on every model card,
+      in `metrics.json` per system, under the three-system table, and in `/health`
+- [x] `retrain` accumulates rather than replacing, and a test proves it — two tests: one over two
+      generated batches, one over three rounds, because a bug that keeps only the last round
+      survives a one-round test
+- [x] Evasions are weighted above ordinary training rows, and the weight is config, not a literal
+      — `sample_weights()` is asserted at two different configured weights, and the count that
+      was weighted up is on the model card
+- [x] Baseline numbers are committed as the reference every later ticket compares against —
+      `artifacts/detector/<anchor>.json` carries the metrics, the params, the backend, the split
+      digest and the seed; four tests check a committed reference against the boundary and the
+      operating point in force, and that it still beats both of its controls
+- [x] A is told it is ready, because ticket 12 unblocks on it — **▲ A: the real detector is
+      ready.** `build_detector_factory` loads the committed tuned params automatically on
+      `data=paysim` / `data=amlsim`, so ticket 12 needs no code change to swap off `StubDetector`
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **libomp was missing, so no number in the README was ever LightGBM's.** It is installed now and
+  every number above came out of LightGBM 4.5.0. The wheel imports cleanly and *then*
+  fails to `dlopen` its own shared library, which is why this went unnoticed: the code fell back
+  to sklearn HistGradientBoosting and kept running. The backend is now a record, not a string —
+  name, version, why it was chosen, and which searched params the fallback has no equivalent for.
+- **The old baseline was soft, and the margin is the whole point of this ticket.** On PaySim, the
+  same features, the same seed, the same committed boundary: PR-AUC **0.060 → 0.152**,
+  recall@1%FPR **0.371 → 0.478**, precision@100 **0.14 → 0.48**. The only difference is 40 Optuna
+  trials against a validation tail *inside* the training window. Every comparison anyone makes
+  against a pre-08 detector was a comparison against a straw man, and that includes the honest
+  failure the README reports for the adaptive loop.
+- **AMLSim is separable before any model runs, and this is the biggest finding.** Every alerted
+  row in the file is a sub-20 amount, against legit traffic reaching 21.5M — a band containing
+  only 21.9% of the negatives. Sorting on **amount alone**, direction chosen on train, reaches
+  PR-AUC 0.456 and **precision@100 of 1.00** on the test window. The graph features finish the
+  job and the tuned detector hits 1.000 across the board. **No AMLSim number is evidence about
+  detection**; it is evidence that the generator is legible. Tickets 11, 15, 17 and 18 all plan
+  to report from it — do not, or label it as a generator artefact every time.
+- **So every artefact now carries an `amount_only` floor.** A baseline is only "strong" relative
+  to how hard the anchor was, and this is the cheapest honest way to say how hard it was: no
+  model, no features, no training, direction chosen on train. PaySim's floor is PR-AUC 0.057
+  against the detector's 0.152, and its fraud spans the entire amount range, so **PaySim is the
+  anchor to read.** A test fails if a committed reference stops beating its own floor.
+- **`subsample` has been an inert knob since the skeleton.** LightGBM ignores `subsample` unless
+  `subsample_freq > 0`, and no config ever set it. Every run's "0.9 row sampling" did nothing.
+  Fixed in `DEFAULT_PARAMS`, and it is a searched knob now that it means something.
+- **`A_baseline` meant two different things in two artefacts.** `experiment=baseline` calibrated
+  the action bands to the target FPR; the three-system table did not, so the same system name
+  carried two sets of bands and therefore two `evasion_rate` columns. All three systems now go
+  through one `fit_detector` hook. **The synthetic hero-table numbers moved because of this**, not
+  because the loop changed.
+- **The operating point was never actually config-driven.** `run_three_systems` never received
+  `eval.fixed_fpr` or `eval.k` and silently used the protocol defaults, which happened to match —
+  so the config knob had no effect and nobody could have noticed. Same for the fidelity
+  scorecard's Level 3, which compared detectors at a threshold the rest of the run did not use.
+- **The M3 fold did not move, and that is ticket 11's problem statement.** A detector 2.5x better
+  on PaySim's own fraud scores **0.0066 / 0.043 / 0.00** on the M3 leave-one-attack-out fold —
+  within noise of the untuned one. Ticket 07 said that fold measures the distance between an
+  injected family and the real distribution; this is the confirmation, from the other side. A
+  better detector cannot fix a fold that is not measuring detection.
+- **Only the decline band is calibrated, and ticket 09 should start here.** `calibrate_to_fpr`
+  places `decline_at` at the target FPR and then puts the other three bands at fixed ratios below
+  it — 0.8, 0.6 and 0.3 of it — which are calibrated to nothing. On the PaySim M3 fold that lands
+  friction on **45.6% of holdout traffic** while precision@100 is 0.00: blanket friction, not
+  detection. The three metrics are unaffected (they are ranking metrics), but `evasion_rate` and
+  `friction_rate` in the same table are a function of those ratios. **Ticket 09** replaces them
+  with bands chosen by expected cost, which is the fix.
+- **The hero table's System A is not the reference in `docs/detector.md`.** `defend.unsupervised`
+  has `ensemble.enabled: true`, so every system in `run_experiment` is a blend of the supervised
+  detector and an isolation forest at weight 0.7 — the model card says `EnsembleDetector` and
+  names both halves. `make baseline` measures the supervised detector alone. Two different
+  systems, two artefacts; do not quote one for the other.
+- **PaySim's test window is 3.3x denser in fraud than its training window** (0.083% → 0.272%), as
+  ticket 02 warned. The bands are calibrated on a validation tail of *train* and land at
+  `decline_at = 0.0287`; every metric names the side it was measured on, in the artefact.
+- **The tuning validation tail is thin, and the artefact says so.** 46 fraud rows on PaySim, 196
+  on AMLSim. `n_val_positives` is recorded next to the score for exactly this reason — a search
+  maximised against 46 positives has a real variance nobody should read past.
+- **`artifacts/detector/` is committed, like `artifacts/splits/`.** Config holds the inputs (the
+  starting params and the search envelope); the artefact holds the decision (the params the
+  search landed on). `make baseline` regenerates both, and re-running it reproduced every metric
+  identically. `make baseline --doc-only` rewrites the document from the committed artefacts
+  alone, since it is a pure function of them.
+- **Fixed in passing:** `/health` returned a dataclass where the Streamlit demo expected a string;
+  `calibrate()` left the detector unfitted when there were too few validation rows to calibrate
+  with; `three_system.measure` is public now, because `run_experiment` was reaching for `_measure`.
 
 ---
 

@@ -1,9 +1,20 @@
 # The workhorse. Every headline number is measured against this; the exotic layers have to
-# beat it on the same split before they earn a row in the table.
+# beat it on the same split before they earn a row in the table. Which only means anything if
+# this one is tuned honestly — a soft baseline makes every later result meaningless.
+#
+# This file holds the INPUTS: the starting params and the envelope the search may move inside.
+# The DECISION — the params the search landed on for an anchor — is committed to
+# artifacts/detector/<anchor>.json by `make baseline`, next to the numbers it produced. Same
+# division as the committed split: config that carried the tuned params would drift from the run
+# that justified them the moment either was edited alone.
 
 kind: lgbm
-replay_weight: 3.0     # evasions are the expensive examples
+replay_weight: 3.0     # evasions are the expensive examples; see afl/defend/models/lgbm.py
 explain: false         # SHAP costs real time in the loop; on for the demo, off for sweeps
+
+# Read the committed tuned params for this run's anchor when there are any. false pins the run
+# to the starting params below, which is how the "did tuning help" column is produced.
+use_committed_params: true
 
 params:
   learning_rate: 0.05
@@ -11,7 +22,33 @@ params:
   min_child_samples: 20
   n_estimators: 300
   subsample: 0.9
+  subsample_freq: 1    # LightGBM ignores `subsample` at the default freq of 0; without this the
+                       # row-sampling fraction above is an inert knob
   colsample_bytree: 0.8
+  reg_lambda: 0.0
+  class_weight: null   # null | balanced — searched, not assumed; see the envelope below
+
+# The honest-tuning contract. The search only ever sees a validation tail of the TRAINING
+# window: afl/defend/tuning.py raises if the validation rows are not strictly after the fitting
+# rows, because a search that touches the test window produces a number that looks like skill.
+tuning:
+  enabled: true
+  n_trials: 40
+  backend: auto        # optuna | random | auto — the random path is exercised in CI
+  metric: pr_auc       # pr_auc | recall_at_fixed_fpr; measured at eval.fixed_fpr
+  fit_frac: 0.8        # of the training window; the remaining tail is the tuning validation set
+
+  # Deliberately wide. A search space hugging the defaults makes the search a formality and
+  # leaves the baseline soft, which is the one failure this ticket exists to avoid.
+  search_space:
+    learning_rate:     {type: float, low: 0.01, high: 0.3, log: true}
+    num_leaves:        {type: int,   low: 15,   high: 255, log: true}
+    min_child_samples: {type: int,   low: 5,    high: 300, log: true}
+    n_estimators:      {type: int,   low: 100,  high: 900, step: 100}
+    subsample:         {type: float, low: 0.5,  high: 1.0}
+    colsample_bytree:  {type: float, low: 0.4,  high: 1.0}
+    reg_lambda:        {type: float, low: 0.001, high: 50.0, log: true}
+    class_weight:      {type: categorical, choices: [null, balanced]}
 
 features:
   stateful: true       # a mule's history does not reset because a new round began

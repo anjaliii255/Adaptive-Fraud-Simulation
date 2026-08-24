@@ -1,0 +1,485 @@
+{
+  "dataset": "paysim",
+  "rows": 636409,
+  "n_features": 56,
+  "build_seconds": 5.61,
+  "build_rows_per_second": 113450,
+  "score_rows": 50000,
+  "score_seconds": 0.396,
+  "score_rows_per_second": 126126,
+  "state": {
+    "entities": 908343,
+    "events": 1272818,
+    "pairs": 636409,
+    "devices": 0
+  },
+  "dead_features": [
+    "device_is_new",
+    "device_seconds_since_first",
+    "pair_is_first_payment",
+    "pair_seconds_since_last",
+    "pair_txn_count",
+    "rail_a2a",
+    "rail_card",
+    "rail_upi",
+    "src_amount_z",
+    "src_in_cnt_3600s",
+    "src_in_sum_3600s",
+    "src_out_amount_std",
+    "src_out_cnt_3600s",
+    "src_out_sum_3600s",
+    "src_out_uniq_dst_3600s",
+    "src_passthrough_ratio_3600s",
+    "src_uniq_devices"
+  ],
+  "coverage": {
+    "amount": {
+      "group": "row",
+      "distinct_values": 622730,
+      "share_informative": 0.999483,
+      "share_never": 0.0,
+      "mean": 181607.521214,
+      "dead": false
+    },
+    "log_amount": {
+      "group": "row",
+      "distinct_values": 622730,
+      "share_informative": 0.999483,
+      "share_never": 0.0,
+      "mean": 10.843299,
+      "dead": false
+    },
+    "hour_of_day": {
+      "group": "row",
+      "distinct_values": 24,
+      "share_informative": 0.898809,
+      "share_never": 0.0,
+      "mean": 15.321058,
+      "dead": false
+    },
+    "is_night": {
+      "group": "row",
+      "distinct_values": 2,
+      "share_informative": 0.0178,
+      "share_never": 0.0,
+      "mean": 0.0178,
+      "dead": false
+    },
+    "day_of_week": {
+      "group": "row",
+      "distinct_values": 7,
+      "share_informative": 0.759942,
+      "share_never": 0.0,
+      "mean": 3.162289,
+      "dead": false
+    },
+    "is_weekend": {
+      "group": "row",
+      "distinct_values": 2,
+      "share_informative": 0.374893,
+      "share_never": 0.0,
+      "mean": 0.374893,
+      "dead": false
+    },
+    "rail_card": {
+      "group": "row",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "rail_upi": {
+      "group": "row",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "rail_a2a": {
+      "group": "row",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 1.0,
+      "dead": true
+    },
+    "amount_is_round": {
+      "group": "row",
+      "distinct_values": 2,
+      "share_informative": 0.000707,
+      "share_never": 0.0,
+      "mean": 0.000707,
+      "dead": false
+    },
+    "amount_under_10k": {
+      "group": "row",
+      "distinct_values": 2,
+      "share_informative": 0.016307,
+      "share_never": 0.0,
+      "mean": 0.016307,
+      "dead": false
+    },
+    "amount_under_1k": {
+      "group": "row",
+      "distinct_values": 2,
+      "share_informative": 0.002362,
+      "share_never": 0.0,
+      "mean": 0.002362,
+      "dead": false
+    },
+    "src_out_cnt_3600s": {
+      "group": "src-outbound",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_out_sum_3600s": {
+      "group": "src-outbound",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_out_uniq_dst_3600s": {
+      "group": "src-outbound",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_out_cnt_86400s": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 1.3e-05,
+      "share_never": 0.0,
+      "mean": 1.3e-05,
+      "dead": false
+    },
+    "src_out_sum_86400s": {
+      "group": "src-outbound",
+      "distinct_values": 9,
+      "share_informative": 1.3e-05,
+      "share_never": 0.0,
+      "mean": 2.420288,
+      "dead": false
+    },
+    "src_out_uniq_dst_86400s": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 1.3e-05,
+      "share_never": 0.0,
+      "mean": 1.3e-05,
+      "dead": false
+    },
+    "src_out_cnt_604800s": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 7.2e-05,
+      "share_never": 0.0,
+      "mean": 7.2e-05,
+      "dead": false
+    },
+    "src_out_sum_604800s": {
+      "group": "src-outbound",
+      "distinct_values": 47,
+      "share_informative": 7.2e-05,
+      "share_never": 0.0,
+      "mean": 7.901951,
+      "dead": false
+    },
+    "src_out_uniq_dst_604800s": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 7.2e-05,
+      "share_never": 0.0,
+      "mean": 7.2e-05,
+      "dead": false
+    },
+    "src_out_txn_count": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 0.000135,
+      "share_never": 0.0,
+      "mean": 0.000135,
+      "dead": false
+    },
+    "src_seconds_since_last_out": {
+      "group": "src-outbound",
+      "distinct_values": 81,
+      "share_informative": 0.000135,
+      "share_never": 0.999865,
+      "mean": 86.623032,
+      "dead": false
+    },
+    "src_out_amount_mean": {
+      "group": "src-outbound",
+      "distinct_values": 87,
+      "share_informative": 0.000135,
+      "share_never": 0.0,
+      "mean": 17.793085,
+      "dead": false
+    },
+    "src_out_amount_std": {
+      "group": "src-outbound",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_amount_z": {
+      "group": "src-outbound",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_amount_ratio_to_mean": {
+      "group": "src-outbound",
+      "distinct_values": 87,
+      "share_informative": 0.000135,
+      "share_never": 0.0,
+      "mean": 1.002104,
+      "dead": false
+    },
+    "src_out_uniq_beneficiaries": {
+      "group": "src-outbound",
+      "distinct_values": 2,
+      "share_informative": 0.000135,
+      "share_never": 0.0,
+      "mean": 0.000135,
+      "dead": false
+    },
+    "src_account_age_s": {
+      "group": "src-outbound",
+      "distinct_values": 87,
+      "share_informative": 0.000146,
+      "share_never": 0.999854,
+      "mean": 91.453898,
+      "dead": false
+    },
+    "dst_in_cnt_3600s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 26,
+      "share_informative": 0.112442,
+      "share_never": 0.0,
+      "mean": 0.18687,
+      "dead": false
+    },
+    "dst_in_sum_3600s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 71269,
+      "share_informative": 0.112442,
+      "share_never": 0.0,
+      "mean": 62360.445965,
+      "dead": false
+    },
+    "dst_in_uniq_src_3600s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 26,
+      "share_informative": 0.112442,
+      "share_never": 0.0,
+      "mean": 0.18687,
+      "dead": false
+    },
+    "dst_in_cnt_86400s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 87,
+      "share_informative": 0.383274,
+      "share_never": 0.0,
+      "mean": 1.129909,
+      "dead": false
+    },
+    "dst_in_sum_86400s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 243669,
+      "share_informative": 0.383274,
+      "share_never": 0.0,
+      "mean": 333582.427607,
+      "dead": false
+    },
+    "dst_in_uniq_src_86400s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 87,
+      "share_informative": 0.383274,
+      "share_never": 0.0,
+      "mean": 1.129909,
+      "dead": false
+    },
+    "dst_in_cnt_604800s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 94,
+      "share_informative": 0.555935,
+      "share_never": 0.0,
+      "mean": 3.612152,
+      "dead": false
+    },
+    "dst_in_sum_604800s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 353594,
+      "share_informative": 0.555935,
+      "share_never": 0.0,
+      "mean": 1000870.961913,
+      "dead": false
+    },
+    "dst_in_uniq_src_604800s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 94,
+      "share_informative": 0.555935,
+      "share_never": 0.0,
+      "mean": 3.612152,
+      "dead": false
+    },
+    "dst_in_txn_count": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 102,
+      "share_informative": 0.572542,
+      "share_never": 0.0,
+      "mean": 5.101952,
+      "dead": false
+    },
+    "dst_in_degree": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 102,
+      "share_informative": 0.572542,
+      "share_never": 0.0,
+      "mean": 5.101952,
+      "dead": false
+    },
+    "dst_seconds_since_last_in": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 486,
+      "share_informative": 0.572542,
+      "share_never": 0.427458,
+      "mean": 62404.548587,
+      "dead": false
+    },
+    "dst_in_amount_mean": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 364154,
+      "share_informative": 0.572542,
+      "share_never": 0.0,
+      "mean": 147485.544576,
+      "dead": false
+    },
+    "dst_amount_z": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 318466,
+      "share_informative": 0.500423,
+      "share_never": 0.0,
+      "mean": 1.135651,
+      "dead": false
+    },
+    "dst_is_first_ever_inbound": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 2,
+      "share_informative": 0.427458,
+      "share_never": 0.0,
+      "mean": 0.427458,
+      "dead": false
+    },
+    "dst_account_age_s": {
+      "group": "beneficiary-inbound",
+      "distinct_values": 709,
+      "share_informative": 0.572559,
+      "share_never": 0.427441,
+      "mean": 270940.774837,
+      "dead": false
+    },
+    "src_in_cnt_3600s": {
+      "group": "pass-through",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_in_sum_3600s": {
+      "group": "pass-through",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "src_seconds_since_last_in": {
+      "group": "pass-through",
+      "distinct_values": 8,
+      "share_informative": 1.1e-05,
+      "share_never": 0.999989,
+      "mean": 0.928959,
+      "dead": false
+    },
+    "src_passthrough_ratio_3600s": {
+      "group": "pass-through",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "dst_out_cnt_3600s": {
+      "group": "pass-through",
+      "distinct_values": 2,
+      "share_informative": 2e-06,
+      "share_never": 0.0,
+      "mean": 2e-06,
+      "dead": false
+    },
+    "pair_is_first_payment": {
+      "group": "relationship",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 1.0,
+      "dead": true
+    },
+    "pair_txn_count": {
+      "group": "relationship",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "pair_seconds_since_last": {
+      "group": "relationship",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 1.0,
+      "mean": -1.0,
+      "dead": true
+    },
+    "src_uniq_devices": {
+      "group": "device",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "device_is_new": {
+      "group": "device",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 0.0,
+      "mean": 0.0,
+      "dead": true
+    },
+    "device_seconds_since_first": {
+      "group": "device",
+      "distinct_values": 1,
+      "share_informative": 0.0,
+      "share_never": 1.0,
+      "mean": -1.0,
+      "dead": true
+    }
+  }
+}
