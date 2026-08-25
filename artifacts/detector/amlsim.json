@@ -6,12 +6,109 @@
     "fixed_fpr": 0.01,
     "k": 100,
     "source": "config/eval/leave_one_attack_out.yaml",
-    "decision_bands": {
-      "mode": "threshold",
-      "step_up_at": 4.309270309684212e-07,
-      "hold_at": 8.618540619368424e-07,
-      "review_at": 1.1491387492491234e-06,
-      "decline_at": 1.4364234365614041e-06
+    "decision": {
+      "mode": "cost",
+      "step_up_at": 0.005,
+      "hold_at": 0.16000000000000025,
+      "review_at": 0.38000000000000006,
+      "decline_at": 0.7499999999999998,
+      "bands_source": "derived from the cost model",
+      "band_units": "calibrated probability (see `calibration` below)",
+      "reference_amount": 156.71,
+      "unreachable_bands": [],
+      "costs": {
+        "source": "default",
+        "unit_amount": 156.71,
+        "fraud_loss_rate": 1.0,
+        "false_decline_cost": 0.35,
+        "step_up_cost": 0.62684,
+        "step_up_efficacy": 0.8,
+        "hold_cost": 1.88052,
+        "hold_efficacy": 0.85,
+        "review_cost": 7.8355,
+        "review_efficacy": 0.95,
+        "rationale": {
+          "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+          "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+          "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+          "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+          "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+          "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+          "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+          "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+          "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+        }
+      },
+      "calibration": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 179133,
+        "n_positives": 196,
+        "base_rate": 0.00109416,
+        "note": "sigmoid, fitted on 179,133 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 5e-08,
+            "ece": 7e-08
+          },
+          "after": {
+            "brier": 3.45e-06,
+            "ece": 1.319e-05
+          },
+          "bins": [
+            {
+              "n": 17914,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17914,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17914,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 7.36e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17913,
+              "predicted": 0.01087609,
+              "observed": 0.01094177
+            }
+          ]
+        }
+      }
     },
     "calibrated_on": "the training window's validation tail"
   },
@@ -149,7 +246,7 @@
     "n_val_positives": 196,
     "fit_end": "2023-04-23T00:00:00",
     "val_start": "2023-04-25T00:00:00",
-    "seconds": 298.27,
+    "seconds": 303.64,
     "params": {
       "objective": "binary",
       "learning_rate": 0.1465362617972893,
@@ -734,14 +831,14 @@
       "precision_at_k": 1.0,
       "k": 100,
       "n_positives": 544,
-      "evasion_rate": 0.0,
-      "caught_rate": 1.0,
-      "false_decline_rate": 0.008815,
-      "friction_rate": 0.038416,
-      "amount_evaded": 0.0,
-      "fit_seconds": 30.19,
-      "score_seconds": 5.83,
-      "score_rows_per_second": 66187,
+      "evasion_rate": 0.001838,
+      "caught_rate": 0.998162,
+      "false_decline_rate": 0.0,
+      "friction_rate": 0.030574,
+      "amount_evaded": 13.52,
+      "fit_seconds": 32.11,
+      "score_seconds": 9.97,
+      "score_rows_per_second": 38718,
       "backend": "lightgbm 4.5.0"
     },
     "default": {
@@ -751,14 +848,14 @@
       "precision_at_k": 0.65,
       "k": 100,
       "n_positives": 544,
-      "evasion_rate": 0.0,
-      "caught_rate": 1.0,
-      "false_decline_rate": 1.0,
-      "friction_rate": 1.0,
-      "amount_evaded": 0.0,
-      "fit_seconds": 23.41,
-      "score_seconds": 6.34,
-      "score_rows_per_second": 60858,
+      "evasion_rate": 0.305147,
+      "caught_rate": 0.694853,
+      "false_decline_rate": 8.6e-05,
+      "friction_rate": 0.03197,
+      "amount_evaded": 1747.06,
+      "fit_seconds": 25.2,
+      "score_seconds": 8.85,
+      "score_rows_per_second": 43618,
       "backend": "lightgbm 4.5.0"
     },
     "amount_only": {

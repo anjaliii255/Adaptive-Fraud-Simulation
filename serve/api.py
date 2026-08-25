@@ -12,10 +12,12 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
 import pydantic
+import yaml
 from fastapi import FastAPI, HTTPException
 
 from afl.attack.optimiser import AttackOptimiser
@@ -24,7 +26,10 @@ from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
 from afl.contract.metrics import DetectorScore
 from afl.contract.schema import AttackBatch, AttackParams, Transaction
+from afl.data.splits import out_of_time_split
+from afl.defend.decision import cost_model_for, policy_from_config
 from afl.defend.models.lgbm import LGBMDetector
+from afl.evaluation import protocol
 from afl.evaluation.leave_one_attack_out import DEFAULT_HOLDOUT, LeaveOneAttackOut
 from afl.loop.closed_loop import find_evasions
 from afl.tracking import InMemoryTracker
@@ -33,6 +38,20 @@ from afl.utils.seed import set_all_seeds
 SEED = int(os.getenv("AFL_SEED", "1337"))
 HELD_OUT = os.getenv("AFL_HELD_OUT_VECTOR", DEFAULT_HOLDOUT)
 MAX_ROWS_RETURNED = 500
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
+
+
+def shipped_policy(rows: list[Transaction]):
+    """The same decision policy `run_experiment.py` builds, from the same two config files.
+
+    Read from config rather than defaulted, because a demo that shows different actions from
+    the ones `make loop` takes is a sales tool. The cost model is denominated in the median
+    payment of the traffic the demo actually generates — the same rule an anchored run uses,
+    and without it the flat costs would be quoted against a scale this lab does not have.
+    """
+    costs_cfg = yaml.safe_load((CONFIG_DIR / "costs" / "default.yaml").read_text())
+    lgbm_cfg = yaml.safe_load((CONFIG_DIR / "defend" / "lgbm.yaml").read_text())
+    return policy_from_config(lgbm_cfg["decision"], cost_model_for(costs_cfg, rows))
 
 
 @asynccontextmanager
@@ -55,7 +74,9 @@ class Lab:
     optimiser: AttackOptimiser = field(
         default_factory=lambda: AttackOptimiser(vector_id="S1", seed=SEED)
     )
-    detector: LGBMDetector = field(default_factory=lambda: LGBMDetector(seed=SEED, explain=True))
+    detector: LGBMDetector = field(
+        default_factory=lambda: LGBMDetector(seed=SEED, explain="always")
+    )
     tracker: InMemoryTracker = field(default_factory=lambda: InMemoryTracker("serve"))
     evaluator: LeaveOneAttackOut | None = None
     round: int = 0
@@ -69,6 +90,19 @@ class Lab:
         for vid in ("S1", "S2", "S3", HELD_OUT):
             pool.extend(self.simulator.generate(registry.get(vid).to_attack_params()).transactions)
         self.evaluator, train = LeaveOneAttackOut.from_pool(pool, held_out_vector=HELD_OUT)
+        self.detector.policy = shipped_policy(train)
+        # Same three steps as `scripts/run_experiment.py:calibrate` — fit on the head, learn the
+        # score → probability map on the tail, refit on all of it. Skipped when the tail is too
+        # thin, which at this deliberately small demo scale it often is; the calibrator then
+        # stays the identity and says so.
+        fit_rows, val_rows = out_of_time_split(train, train_frac=0.8, embargo_days=1.0)
+        if val_rows and any(t.is_fraud for t in fit_rows):
+            self.detector.fit(fit_rows)
+            self.detector.policy.reset_calibration()
+            y, s = protocol.align(
+                val_rows, protocol.score_transactions(self.detector, val_rows, "calibration")
+            )
+            self.detector.policy.fit_calibrator(s, y)
         self.detector.fit(train)
 
     def reset(self) -> None:

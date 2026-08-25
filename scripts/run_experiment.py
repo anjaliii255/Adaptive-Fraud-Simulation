@@ -30,7 +30,11 @@ from afl.contract.schema import Transaction
 from afl.data import loaders
 from afl.data.splits import committed_split_for, out_of_time_split
 from afl.defend import baseline
-from afl.defend.decision import DecisionPolicy, assert_one_operating_point
+from afl.defend.decision import (
+    assert_one_operating_point,
+    cost_model_for,
+    policy_from_config,
+)
 from afl.defend.features import FeatureBuilder
 from afl.defend.models.anomaly import AnomalyDetector, EnsembleDetector
 from afl.defend.models.lgbm import LGBMDetector
@@ -106,19 +110,25 @@ def detector_params(cfg: DictConfig) -> tuple[dict, str]:
     return {**base, **tuned}, source
 
 
-def build_detector_factory(cfg: DictConfig):
+def build_detector_factory(cfg: DictConfig, rows: list[Transaction] | None = None):
+    """A fresh detector per system, all of them on one decision policy built from one cost model.
+
+    `rows` is the traffic the policy will decide on, and it is what the cost model's flat costs
+    are denominated against — an analyst's time is priced as a share of a typical payment, so it
+    has to know what a typical payment is here. See `config/costs/default.yaml`; without it the
+    same config declines everything on PaySim and nothing on AMLSim.
+
+    A *fresh* `DecisionPolicy` per detector, not a shared one, because each carries its own
+    fitted calibrator now: sharing it would fit System C's score → probability map on System A's
+    scores and quietly put the three rows of the hero table on three operating points.
+    """
     sup, uns = cfg.defend.supervised, cfg.defend.unsupervised
-    dec = sup.decision
+    dec = OmegaConf.to_container(sup.decision)
     params, params_source = detector_params(cfg)
+    costs = cost_model_for(OmegaConf.to_container(cfg.costs), rows)
 
     def factory():
-        policy = DecisionPolicy(
-            mode=str(dec.mode),
-            step_up_at=float(dec.step_up_at),
-            hold_at=float(dec.hold_at),
-            review_at=float(dec.review_at),
-            decline_at=float(dec.decline_at),
-        )
+        policy = policy_from_config(dec, costs)
         model = LGBMDetector(
             policy=policy,
             features=FeatureBuilder(
@@ -128,7 +138,7 @@ def build_detector_factory(cfg: DictConfig):
             params=params,
             seed=int(cfg.seed),
             replay_weight=float(sup.replay_weight),
-            explain=bool(sup.explain),
+            explain=sup.explain,  # bool accepted for a pre-ticket-09 config; see `_explain_mode`
             params_source=params_source,
         )
         if bool(uns.ensemble.enabled):
@@ -181,18 +191,38 @@ def build_pool(
     return pool
 
 
-def calibrate(detector, train: list[Transaction], target_fpr: float, embargo_days: float) -> None:
-    """Set the action bands on a validation tail of the training data — never on the holdout."""
+def calibrate(
+    detector,
+    train: list[Transaction],
+    target_fpr: float,
+    embargo_days: float,
+    fpr_bands: bool = False,
+) -> None:
+    """Fit the score → probability map on a validation tail of training — never on the holdout.
+
+    The map is fitted from a model trained on the head of the training window and then applied
+    to a model refitted on all of it. That is the same compromise the FPR bands always made, and
+    it is the price of not spending a slice of the holdout on calibration; the reliability
+    numbers in the artefact are what say whether it cost anything.
+
+    `fpr_bands` additionally pins `decline_at` to a target FPR. Threshold mode only — in cost
+    mode the bands come from the cost model, and `assert_one_operating_point` refuses the config
+    that asks for both.
+    """
     from afl.evaluation import protocol
 
     fit_rows, val_rows = out_of_time_split(train, train_frac=0.8, embargo_days=embargo_days)
     if len(val_rows) < 50 or not any(t.is_fraud for t in fit_rows):
-        log.warning("not enough validation rows to calibrate — keeping configured bands")
+        log.warning("not enough validation rows to calibrate — keeping the derived bands")
         detector.fit(train)
         return
     detector.fit(fit_rows)
+    # identity first, or the scores below are already calibrated and the fit stacks two maps
+    detector.policy.reset_calibration()
     y, s = protocol.align(val_rows, protocol.score_transactions(detector, val_rows, "calibration"))
-    detector.policy.calibrate_to_fpr(s, y, target_fpr=target_fpr)
+    detector.policy.fit_calibrator(s, y)
+    if fpr_bands:
+        detector.policy.calibrate_to_fpr(s, y, target_fpr=target_fpr)
     detector.fit(train)
 
 
@@ -206,13 +236,18 @@ def build_fit(cfg: DictConfig):
     """
     target_fpr = float(cfg.eval.fixed_fpr)
     embargo_days = float(cfg.eval.embargo_days)
-    configured = cfg.defend.supervised.decision.get("calibrate_to_fpr")
-    assert_one_operating_point(configured, target_fpr)
-    enabled = configured is not None
+    dec = cfg.defend.supervised.decision
+    configured = dec.get("calibrate_to_fpr")
+    mode = str(dec.get("mode", "cost"))
+    assert_one_operating_point(configured, target_fpr, mode=mode)
+    # The score → probability map is fitted whenever there is a validation tail to fit it on;
+    # `calibrate_to_fpr` is the separate, threshold-mode-only question of where to pin the bands.
+    fpr_bands = configured is not None
+    calibrating = fpr_bands or str(dec.get("calibration", "sigmoid")) != "none"
 
     def fit(detector, rows: list[Transaction]) -> None:
-        if enabled:
-            calibrate(detector, rows, target_fpr, embargo_days)
+        if calibrating:
+            calibrate(detector, rows, target_fpr, embargo_days, fpr_bands=fpr_bands)
         else:
             detector.fit(rows)
 
@@ -306,8 +341,11 @@ def main(cfg: DictConfig) -> None:
 
     real = load_anchor(cfg)
     simulator = build_simulator(cfg, anchor=real)
-    detector_factory = build_detector_factory(cfg)
     pool = build_pool(cfg, simulator, real)
+    # after the pool, not before: the cost model's flat costs are denominated in the median
+    # payment of the traffic being decided on. Real rows when there are any — the injected
+    # attacks are a fraction of a percent of an anchored pool and should not move the scale.
+    detector_factory = build_detector_factory(cfg, real or pool)
     log.info("pool: %d rows, %d fraud", len(pool), sum(1 for t in pool if t.is_fraud))
 
     audit = commensurability_audit(cfg, real, pool)

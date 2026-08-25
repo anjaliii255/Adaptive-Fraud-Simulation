@@ -51,7 +51,12 @@ from afl.data.splits import (
 )
 from afl.defend import tuning
 from afl.defend.baseline import Baseline, load_all
-from afl.defend.decision import DecisionPolicy
+from afl.defend.decision import (
+    CostModel,
+    assert_one_operating_point,
+    cost_model_for,
+    policy_from_config,
+)
 from afl.defend.features import FeatureBuilder
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol
@@ -62,6 +67,7 @@ log = logging.getLogger("build_baseline")
 DATA_DIR = Path("config/data")
 LGBM_CONFIG = Path("config/defend/lgbm.yaml")
 EVAL_CONFIG = Path("config/eval/leave_one_attack_out.yaml")
+COSTS_CONFIG = Path("config/costs/default.yaml")
 ARTIFACT_DIR = Path("artifacts/detector")
 DOC_PATH = Path("docs/detector.md")
 
@@ -87,16 +93,17 @@ def stats(rows: list[Transaction]) -> dict:
     }
 
 
-def build_detector(params: dict, sup: dict, seed: int, source: str) -> LGBMDetector:
-    dec = sup["decision"]
+def build_detector(
+    params: dict, sup: dict, seed: int, source: str, costs: CostModel
+) -> LGBMDetector:
+    """The reference detector, on the same decision policy the rest of the project runs.
+
+    `costs` is denominated in this anchor's own median payment, so the bands the policy derives
+    are comparable across anchors whose amounts differ by two orders of magnitude. It is passed
+    in rather than built here because the anchor's rows are what measures it.
+    """
     return LGBMDetector(
-        policy=DecisionPolicy(
-            mode=str(dec["mode"]),
-            step_up_at=float(dec["step_up_at"]),
-            hold_at=float(dec["hold_at"]),
-            review_at=float(dec["review_at"]),
-            decline_at=float(dec["decline_at"]),
-        ),
+        policy=policy_from_config(sup["decision"], costs),
         features=FeatureBuilder(
             stateful=bool(sup["features"]["stateful"]),
             windows_s=tuple(int(w) for w in sup["features"]["windows_s"]),
@@ -116,21 +123,27 @@ def fit_calibrate_score(
     test: list[Transaction],
     fixed_fpr: float,
     k: int,
-    calibrate: bool,
+    fpr_bands: bool,
 ) -> dict:
-    """Fit, set the action bands on validation, refit on the full training window, score test.
+    """Fit, calibrate on validation, refit on the full training window, score test.
 
-    The bands are calibrated on the inner validation tail and never on `test`, for the same
-    reason the hyperparameters are: an operating point chosen on the data it is reported from
-    is not an operating point, it is a result.
+    Two different things are set on that inner validation tail and neither is ever set on
+    `test`, for the same reason the hyperparameters are not: an operating point chosen on the
+    window it is reported from is not an operating point, it is a result.
+
+      * the score → probability map, always, because the cost model needs a probability;
+      * the FPR-pinned bands, only when the config asked for them, which in cost mode it cannot.
     """
     started = time.perf_counter()
-    if calibrate and val_rows and any(t.is_fraud for t in fit_rows):
+    if val_rows and any(t.is_fraud for t in fit_rows):
         detector.fit(fit_rows)
+        detector.policy.reset_calibration()
         y, s = protocol.align(
             val_rows, protocol.score_transactions(detector, val_rows, "calibration")
         )
-        detector.policy.calibrate_to_fpr(s, y, target_fpr=fixed_fpr)
+        detector.policy.fit_calibrator(s, y)
+        if fpr_bands:
+            detector.policy.calibrate_to_fpr(s, y, target_fpr=fixed_fpr)
     detector.fit(train)
     fit_seconds = time.perf_counter() - started
 
@@ -185,17 +198,23 @@ def amount_only_reference(
     }
 
 
-def run_anchor(cfg: dict, args, sup: dict, eval_cfg: dict) -> Baseline:
+def run_anchor(cfg: dict, args, sup: dict, eval_cfg: dict, costs_cfg: dict) -> Baseline:
     """One anchor: split, tune, calibrate, score, and package the whole thing as a reference."""
     name = cfg["name"]
     seed = int(args.seed)
     set_all_seeds(seed)
     fixed_fpr, k = float(eval_cfg["fixed_fpr"]), int(eval_cfg["k"])
     tune_cfg = sup["tuning"]
+    assert_one_operating_point(
+        sup["decision"].get("calibrate_to_fpr"), fixed_fpr, mode=str(sup["decision"]["mode"])
+    )
 
     if args.sample is not None:
         cfg = {**cfg, "sample": {**(cfg.get("sample") or {}), "sample_fraction": args.sample}}
     rows = loaders.load_from_config(cfg)
+    # The flat costs are quoted against this anchor's own median payment — 74,872 on PaySim and
+    # 157 on AMLSim — so one cost config places comparable bands on both. See config/costs/.
+    costs = cost_model_for(costs_cfg, rows)
 
     split: CommittedSplit | None = committed_split_for(cfg)
     if split is None:
@@ -255,7 +274,7 @@ def run_anchor(cfg: dict, args, sup: dict, eval_cfg: dict) -> Baseline:
 
     # Both variants on the same window: "tuned" is a claim about a comparison, so the artefact
     # carries the counterfactual rather than an assurance that the search helped.
-    calibrate = sup["decision"].get("calibrate_to_fpr") is not None
+    fpr_bands = sup["decision"].get("calibrate_to_fpr") is not None
     metrics: dict[str, dict] = {}
     tuned_detector: LGBMDetector | None = None
     for variant, params, source in (
@@ -263,9 +282,9 @@ def run_anchor(cfg: dict, args, sup: dict, eval_cfg: dict) -> Baseline:
         ("default", sup["params"], "config/defend/lgbm.yaml"),
     ):
         set_all_seeds(seed)
-        detector = build_detector(params, sup, seed, source)
+        detector = build_detector(params, sup, seed, source, costs)
         metrics[variant] = fit_calibrate_score(
-            detector, fit_rows, val_rows, train, test, fixed_fpr, k, calibrate
+            detector, fit_rows, val_rows, train, test, fixed_fpr, k, fpr_bands
         )
         metrics[variant]["backend"] = str(detector.backend)
         tuned_detector = tuned_detector or detector
@@ -284,7 +303,10 @@ def run_anchor(cfg: dict, args, sup: dict, eval_cfg: dict) -> Baseline:
             "fixed_fpr": fixed_fpr,
             "k": k,
             "source": str(EVAL_CONFIG),
-            "decision_bands": card["decision"],
+            # The whole decision layer, not four band numbers: the cost model that placed
+            # them, its stated rationale per parameter, and how well the score → probability
+            # map actually calibrated. A band without those behind it is unauditable.
+            "decision": card["decision"],
             "calibrated_on": "the training window's validation tail",
         },
         backend=card["backend"],
@@ -368,8 +390,8 @@ def detector_doc(cards: dict[str, Baseline], missing: list[str]) -> str:
 {window_row("test", te)}
 
 Committed boundary `{b.split["digest"]}`, embargo {b.split["embargo_seconds"]:,}s. The search and
-the action bands saw a {b.data["tuning_validation"]["rows"]:,}-row validation tail inside train
-({b.data["tuning_validation"]["fraud"]:,} fraud) and nothing after it.
+the score → probability calibration saw a {b.data["tuning_validation"]["rows"]:,}-row validation
+tail inside train ({b.data["tuning_validation"]["fraud"]:,} fraud) and nothing after it.
 
 **Backend: {b.backend["name"]} {b.backend["version"]}** — {b.backend["reason"]}
 {dropped_line}
@@ -379,7 +401,10 @@ Best {tn["best_score"]:.4f} against {tn["default_score"]:.4f} for the stock para
 
 **What the policy did on the test window:** friction on {_pct(ops["friction_rate"])} of legit
 traffic, {_pct(ops["false_decline_rate"])} declined outright, and
-{_pct(ops["evasion_rate"])} of fraud allowed through untouched.
+{_pct(ops["evasion_rate"])} of fraud allowed through untouched. Those three are a property of
+the *decision layer*, not of the ranking above them — the bands come from the cost model in
+`config/costs/default.yaml`, and `docs/decisions.md` is where they are priced and compared
+against the alternatives.
 
 | param | committed value |
 | --- | --- |
@@ -424,6 +449,10 @@ This is the detector the rest of the project is measured against: gradient-boost
 56 causal features in `docs/features.md`, trained on the training side of the committed
 out-of-time boundary and scored on the test side, at one operating point fixed in
 `config/eval/leave_one_attack_out.yaml` before any of these numbers existed.
+
+The three metrics below are **rank statistics**, so the graded decision layer added in ticket 09
+cannot move them: calibrating the score to a probability is a monotone map. What that layer does
+move — the action mix, the friction, the realised cost — lives in `docs/decisions.md`.
 
 **Backend: {", ".join(backends)}.** LightGBM needs libomp on macOS. Without it the wheel imports
 and then fails to load its own shared library, and the code falls back to sklearn's
@@ -515,6 +544,7 @@ def main() -> int:
 
     sup = yaml.safe_load(LGBM_CONFIG.read_text())
     eval_cfg = yaml.safe_load(EVAL_CONFIG.read_text())
+    costs_cfg = yaml.safe_load(COSTS_CONFIG.read_text())
 
     cards: dict[str, Baseline] = {}
     missing: list[str] = []
@@ -532,7 +562,7 @@ def main() -> int:
 
     for cfg in anchors(args.datasets):
         try:
-            cards[cfg["name"]] = run_anchor(cfg, args, sup, eval_cfg)
+            cards[cfg["name"]] = run_anchor(cfg, args, sup, eval_cfg, costs_cfg)
         except loaders.DatasetNotDownloaded as exc:
             missing.append(cfg["name"])
             print(f"SKIPPED {cfg['name']}: {exc}", file=sys.stderr)

@@ -359,12 +359,8 @@ def test_two_operating_points_in_one_config_are_refused():
         assert_one_operating_point(0.05, 0.01)
 
 
-def test_the_shipped_config_names_exactly_one_operating_point():
-    from afl.defend.decision import assert_one_operating_point
-
-    sup = yaml.safe_load(LGBM_CONFIG.read_text())
-    eval_cfg = yaml.safe_load(EVAL_CONFIG.read_text())
-    assert_one_operating_point(sup["decision"]["calibrate_to_fpr"], eval_cfg["fixed_fpr"])
+# The shipped config's operating point, the cost model behind the bands, and the reason codes
+# are asserted in `tests/test_decision.py` — ticket 09's file.
 
 
 def test_the_table_names_the_backend_that_produced_it():

@@ -4,19 +4,40 @@ A score of 0.91 is not an answer an analyst can act on. Reason codes turn it int
 saw 14 inbound payments in an hour, from 14 accounts that had never paid it before" — which is
 also what makes a false positive arguable instead of mysterious.
 
-Falls back to global feature importance when SHAP is unavailable; the fallback is labelled in the
-reason string so nobody mistakes a global explanation for a local one.
+Three rules this module keeps, all of them enforced by `tests/test_decision.py` rather than
+promised here:
+
+**A flagged transaction is never unexplained.** `MIN_REASONS` codes, or the row does not get
+flagged. Not a target: `reason_codes` pads from global importance when SHAP has fewer than that
+many non-zero drivers, because "we stepped this customer up and cannot say why" is the failure
+mode reason codes exist to prevent.
+
+**A global explanation is labelled as one, in the string itself.** Not in a log line nobody
+reads, not in a sibling field somebody drops on the way to the UI. `GLOBAL_PREFIX` travels with
+the text, so an explanation that is not about *this* transaction says so wherever it is shown.
+
+**Explaining is not a mode you can switch off for flagged rows.** It is priced per flagged row,
+not per scored row, which is what makes that affordable: on the loop's batches under 1% of rows
+carry an action, so the SHAP call is on a hundred rows and not on a hundred thousand.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
 
+from afl.contract.metrics import Action, DetectorScore
 from afl.contract.schema import Transaction
 
 log = logging.getLogger(__name__)
+
+#: The floor a flagged transaction is never allowed to fall below.
+MIN_REASONS = 3
+
+#: Carried in the reason text itself, never alongside it. See the module docstring.
+GLOBAL_PREFIX = "(global, not this transaction)"
 
 #: Human phrasing for the features an analyst will actually see. Keyed by the names in
 #: `afl/defend/features.py`; anything missing falls back to the column name with the underscores
@@ -64,22 +85,97 @@ FEATURE_PHRASES = {
 }
 
 
+def readable(feature: str) -> str:
+    """The analyst phrase for a column, or the column name made readable."""
+    return FEATURE_PHRASES.get(feature, feature.replace("_", " "))
+
+
+def _duration(seconds: float) -> str:
+    """Seconds as something a human reads at a glance. `276480` is not a reason code."""
+    seconds = abs(float(seconds))
+    if not math.isfinite(seconds):
+        return str(seconds)
+    for size, unit in ((86_400.0, "d"), (3_600.0, "h"), (60.0, "m")):
+        if seconds >= size:
+            return f"{seconds / size:,.1f}{unit}"
+    return f"{seconds:,.0f}s"
+
+
+def _value(feature: str, value: float) -> str:
+    """A feature's value, formatted for the person reading it rather than for a debugger.
+
+    `7.57632e+06` is a number a model produced; `7,576,325` is a number an analyst can argue
+    with, and a dwell time is worth reading as `4.6m` rather than as 276 thousand of anything.
+
+    Non-finite values pass through as themselves. A reason code is the last thing that should
+    raise: a scorer that crashes formatting an explanation has turned an explainability
+    feature into an outage.
+    """
+    if not math.isfinite(value):
+        return str(value)
+    if feature.endswith("_s") or "_seconds_" in feature:
+        return _duration(value)
+    if value == int(value) and abs(value) < 1e15:
+        return f"{int(value):,}"
+    if abs(value) >= 1_000:
+        return f"{value:,.0f}"
+    if abs(value) >= 0.01:
+        return f"{value:,.2f}"
+    return f"{value:.3g}"
+
+
 def phrase(feature: str, value: float, direction: float) -> str:
     """One feature rendered as an analyst-readable reason code."""
-    base = FEATURE_PHRASES.get(feature, feature.replace("_", " "))
     arrow = "↑" if direction > 0 else "↓"
-    return f"{arrow} {base} ({value:g})"
+    return f"{arrow} {readable(feature)} ({_value(feature, value)})"
 
 
-def reason_codes(detector, txns: list[Transaction], top_k: int = 3) -> list[list[str]]:
-    """Top-k local drivers per transaction. Returns one list of strings per input row."""
-    if detector.model is None:
-        return [[] for _ in txns]
+def global_phrases(detector, top_k: int, spoken: set[str] | None = None) -> list[str]:
+    """Top features model-wide, each labelled as a global explanation in its own text.
 
-    X = detector.features.transform(txns, update=False).reindex(
-        columns=detector.feature_names, fill_value=0.0
-    )
-    values = X.to_numpy()
+    `spoken` is the set of analyst phrases already used on this row, so padding a short local
+    explanation never repeats something the row has already said.
+    """
+    spoken = set(spoken or ())
+    out = []
+    for name in detector.feature_importance():
+        text = readable(name)
+        if text in spoken:
+            continue
+        spoken.add(text)
+        out.append(f"{GLOBAL_PREFIX} {text}")
+        if len(out) >= top_k:
+            break
+    return out
+
+
+def reason_codes(
+    detector,
+    txns: list[Transaction],
+    top_k: int = MIN_REASONS,
+    values: np.ndarray | None = None,
+) -> list[list[str]]:
+    """Top-`top_k` local drivers per transaction, as one list of strings per input row.
+
+    `values` is the design matrix for `txns` when the caller already built it — which the
+    detector always has, having just scored these rows. Rebuilding it here costs a second pass
+    over every entity's history, and on an anchor with deep histories that is the expensive half
+    of scoring, not a rounding error.
+    """
+    if not txns:
+        return []
+    if getattr(detector, "model", None) is None:
+        # No model means no scores above zero, so nothing is flagged and nothing needs a reason.
+        # Said explicitly rather than returned empty, in case a caller flags on something else.
+        return [["(no model fitted — this score has no explanation)"] for _ in txns]
+
+    if values is None:
+        values = (
+            detector.features.transform(txns, update=False)
+            .reindex(columns=detector.feature_names, fill_value=0.0)
+            .to_numpy()
+        )
+    values = np.asarray(values, dtype=float)
 
     try:
         import shap
@@ -96,19 +192,71 @@ def reason_codes(detector, txns: list[Transaction], top_k: int = 3) -> list[list
             sv = sv[:, :, -1]
     except Exception as e:  # shap missing, or model unsupported by TreeExplainer
         log.warning("SHAP unavailable (%s) — falling back to global importance", e)
-        importance = detector.feature_importance()
-        top = [k for k, _ in list(importance.items())[:top_k]]
-        return [[f"(global) {FEATURE_PHRASES.get(k, k)}" for k in top] for _ in txns]
+        fallback = global_phrases(detector, top_k)
+        return [list(fallback) for _ in txns]
 
     out: list[list[str]] = []
     for i in range(len(txns)):
-        order = np.argsort(-np.abs(sv[i]))[:top_k]
-        out.append(
-            [phrase(detector.feature_names[j], float(values[i, j]), float(sv[i, j])) for j in order]
-        )
+        row: list[str] = []
+        used: set[str] = set()  # analyst phrases, not column names — see below
+        for j in np.argsort(-np.abs(sv[i])):
+            if sv[i, j] == 0.0 or len(row) >= top_k:
+                break
+            name = detector.feature_names[j]
+            # Deduplicate on the *phrase*, not the column. `amount` and `log_amount` are two
+            # columns and one fact, and a tree splitting on both spends two of an analyst's
+            # three reason codes saying "transaction amount" twice. The weaker of the pair is
+            # dropped and the next real driver takes the slot.
+            spoken = readable(name)
+            if spoken in used:
+                continue
+            used.add(spoken)
+            row.append(phrase(name, float(values[i, j]), float(sv[i, j])))
+        if len(row) < top_k:
+            # A tree can genuinely attribute a score to fewer than `top_k` distinct facts — a
+            # shallow model, or a row that took a short path. Pad rather than return two reasons.
+            row += global_phrases(detector, top_k - len(row), spoken=used)
+        out.append(row)
     return out
+
+
+def unexplained(scores: list[DetectorScore], min_reasons: int = MIN_REASONS) -> list[str]:
+    """Ids of flagged transactions carrying fewer than `min_reasons` reason codes.
+
+    The invariant as a function, so the test, the artefact builder and the demo all check the
+    same thing rather than three approximations of it.
+    """
+    return [
+        s.txn_id for s in scores if s.action is not Action.ALLOW and len(s.reasons) < min_reasons
+    ]
+
+
+def assert_flagged_rows_are_explained(
+    scores: list[DetectorScore], min_reasons: int = MIN_REASONS
+) -> None:
+    """Raise if a flagged transaction is short of reasons — a decision nobody can read."""
+    short = unexplained(scores, min_reasons)
+    if short:
+        raise AssertionError(
+            f"{len(short)} flagged transaction(s) carry fewer than {min_reasons} reason codes, "
+            f"e.g. {short[:3]} — a decision an analyst cannot argue with is not a decision"
+        )
 
 
 def global_importance(detector, top_k: int = 15) -> dict[str, float]:
     """Model-level view — for the model card, not for an individual decision."""
     return dict(list(detector.feature_importance().items())[:top_k])
+
+
+__all__ = [
+    "FEATURE_PHRASES",
+    "GLOBAL_PREFIX",
+    "MIN_REASONS",
+    "assert_flagged_rows_are_explained",
+    "global_importance",
+    "global_phrases",
+    "phrase",
+    "readable",
+    "reason_codes",
+    "unexplained",
+]

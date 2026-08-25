@@ -63,12 +63,23 @@ RAW_COLUMNS = {
 }
 
 
+class NoRawReader(KeyError):
+    """Raised for an anchor whose boundary this script does not derive. Skipped, never fatal."""
+
+
 def read_raw(cfg: dict) -> tuple[pd.DataFrame, tuple[str, ...]]:
     """(frame, column roles) — only the columns the split and the integrity checks need."""
     source, loader = cfg["source"], cfg["loader"]
     root = Path(source.get("place_in", DATA_DIR))
     if loader not in RAW_COLUMNS:
-        raise KeyError(f"{cfg['name']}: no raw reader for loader {loader!r}")
+        # Not every anchor's boundary is derived here. AMLworld ships real timestamps and its
+        # split was committed by hand for reasons its data card states; this script has no raw
+        # reader for it and should say so and move on, rather than taking the anchors that come
+        # after it alphabetically down with it.
+        raise NoRawReader(
+            f"{cfg['name']}: no raw reader for loader {loader!r}. Either add one to "
+            "RAW_COLUMNS, or leave the boundary committed by hand and say so in its data card."
+        )
 
     roles = RAW_COLUMNS[loader]
     file = source.get("transactions_file") or source["file"]
@@ -471,7 +482,10 @@ def main() -> int:
     for cfg in configs:
         try:
             build(cfg, synth_rates)
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, NoRawReader) as exc:
+            # One anchor that is not on disk, or one whose boundary is committed by hand, must
+            # not stop the ones after it: before this, `amlworld` raised here and `paysim` — the
+            # anchor everything is reported from — was never regenerated at all.
             missing.append(f"{cfg['name']}: {exc}")
     for line in missing:
         print(f"\nSKIPPED {line}", file=sys.stderr)

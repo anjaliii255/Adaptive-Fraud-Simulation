@@ -105,6 +105,10 @@ class SystemResult:
             f"recall@{self.metrics.fixed_fpr:.0%}fpr": self.metrics.recall_at_fixed_fpr,
             f"precision@{self.metrics.k}": self.metrics.precision_at_k,
             "evasion_rate": round(self.operational.get("evasion_rate", float("nan")), 4),
+            # The realised cost of catching it. Under a cost-derived policy the FPR is an
+            # OUTPUT, not a target, so the column that reconciles `recall@FPR` with what the
+            # policy actually did has to be in the table rather than in a sibling artefact.
+            "friction_rate": round(self.operational.get("friction_rate", float("nan")), 4),
             "train_rows": self.n_train,
             "train_fraud": self.n_train_fraud,
             "rounds": self.rounds,

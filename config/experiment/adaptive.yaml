@@ -18,4 +18,6 @@ attack:
 
 defend:
   supervised:
-    explain: true        # the demo shows reason codes; a score with no reason is not a decision
+    # every row explained, not just the flagged ones: the demo shows reason codes beside
+    # allowed traffic too, so an analyst can see what a quiet transaction looked like
+    explain: always

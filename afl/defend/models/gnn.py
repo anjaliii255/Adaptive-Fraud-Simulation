@@ -151,6 +151,14 @@ class TemporalGNNDetector:
         return np.array([node_p[self._node_index.get(t.dst, 0)] for t in txns])
 
     def score(self, batch: AttackBatch) -> list[DetectorScore]:
+        """One reason code per row, which is below the floor ticket 09 set.
+
+        Left as-is deliberately: this model is `enabled: false` and never reaches a reported
+        table, so padding it here would be inventing an explanation for a detector nobody is
+        scoring through. **ticket 18** owns making it earn its place, and
+        `explain.assert_flagged_rows_are_explained` is the bar it has to clear if it does —
+        the attended neighbours are the local explanation a message-passing model owes.
+        """
         probs = self.predict_proba(batch.transactions)
         return [
             self.policy.decide(t.txn_id, float(p), amount=t.amount, reasons=["gnn:beneficiary"])

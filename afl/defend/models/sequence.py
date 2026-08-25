@@ -115,6 +115,14 @@ class SequenceDetector:
         return np.array([self._entity_scores.get(t.src, 0.0) for t in txns])
 
     def score(self, batch: AttackBatch) -> list[DetectorScore]:
+        """One reason code per row, which is below the floor ticket 09 set.
+
+        Left as-is deliberately: this model is `enabled: false` and never reaches a reported
+        table, so padding it here would be inventing an explanation for a detector nobody is
+        scoring through. **ticket 17** owns making it earn its place, and
+        `explain.assert_flagged_rows_are_explained` is the bar it has to clear if it does —
+        an attention weight per step is the local explanation a sequence model owes.
+        """
         probs = self.predict_proba(batch.transactions)
         return [
             self.policy.decide(

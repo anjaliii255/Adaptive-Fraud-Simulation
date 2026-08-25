@@ -1,4 +1,4 @@
-.PHONY: setup smoke test splits features baseline fidelity loop compare figures demo lint fmt clean
+.PHONY: setup smoke test splits features baseline decisions fidelity loop compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -17,6 +17,9 @@ features: ## build the feature table over every anchor; record the cost and the 
 
 baseline: ## tune the supervised detector on every anchor; commit the reference numbers
 	uv run python scripts/build_baseline.py
+
+decisions: ## price the graded action bands and reason codes on every anchor; commit them
+	uv run python scripts/build_decisions.py
 
 fidelity: ## harness before generator
 	uv run python scripts/build_fidelity.py

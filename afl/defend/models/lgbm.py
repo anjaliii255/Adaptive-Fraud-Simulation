@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from afl.contract.metrics import DetectorScore
+from afl.contract.metrics import Action, DetectorScore
 from afl.contract.schema import AttackBatch, Transaction
 from afl.defend.decision import DecisionPolicy
 from afl.defend.features import FeatureBuilder
@@ -64,6 +64,22 @@ _SKLEARN_ALIASES = {
 _NOT_A_KNOB = frozenset({"objective", "verbosity", "verbose", "random_state", "seed", "n_jobs"})
 
 _FALLBACK_WARNED = False  # the backend is an environment fact; say it once, not once per fit
+
+EXPLAIN_MODES = ("flagged", "always")
+
+
+def _explain_mode(explain: str | bool) -> str:
+    """`explain` was a bool before ticket 09 made reason codes non-optional on flagged rows.
+
+    `True` meant "explain every row" and still does. `False` meant "explain nothing", which is no
+    longer on offer — it becomes "flagged", the new default, because the invariant a flagged
+    transaction carries reason codes is not a setting.
+    """
+    if isinstance(explain, bool):
+        return "always" if explain else "flagged"
+    if explain not in EXPLAIN_MODES:
+        raise ValueError(f"unknown explain mode {explain!r}; expected one of {EXPLAIN_MODES}")
+    return explain
 
 
 @dataclass(frozen=True)
@@ -205,14 +221,18 @@ class LGBMDetector:
         params: dict[str, Any] | None = None,
         seed: int = 1337,
         replay_weight: float = 3.0,
-        explain: bool = False,
+        explain: str | bool = "flagged",
         params_source: str = "default",
     ) -> None:
         self.policy = policy or DecisionPolicy()
         self.features = features or FeatureBuilder(stateful=True)
         self.seed = seed
         self.replay_weight = replay_weight  # evasions are the expensive examples; weight them up
-        self.explain = explain
+        #: "flagged" | "always". Never "never": a transaction that got an action and no reason
+        #: is what ticket 09 exists to stop, so the knob only decides whether the *allowed* rows
+        #: are explained too. Flagged-only is what makes this affordable in the loop — SHAP runs
+        #: on the rows that carry an action, which is well under 1% of a batch.
+        self.explain = _explain_mode(explain)
         #: Where `params` came from — "default", or the artefact a tuned set was read from.
         #: Written into the model card so a reported number says whether it was tuned.
         self.params_source = params_source
@@ -294,7 +314,19 @@ class LGBMDetector:
         self._fit_model(self._corpus, self.sample_weights(self._corpus))
 
     # ── scoring ─────────────────────────────────────────────────────────────────
-    def predict_proba(self, txns: list[Transaction]) -> np.ndarray:
+    def design_matrix(self, txns: list[Transaction]) -> np.ndarray:
+        """The feature table for these rows, in the order the model was fitted on.
+
+        Public because scoring and explaining both need it and building it twice is the
+        expensive half of scoring an old batch — see the ticket 07 carry-out on inserting rows
+        into the middle of a deep history.
+        """
+        X = self.features.transform(txns, update=False)
+        return X.reindex(columns=self.feature_names, fill_value=0.0).to_numpy()
+
+    def predict_proba(
+        self, txns: list[Transaction], values: np.ndarray | None = None
+    ) -> np.ndarray:
         if self.model is None:
             if not self._warned_unfitted:
                 log.warning(
@@ -303,20 +335,42 @@ class LGBMDetector:
                 )
                 self._warned_unfitted = True
             return np.zeros(len(txns), dtype=float)
-        X = self.features.transform(txns, update=False)
-        X = X.reindex(columns=self.feature_names, fill_value=0.0)
-        return self.model.predict_proba(X.to_numpy())[:, 1]
+        values = self.design_matrix(txns) if values is None else values
+        return self.model.predict_proba(values)[:, 1]
 
     def score(self, batch: AttackBatch) -> list[DetectorScore]:
-        txns = batch.transactions
-        probs = self.predict_proba(txns)
-        reasons: list[list[str]] = [[]] * len(txns)
-        if self.explain and self.model is not None:
-            from afl.defend.explain import reason_codes
+        """Score, decide, and explain whatever the decision flagged.
 
-            reasons = reason_codes(self, txns)
+        Two passes over the actions rather than one, because the explanation is priced per
+        *flagged* row: the first pass finds out which rows carry an action, the second explains
+        only those. On a batch where 0.5% of rows are flagged that is a 200x saving over
+        explaining everything, which is what lets reason codes be unconditional instead of a
+        mode somebody switches off before a sweep and forgets to switch back on.
+        """
+        from afl.defend.explain import reason_codes
+
+        txns = batch.transactions
+        if not txns:
+            return []
+        values = self.design_matrix(txns) if self.model is not None else None
+        probs = self.predict_proba(txns, values=values)
+        actions = [
+            self.policy.act(float(p), amount=t.amount) for t, p in zip(txns, probs, strict=False)
+        ]
+
+        wanted = (
+            list(range(len(txns)))
+            if self.explain == "always"
+            else [i for i, a in enumerate(actions) if a is not Action.ALLOW]
+        )
+        reasons: list[list[str]] = [[] for _ in txns]
+        if wanted and self.model is not None:
+            explained = reason_codes(self, [txns[i] for i in wanted], values=values[wanted])
+            for i, rs in zip(wanted, explained, strict=False):
+                reasons[i] = rs
+
         return [
-            self.policy.decide(t.txn_id, float(p), amount=t.amount, reasons=list(rs))
+            self.policy.decide(t.txn_id, float(p), amount=t.amount, reasons=rs)
             for t, p, rs in zip(txns, probs, reasons, strict=False)
         ]
 
@@ -330,13 +384,11 @@ class LGBMDetector:
             "params_source": self.params_source,
             "seed": self.seed,
             "training": self.training.to_dict(),
-            "decision": {
-                "mode": self.policy.mode,
-                "step_up_at": self.policy.step_up_at,
-                "hold_at": self.policy.hold_at,
-                "review_at": self.policy.review_at,
-                "decline_at": self.policy.decline_at,
-            },
+            "explain": self.explain,
+            # The whole decision layer, not four numbers: the cost model that placed the bands,
+            # its stated rationale, and the reliability of the score → probability map. A band
+            # without the costs behind it is a number nobody can argue with.
+            "decision": self.policy.to_dict(),
         }
 
     def feature_importance(self) -> dict[str, float]:

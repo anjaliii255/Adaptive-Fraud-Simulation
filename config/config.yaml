@@ -6,6 +6,7 @@ defaults:
   - data: synthetic
   - attack@attack.engines: engines
   - attack@attack.optimiser: optimiser
+  - costs: default
   - defend@defend.supervised: lgbm
   - defend@defend.unsupervised: anomaly
   - eval: leave_one_attack_out

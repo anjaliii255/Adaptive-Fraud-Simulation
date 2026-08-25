@@ -1,0 +1,109 @@
+# What a decision costs. This file is the operating point.
+#
+# Every number here has a `why`, and `CostModel.from_config` REFUSES to load a parameter whose
+# `why` is missing or blank. That is deliberate: a YAML comment can be deleted and nothing
+# notices, a required field cannot. These eight numbers decide, between them, what share of
+# traffic gets friction and what share of fraud gets through — so an unjustified one is a
+# business decision nobody made.
+#
+# ── Units ──────────────────────────────────────────────────────────────────────────────────
+# Two of the numbers are FRACTIONS OF THE TRANSACTION AMOUNT (`fraud_loss_rate`,
+# `false_decline_cost`). Three are FLAT costs paid once per transaction that receives the action
+# (`step_up_cost`, `hold_cost`, `review_cost`), and those are quoted in multiples of
+# `unit_amount` rather than in currency. The remaining three are EFFICACIES — the share of fraud
+# each action actually stops (`step_up_efficacy`, `hold_efficacy`, `review_efficacy`). An allow
+# stops none of it and a decline stops all of it, so neither needs a number here.
+#
+# The indirection is not decoration. PaySim's median payment is 74,872 and AMLSim's is 157 — a
+# 477x gap between two anchors this same config has to serve. A review priced at an absolute
+# "4.0" is a rounding error on one and a fortune on the other: on PaySim the review band would
+# open at a probability of 0.00005 and queue the entire day's traffic, on AMLSim it would never
+# open at all. Both would look equally principled in the artefact. Quoting flat costs against
+# the anchor's own median payment is what makes one cost model portable across anchors, and
+# `make decisions` prints the resolved currency figure per anchor so the abstraction is visible
+# rather than load-bearing and hidden.
+#
+# ── The ladder ─────────────────────────────────────────────────────────────────────────────
+# allow -> step_up -> hold -> review -> decline. Both the efficacy and the cost must rise along
+# it. A rung that costs more than the one below it and stops less fraud is *dominated*: it can
+# never minimise expected cost at any probability or any amount, so the graded policy silently
+# collapses to four actions. `CostModel.__post_init__` raises rather than letting that happen —
+# the house numbers this file replaces had exactly that defect, pricing a hold at 3x a step-up
+# while stopping less.
+
+name: default
+
+unit_amount:
+  value: null
+  why: >-
+    The currency unit the flat costs below are quoted in. `null` means "measure it from the
+    anchor": the median payment in the run's dataset, resolved at load and written into every
+    artefact. A literal here would pin the cost model to one dataset's amount scale, and the
+    same file has to serve PaySim (median 74,872) and AMLSim (median 157).
+
+fraud_loss_rate:
+  value: 1.0
+  why: >-
+    Share of the amount lost when fraud is allowed through. 1.0 — the whole amount. On an
+    instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which
+    is the property C3 exists to exploit. Card carries some interchange recovery, but the
+    loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the
+    reading that does not flatter the detector. A lower value here makes every band wider.
+
+false_decline_cost:
+  value: 0.35
+  why: >-
+    Cost of wrongly declining a good payment, as a share of its amount. A false decline costs
+    the margin on the payment, the support contact, and a slice of the customer's future volume;
+    the industry's own surveys put the lifetime cost at a multiple of the transaction margin.
+    0.35 is the mid of the range we are prepared to defend. This is the single number that most
+    moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well
+    — the sensitivity is measured, not asserted.
+
+step_up_cost:
+  value: 0.004
+  why: >-
+    Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment
+    (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction
+    plus the small share of good payments that are abandoned at the challenge. Flat rather than
+    amount-scaled because abandonment is a behaviour, not a percentage of value.
+
+step_up_efficacy:
+  value: 0.80
+  why: >-
+    Share of fraud a challenge stops. High against a fraudster who does not hold the second
+    factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most
+    here — C2 (the victim is socially engineered into authorising it) and M3 (the account owner
+    IS the fraudster) — so 0.80 is a population average across the taxonomy, not a promise about
+    any one vector. It is set below the rungs above it because a challenge cannot be the top of
+    the ladder.
+
+hold_cost:
+  value: 0.012
+  why: >-
+    Flat cost of delaying settlement pending an automated recheck — 3x a challenge. On an
+    instant rail a hold is the product promise being broken rather than a moment of friction,
+    so it costs materially more than an OTP and materially less than an analyst's time.
+
+hold_efficacy:
+  value: 0.85
+  why: >-
+    Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through
+    families trade against — C3's whole design is to move funds onward before anyone looks — but
+    below a review, because a hold with nobody watching it eventually releases.
+
+review_cost:
+  value: 0.05
+  why: >-
+    Flat cost of putting a case in the analyst queue, as a multiple of the median payment
+    (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the
+    delay to the customer. This is the number that sets how big the queue is, and
+    `precision@100` is what says whether the queue was worth staffing.
+
+review_efficacy:
+  value: 0.95
+  why: >-
+    Share of fraud a human review stops. The best rung short of a decline, and deliberately
+    under 1.0: an analyst working from the same features the model had is not infallible, and a
+    review that stopped everything would dominate the decline outright and remove the top of the
+    ladder. Analysts also let some fraud through on purpose, to keep a case alive.

@@ -57,6 +57,7 @@ make smoke                     # runs the whole loop on dummy data; has to pass
 ```bash
 make features    # build the feature table over every anchor; record cost and coverage
 make baseline    # tune the detector on every anchor; commit the reference numbers
+make decisions   # price the graded action bands and reason codes; commit them
 make fidelity    # build the fidelity scorecard, before trusting any generator
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
@@ -82,7 +83,7 @@ Two real anchors, neither committed (`data/**` is gitignored) and neither fetche
 | span | 743 hourly steps (~31 days) | 200 daily steps |
 | put it in | `data/raw/` | `data/raw/IBMAml/` |
 
-Both sit **~37x below** the synthetic default's measured 4.74% fraud rate. That is more than an
+Both sit **~31x below** the synthetic default's measured 4.03% fraud rate. That is more than an
 order of magnitude, so no operating point carries between the two regimes and their numbers never
 share a table. `scripts/build_splits.py` measures the gap on every run rather than quoting it.
 
@@ -159,8 +160,8 @@ own, so a config that carried them could never drift from the run that justified
 
 The search only ever sees a validation tail *inside* the training window, and
 `afl/defend/tuning.py` raises rather than warns if that tail is not strictly after the rows it
-fitted on. The action bands are calibrated on the same tail. An operating point chosen on the
-window it is reported from is not an operating point, it is a result.
+fitted on. The score → probability calibration is fitted on the same tail. An operating point
+chosen on the window it is reported from is not an operating point, it is a result.
 
 Two things worth knowing before quoting a number from it.
 
@@ -176,6 +177,74 @@ detector being good.** PaySim is the anchor to read.
 0.060 → 0.152, recall@1%FPR 0.371 → 0.478, precision@100 0.14 → 0.48. Both sides are committed,
 so the claim that the search earned its keep is checkable rather than asserted.
 
+## Decisions
+
+A score is not an answer. `docs/decisions.md` is what happens when a rank becomes an action
+somebody has to work; `artifacts/decisions/<anchor>.json` is the evidence behind it.
+
+```bash
+make decisions   # price the bands on every anchor, and rewrite the write-up from the artefacts
+```
+
+Five graded actions — allow, step-up, hold, review, decline — and the one a transaction gets is
+whichever **minimises expected cost** at its own probability and its own amount. There are no
+threshold numbers in `config/defend/lgbm.yaml` any more; there is nowhere left to type one. The
+eight business numbers that place them live in `config/costs/default.yaml`, each with a stated
+`why`, and `CostModel.from_config` refuses to load a parameter whose `why` is blank.
+
+Five things this got wrong before, all of them measured rather than reasoned about.
+
+**The bands used to sit inside the score distribution's noise floor.** `calibrate_to_fpr` pinned
+`decline_at` to the target FPR and put the other three at 0.8, 0.6 and 0.3 of it — ratios
+calibrated to nothing. On the M3 fold the detector's highest probability is `1.8e-05`, so all four
+bands landed inside that range and 45.6% of holdout traffic picked up friction while precision@100
+was 0.00. That is not a strict policy, it is a threshold placed in numerical noise. A cost model
+declines to act at a fraud probability of 0.0018%, which is the correct answer.
+
+**A cost model needs a probability, and a boosted tree emits a ranking score.** `p × amount`
+against a flat analyst cost is arithmetic on a probability. Running the same synthetic loop with
+`decision.calibration=none` puts friction on **99.3%** of legit traffic against 9.3% with Platt
+scaling fitted on the validation tail.
+
+**So the two scales are kept apart.** The calibrated probability chooses the action and appears in
+the reason code; `DetectorScore.score` stays the detector's own score, which is what every metric
+reads. That division means the decision layer cannot move PR-AUC, recall@1%FPR or precision@k *by
+construction* — not by a monotonicity argument. The argument was tried first and it failed:
+`1/(1+exp(-z))` rounds to exactly 1.0 in float64 past z ≈ 37, and on PaySim's committed test window
+the fitted map collapsed 129 distinct scores in the top 200 rows into a single value across 480 of
+them, moving precision@100 on the stock-params control from 0.14 to 0.06. A detection metric had
+moved because of a decision knob.
+
+**A flat cost in absolute currency cannot serve two anchors.** PaySim's median payment is 74,872
+and AMLSim's is 157. Flat costs are therefore quoted against `unit_amount` — the anchor's own
+median payment — and resolved to currency at load, so the same eight numbers place the same ladder
+on both files instead of declining everything on one and nothing on the other.
+
+**Cost-derived does not mean less friction, and the artefact is where that gets settled.** A
+policy that minimises expected cost will buy *more* friction when the fraud it stops is worth more
+than the friction costs. On PaySim's committed test window it frictions 3.80% of legit traffic
+against the ratio bands' 2.19%, declines almost nothing where the old policy declined 0.75%, and
+lets 36.3% of fraud through against 44.2%. Under the cost model that is a 86.7% improvement on
+allowing everything, where the policy it replaced managed 1.5%.
+
+Whether that trade pays is an empirical question about a particular anchor, so `make decisions`
+measures it rather than assuming it — against the ratio bands, against allowing everything and
+against declining everything, all four scored from the same probabilities so the only difference
+is where the bands sit. **On AMLSim every one of them loses to doing nothing**, and the artefact
+says why in a sentence: the entire fold's fraud is worth 5,206, an analyst review is priced at
+7.84, so the whole window is worth 664 reviews and no threshold anywhere can pay for itself. That
+is a fact about the anchor, and one more reason not to quote AMLSim.
+
+The tests assert only the floor that always holds — a policy has to beat doing nothing and beat
+blocking everything — because "lower cost than the ratio bands" is not guaranteed on a finite
+sample and, on the small synthetic window, is not even true.
+
+Every flagged transaction carries at least three reason codes in analyst language, and that is an
+invariant rather than a target: `explain` chooses whether *allowed* rows are explained too, never
+whether flagged ones are. When SHAP is unavailable the fallback to global importance is labelled
+inside the reason string, so an explanation that is not about this transaction says so wherever it
+is shown.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -189,9 +258,9 @@ afl/fidelity     3-level scorecard (statistical / structural / utility) + privac
 afl/loop         where attack meets defend; the closed loop lives here
 afl/evaluation   out-of-time split, leave-one-attack-out, three-system table         [blue]
 serve            FastAPI + Streamlit demo
-config           Hydra configs; experiment/{baseline,smote,adaptive}
-scripts          run_experiment, build_splits, build_features, build_baseline, build_fidelity,
-                 make_figures
+config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
+scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
+                 build_fidelity, make_figures
 ```
 
 ## How it's scored
@@ -208,33 +277,41 @@ almost nothing.
 ## Current numbers (honest)
 
 On the synthetic placeholder config, held out on M3, the adaptive system lands below both
-baselines:
+baselines. Regenerated by `make compare` after ticket 09, on LightGBM 4.5.0:
 
 ```
-baseline   PR-AUC 0.508   recall@1%FPR 0.233
-SMOTE      PR-AUC 0.499   recall@1%FPR 0.233
-adaptive   PR-AUC 0.312   recall@1%FPR 0.185
+system       PR-AUC   recall@1%FPR   precision@100   evasion   friction
+A_baseline   0.567    0.289          0.66            0.113     0.093
+B_smote      0.567    0.289          0.66            0.320     0.076
+C_adaptive   0.145    0.062          0.21            0.354     0.226
 ```
 
-Produced on the sklearn HistGradientBoosting fallback, not LightGBM, because libomp was missing on
-the machine that ran it. Install libomp before quoting any of it.
+**This is a pipeline check, not a result.** `data=synthetic` has no real anchor, and the run says
+so in a banner and in its own artefact. Reportable numbers need `data=paysim`; the detector's
+reference is `docs/detector.md` and the decision layer's is `docs/decisions.md`.
 
-These are lower again than the post-freeze numbers, and nothing regressed to cause it. M3 stopped
-being a proxy: it is now genuine first-party fraud, where no device changes, no new operator appears
-and no new beneficiary is ever paid, so none of the signals a supervised model leans on fire at all.
-A harder holdout is the point of the holdout. Each regime supersedes the last rather than sitting
-beside it, and a fourth arrives the moment real data lands — see
-`docs/adr/0002-dataset-anchors.md`, because the real base rate is ~130x lower than this one.
+Two things about the table have changed since it was last written down, and neither is a
+regression. It runs on **LightGBM** now rather than the sklearn fallback — libomp was missing on
+the machine that produced the older numbers, so none of them were ever LightGBM's, which ticket 08
+found and fixed. And `evasion` and `friction` come from a cost model now rather than from four
+thresholds nobody chose; the three ranking columns cannot move for that reason, and did not.
 
-That's the untuned output. Nobody massaged it. It's the weak-side reading the design itself
-predicts when the loop searches a single vector against a detector that already generalises to the
-holdout.
+**A and B are identical, and that is the honest reading.** SMOTE interpolates between existing
+fraud rows; on this holdout it cannot invent the one thing that would help, so it reproduces the
+baseline to six decimals while doubling the training fraud. That is precisely why System B is in
+the table — it makes System C falsifiable, and here it falsifies it.
 
-Fixing it is build work, not skeleton work. The optimiser needs to search across the stronger
-vectors on a real dataset. The first pass also caught and fixed a set of leakage bugs, including
-velocity windows peeking forward, retraining not accumulating, and the loop training on the
-holdout window. Most of the earlier apparent signal was leakage, so these are the real starting
-numbers.
+M3 is a hard holdout on purpose: genuine first-party fraud, where no device changes, no new
+operator appears and no new beneficiary is ever paid, so none of the signals a supervised model
+leans on fire at all. C searching a single vector against a detector that already generalises to
+that holdout is the weak-side reading the design itself predicts. Ticket 12 widened the search and
+`artifacts/abcd/` records what happened: adaptive did not beat non-adaptive, 4 of 7 seeds,
+p = 0.500. Reported as a negative rather than re-run until it wasn't.
+
+Each numeric regime supersedes the last rather than sitting beside it — the vectors, the holdout,
+the backend and now the decision layer have each moved the table, and a run from before any of
+them is not comparable. **System C in particular does not survive a decision-layer change**, since
+the loop retrains on whatever the policy allowed through.
 
 ## Vectors
 

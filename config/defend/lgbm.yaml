@@ -10,7 +10,12 @@
 
 kind: lgbm
 replay_weight: 3.0     # evasions are the expensive examples; see afl/defend/models/lgbm.py
-explain: false         # SHAP costs real time in the loop; on for the demo, off for sweeps
+
+# flagged | always. Reason codes on a FLAGGED row are not optional — a transaction that got an
+# action and no explanation is what ticket 09 removed — so this only decides whether the allowed
+# rows are explained too. `flagged` is what makes it affordable: SHAP runs on the rows carrying
+# an action, well under 1% of a batch, instead of on all of them.
+explain: flagged
 
 # Read the committed tuned params for this run's anchor when there are any. false pins the run
 # to the starting params below, which is how the "did tuning help" column is produced.
@@ -54,10 +59,39 @@ features:
   stateful: true       # a mule's history does not reset because a new round began
   windows_s: [3600, 86400, 604800]
 
+# Score -> action. The costs themselves live in config/costs/default.yaml, because what a
+# decline costs is a business input shared by every detector in the run, not a property of the
+# gradient-boosted trees.
 decision:
-  mode: threshold      # threshold | cost
-  step_up_at: 0.20
-  hold_at: 0.50
-  review_at: 0.70
-  decline_at: 0.90
-  calibrate_to_fpr: 0.01   # null to keep the fixed bands above
+  # cost | threshold. `cost` prices all five actions at THIS transaction's amount and takes the
+  # cheapest, so the bands are an output of config/costs/default.yaml rather than four numbers
+  # typed in here. `threshold` compares against derived band edges, for a detector with no
+  # amount to hand.
+  #
+  # The bands used to be hand-set: `calibrate_to_fpr` put decline_at at the target FPR and the
+  # other three sat at 0.8, 0.6 and 0.3 of it — ratios calibrated to nothing. On the PaySim M3
+  # fold that landed friction on 45.6% of holdout traffic while precision@100 was 0.00. There
+  # are no band numbers in this file any more; there is nowhere left to type one.
+  mode: cost
+
+  # sigmoid | isotonic | none. `p x amount` against a flat analyst cost is arithmetic on a
+  # probability, and a boosted tree's predict_proba is a ranking score. Platt scaling on the
+  # tuning validation tail makes it one. Isotonic is available and is not the default because
+  # that tail carries 46 fraud rows on PaySim — two parameters are what survives it.
+  #
+  # `none` is a foot-gun and the number is measured: the same synthetic loop puts friction on
+  # 99.3% of legit traffic with the map off against 9.3% with it on, because a band placed at a
+  # genuine probability of 0.005 catches nearly everything when the score is not a probability.
+  # A one-shot warning fires if anything decides in cost mode without it.
+  #
+  # None of this can move PR-AUC, recall@FPR or precision@k — not because the map is monotone,
+  # but because the calibrated probability never reaches `DetectorScore.score`. The monotonicity
+  # argument was tried and it broke: the logistic rounds to exactly 1.0 in float64, and on
+  # PaySim's test window it flattened the top 200 rows into one value. See decision.decide.
+  calibration: sigmoid
+
+  # null in cost mode, and `assert_one_operating_point` refuses anything else: the cost model
+  # places the bands, so an FPR target would be a second operating point wearing one config. The
+  # realised FPR is reported instead, as `false_decline_rate`, next to recall@1%FPR in the same
+  # table. Set mode=threshold if an FPR target is what you actually want.
+  calibrate_to_fpr: null

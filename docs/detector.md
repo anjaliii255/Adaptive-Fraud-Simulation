@@ -9,6 +9,10 @@ This is the detector the rest of the project is measured against: gradient-boost
 out-of-time boundary and scored on the test side, at one operating point fixed in
 `config/eval/leave_one_attack_out.yaml` before any of these numbers existed.
 
+The three metrics below are **rank statistics**, so the graded decision layer added in ticket 09
+cannot move them: calibrating the score to a probability is a monotone map. What that layer does
+move — the action mix, the friction, the realised cost — lives in `docs/decisions.md`.
+
 **Backend: lightgbm 4.5.0.** LightGBM needs libomp on macOS. Without it the wheel imports
 and then fails to load its own shared library, and the code falls back to sklearn's
 HistGradientBoosting — a different model under a table headed "LightGBM". Every artefact records
@@ -63,7 +67,7 @@ excludes nothing and the detector has to earn every point. It is also the harder
 different reason: `nameOrig` is effectively unique per row, so there is no sender history at all
 and a third of the feature table is structurally empty on it (`docs/features.md`).
 
-_Every configured anchor was on disk when this ran._
+**Not measured.** `amlworld` is not downloaded, so it has no baseline here. `banksim` is not downloaded, so it has no baseline here.
 
 ## Per anchor
 
@@ -77,18 +81,21 @@ _Every configured anchor was on disk when this ran._
 | test | 385,909 | 544 | 0.1410% | 2023-05-23 00:00:00 | 2023-07-19 00:00:00 |
 
 Committed boundary `0400e45485d9de69`, embargo 172,800s. The search and
-the action bands saw a 179,133-row validation tail inside train
-(196 fraud) and nothing after it.
+the score → probability calibration saw a 179,133-row validation
+tail inside train (196 fraud) and nothing after it.
 
 **Backend: lightgbm 4.5.0** — libomp present, LightGBM loaded
 
 **Search:** 40 trials on optuna, maximising `pr_auc` on validation.
 Best 1.0000 against 0.4463 for the stock params
-(+0.5537), in 298s.
+(+0.5537), in 304s.
 
-**What the policy did on the test window:** friction on 3.8% of legit
-traffic, 0.9% declined outright, and
-0.0% of fraud allowed through untouched.
+**What the policy did on the test window:** friction on 3.1% of legit
+traffic, 0.0% declined outright, and
+0.2% of fraud allowed through untouched. Those three are a property of
+the *decision layer*, not of the ranking above them — the bands come from the cost model in
+`config/costs/default.yaml`, and `docs/decisions.md` is where they are priced and compared
+against the alternatives.
 
 | param | committed value |
 | --- | --- |
@@ -114,18 +121,21 @@ traffic, 0.9% declined outright, and
 | test | 150,766 | 410 | 0.2719% | 2023-01-15 12:00:00 | 2023-01-31 23:00:00 |
 
 Committed boundary `6ea0b94c1c8d3d3a`, embargo 90,000s. The search and
-the action bands saw a 61,399-row validation tail inside train
-(46 fraud) and nothing after it.
+the score → probability calibration saw a 61,399-row validation
+tail inside train (46 fraud) and nothing after it.
 
 **Backend: lightgbm 4.5.0** — libomp present, LightGBM loaded
 
 **Search:** 40 trials on optuna, maximising `pr_auc` on validation.
 Best 0.3688 against 0.0654 for the stock params
-(+0.3034), in 287s.
+(+0.3034), in 294s.
 
-**What the policy did on the test window:** friction on 2.2% of legit
-traffic, 0.7% declined outright, and
-44.1% of fraud allowed through untouched.
+**What the policy did on the test window:** friction on 3.8% of legit
+traffic, <0.1% declined outright, and
+36.3% of fraud allowed through untouched. Those three are a property of
+the *decision layer*, not of the ranking above them — the bands come from the cost model in
+`config/costs/default.yaml`, and `docs/decisions.md` is where they are priced and compared
+against the alternatives.
 
 | param | committed value |
 | --- | --- |

@@ -59,8 +59,8 @@
       "self_transfers": 0,
       "self_transfer_share": 0.0
     },
-    "synthetic_base_rate": 0.047445,
+    "synthetic_base_rate": 0.040313,
     "synthetic_base_rate_data_config": 0.014097,
-    "base_rate_ratio_vs_synthetic": 0.0272
+    "base_rate_ratio_vs_synthetic": 0.032
   }
 }

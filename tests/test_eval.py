@@ -19,7 +19,6 @@ from afl.attack.templates import registry
 from afl.contract.metrics import Action, DetectorScore
 from afl.contract.schema import Rail, Transaction
 from afl.data.splits import assert_no_leakage, holdout_vector, out_of_time_split
-from afl.defend.decision import CostModel, DecisionPolicy
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol, three_system
 from afl.evaluation.leave_one_attack_out import LeaveOneAttackOut, make_splits, sweep
@@ -182,26 +181,8 @@ def test_sweep_reports_one_row_per_family():
         assert result.held_out_vector == vid
 
 
-# ── decision policy ─────────────────────────────────────────────────────────────
-def test_graded_actions_ladder_up_with_score():
-    policy = DecisionPolicy()
-    ladder = [policy.act(s) for s in (0.05, 0.30, 0.60, 0.80, 0.95)]
-    assert ladder == [Action.ALLOW, Action.STEP_UP, Action.HOLD, Action.REVIEW, Action.DECLINE]
-
-
-def test_cost_mode_declines_a_large_likely_fraud_and_allows_a_small_unlikely_one():
-    policy = DecisionPolicy(mode="cost", costs=CostModel())
-    assert policy.act(0.99, amount=50_000) in (Action.DECLINE, Action.REVIEW)
-    assert policy.act(0.001, amount=5.0) is Action.ALLOW
-
-
-def test_calibration_hits_the_target_fpr():
-    rng = np.random.default_rng(0)
-    labels = np.array([0] * 1_000 + [1] * 50)
-    scores = np.concatenate([rng.uniform(0, 0.6, 1_000), rng.uniform(0.4, 1.0, 50)])
-    policy = DecisionPolicy().calibrate_to_fpr(scores, labels, target_fpr=0.01)
-    realised = float((scores[labels == 0] >= policy.decline_at).mean())
-    assert realised == pytest.approx(0.01, abs=0.005)
+# The decision policy's own guarantees — cost-derived bands, calibration, reason codes — live
+# in `tests/test_decision.py`, which is where ticket 09's work landed.
 
 
 # ── three systems ───────────────────────────────────────────────────────────────

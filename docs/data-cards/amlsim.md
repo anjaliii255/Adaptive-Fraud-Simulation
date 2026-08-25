@@ -22,8 +22,8 @@ Multi-agent AML simulator output with per-alert typology labels. Its value is th
 
 ## The base rate, and why it breaks comparability
 
-At **0.12991%** this anchor sits **37x below** the synthetic default's
-measured **4.74%**.
+At **0.12991%** this anchor sits **31x below** the synthetic default's
+measured **4.03%**.
 
 That is more than an order of magnitude, so the two are not comparable and no operating point carries across. A 1% FPR here buys 13,232 false positives against 1,719 fraud rows, so precision@k collapses in a way it never does on synthetic traffic. Thresholds must be set at this rate, and synthetic numbers never share a table with these.
 

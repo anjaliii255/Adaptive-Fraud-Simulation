@@ -17,9 +17,9 @@ The feature table is the blue side's view of a transaction, and it obeys two rul
 
 | anchor | rows | build | throughput | score (tail) | entities | events | dead |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| amlsim | 1,323,234 | 10.4s | 126,660/s | 50,000 in 0.6s | 9,999 | 2,646,468 | 8 |
-| paysim | 636,409 | 5.6s | 113,450/s | 50,000 in 0.4s | 908,343 | 1,272,818 | 17 |
-| synthetic | 15,913 | 0.1s | 130,608/s | 15,913 in 0.6s | 392 | 31,826 | 1 |
+| amlsim | 1,323,234 | 10.4s | 127,770/s | 50,000 in 0.6s | 9,999 | 2,646,468 | 8 |
+| paysim | 636,409 | 5.6s | 114,440/s | 50,000 in 0.4s | 908,343 | 1,272,818 | 17 |
+| synthetic | 20,093 | 0.2s | 124,256/s | 20,093 in 0.7s | 397 | 40,186 | 1 |
 
 Timings are wall-clock on the machine that last ran `make features`, so treat them as an
 order of magnitude rather than a benchmark. The shape is the part that transfers: the builder is
@@ -57,7 +57,8 @@ detection numbers from; `tests/test_features.py` asserts the second one on the r
 - **paysim** — 17 of 56 columns never take a second value: `device_is_new`, `device_seconds_since_first`, `pair_is_first_payment`, `pair_seconds_since_last`, `pair_txn_count`, `rail_a2a`, `rail_card`, `rail_upi`, `src_amount_z`, `src_in_cnt_3600s`, `src_in_sum_3600s`, `src_out_amount_std`, `src_out_cnt_3600s`, `src_out_sum_3600s`, `src_out_uniq_dst_3600s`, `src_passthrough_ratio_3600s`, `src_uniq_devices`
 - **synthetic** — 1 of 56 columns never take a second value: `amount_is_round`
 
-- Every configured anchor was on disk when this ran.
+- `amlworld` is not downloaded, so it has no column above.
+- `banksim` is not downloaded, so it has no column above.
 
 ## The columns
 
@@ -73,9 +74,9 @@ The transaction on its own — no history needed, so never empty on any anchor.
 | `is_night` | 00:00-05:59. The cheapest out-of-pattern-timing proxy there is. | **dead** | 2% | 25% |
 | `day_of_week` | Monday=0. Payroll, rent and settlement traffic all have a weekday shape. | 85% | 76% | 83% |
 | `is_weekend` | Saturday or Sunday: less legit volume, so the same burst is louder. | 28% | 37% | 27% |
-| `rail_card` | Card rail. Constant on both real anchors, which are account-to-account only. | **dead** | **dead** | 39% |
+| `rail_card` | Card rail. Constant on both real anchors, which are account-to-account only. | **dead** | **dead** | 38% |
 | `rail_upi` | UPI rail — the C2 collect-request surface. Synthetic traffic only, today. | **dead** | **dead** | 31% |
-| `rail_a2a` | A2A rail: irrevocable, so a pass-through here has no chargeback to fear. | **dead** | **dead** | 30% |
+| `rail_a2a` | A2A rail: irrevocable, so a pass-through here has no chargeback to fear. | **dead** | **dead** | 31% |
 | `amount_is_round` | Round to the nearest 100. Hand-typed amounts and structuring cluster here. | &lt;1% | &lt;1% | **dead** |
 | `amount_under_10k` | 9,000-9,999.99: parked under a reporting ceiling. The M1 boundary tell. | &lt;1% | 2% | &lt;1% |
 | `amount_under_1k` | 900-999.99: the same trick at the smaller limit. | &lt;1% | &lt;1% | &lt;1% |
@@ -89,20 +90,20 @@ What the paying account has sent before. Velocity and RFM: the card-testing (S2)
 | `src_out_cnt_3600s` | Payments this account sent in the last 1h. The classic velocity count. | 61% | **dead** | 11% |
 | `src_out_sum_3600s` | Value it sent in the last 1h. Catches a large drain a count misses. | 61% | **dead** | 11% |
 | `src_out_uniq_dst_3600s` | Distinct beneficiaries paid in the last 1h. Fan-out breadth: card testing and mule spraying both widen it. | 61% | **dead** | 11% |
-| `src_out_cnt_86400s` | Payments this account sent in the last 24h. The classic velocity count. | 69% | &lt;1% | 70% |
-| `src_out_sum_86400s` | Value it sent in the last 24h. Catches a large drain a count misses. | 86% | &lt;1% | 78% |
-| `src_out_uniq_dst_86400s` | Distinct beneficiaries paid in the last 24h. Fan-out breadth: card testing and mule spraying both widen it. | 69% | &lt;1% | 70% |
-| `src_out_cnt_604800s` | Payments this account sent in the last 7d. The classic velocity count. | 76% | &lt;1% | 91% |
+| `src_out_cnt_86400s` | Payments this account sent in the last 24h. The classic velocity count. | 69% | &lt;1% | 74% |
+| `src_out_sum_86400s` | Value it sent in the last 24h. Catches a large drain a count misses. | 86% | &lt;1% | 85% |
+| `src_out_uniq_dst_86400s` | Distinct beneficiaries paid in the last 24h. Fan-out breadth: card testing and mule spraying both widen it. | 69% | &lt;1% | 74% |
+| `src_out_cnt_604800s` | Payments this account sent in the last 7d. The classic velocity count. | 76% | &lt;1% | 92% |
 | `src_out_sum_604800s` | Value it sent in the last 7d. Catches a large drain a count misses. | 92% | &lt;1% | 98% |
-| `src_out_uniq_dst_604800s` | Distinct beneficiaries paid in the last 7d. Fan-out breadth: card testing and mule spraying both widen it. | 66% | &lt;1% | 90% |
+| `src_out_uniq_dst_604800s` | Distinct beneficiaries paid in the last 7d. Fan-out breadth: card testing and mule spraying both widen it. | 66% | &lt;1% | 91% |
 | `src_out_txn_count` | Payments this account has ever sent, as of now. Tenure, and the denominator the ratios need. | 99% | &lt;1% | 98% |
 | `src_seconds_since_last_out` | Seconds since its last payment; -1 if it has never paid. Dormancy then activity is the bust-out arc. | 39% | &lt;1% | 98% |
 | `src_out_amount_mean` | Its own average payment. 'Normal' has to mean normal for this account, not for the population. | 99% | &lt;1% | 98% |
-| `src_out_amount_std` | Spread of its own payments. A steady account and an erratic one need different z-scores. | 12% | **dead** | 96% |
-| `src_amount_z` | Amount in standard deviations of the account's own history. The drift tell behind S3, C1 and M3. | 12% | **dead** | 96% |
+| `src_out_amount_std` | Spread of its own payments. A steady account and an erratic one need different z-scores. | 12% | **dead** | 97% |
+| `src_amount_z` | Amount in standard deviations of the account's own history. The drift tell behind S3, C1 and M3. | 12% | **dead** | 97% |
 | `src_amount_ratio_to_mean` | Amount over its own mean. Scale-free, and it survives a zero standard deviation. | 13% | &lt;1% | 98% |
 | `src_out_uniq_beneficiaries` | Distinct beneficiaries ever paid, counted as of this row. Graph out-degree with no future in it. | 72% | &lt;1% | 97% |
-| `src_account_age_s` | Seconds since the account was first seen at all; -1 if this is its first row. A fabricated identity (M2) has no past to show. | 99% | &lt;1% | 98% |
+| `src_account_age_s` | Seconds since the account was first seen at all; -1 if this is its first row. A fabricated identity (M2) has no past to show. | 99% | &lt;1% | 99% |
 
 ### beneficiary-inbound
 
@@ -110,20 +111,20 @@ What the beneficiary has received before. Fan-in pressure and payee novelty: the
 
 | feature | why it is here | amlsim | paysim | synthetic |
 | --- | --- | ---: | ---: | ---: |
-| `dst_in_cnt_3600s` | Payments this beneficiary received in the last 1h. Fan-in pressure. | 38% | 11% | 25% |
-| `dst_in_sum_3600s` | Value it received in the last 1h. What a mule account is holding. | 38% | 11% | 25% |
-| `dst_in_uniq_src_3600s` | Distinct payers in the last 1h. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 38% | 11% | 25% |
-| `dst_in_cnt_86400s` | Payments this beneficiary received in the last 24h. Fan-in pressure. | 74% | 38% | 82% |
-| `dst_in_sum_86400s` | Value it received in the last 24h. What a mule account is holding. | 74% | 38% | 82% |
-| `dst_in_uniq_src_86400s` | Distinct payers in the last 24h. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 74% | 38% | 82% |
-| `dst_in_cnt_604800s` | Payments this beneficiary received in the last 7d. Fan-in pressure. | 91% | 56% | 94% |
-| `dst_in_sum_604800s` | Value it received in the last 7d. What a mule account is holding. | 96% | 56% | 96% |
-| `dst_in_uniq_src_604800s` | Distinct payers in the last 7d. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 87% | 56% | 94% |
+| `dst_in_cnt_3600s` | Payments this beneficiary received in the last 1h. Fan-in pressure. | 38% | 11% | 30% |
+| `dst_in_sum_3600s` | Value it received in the last 1h. What a mule account is holding. | 38% | 11% | 30% |
+| `dst_in_uniq_src_3600s` | Distinct payers in the last 1h. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 38% | 11% | 30% |
+| `dst_in_cnt_86400s` | Payments this beneficiary received in the last 24h. Fan-in pressure. | 74% | 38% | 84% |
+| `dst_in_sum_86400s` | Value it received in the last 24h. What a mule account is holding. | 74% | 38% | 84% |
+| `dst_in_uniq_src_86400s` | Distinct payers in the last 24h. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 74% | 38% | 84% |
+| `dst_in_cnt_604800s` | Payments this beneficiary received in the last 7d. Fan-in pressure. | 91% | 56% | 95% |
+| `dst_in_sum_604800s` | Value it received in the last 7d. What a mule account is holding. | 96% | 56% | 97% |
+| `dst_in_uniq_src_604800s` | Distinct payers in the last 7d. Fourteen accounts paying one beneficiary in an hour is the S1 tell; fourteen payments from one account is a subscription. | 87% | 56% | 95% |
 | `dst_in_txn_count` | Payments this beneficiary has ever received, as of now. | 99% | 57% | 98% |
 | `dst_in_degree` | Distinct accounts that have ever paid it, as of now. Graph in-degree computed at the row's timestamp, never over the finished graph. | 90% | 57% | 98% |
 | `dst_seconds_since_last_in` | Seconds since it last received anything; -1 if never. | 62% | 57% | 98% |
 | `dst_in_amount_mean` | What it usually receives. A merchant taking 300 a hundred times is not a mule taking 300,000 once. | 99% | 57% | 98% |
-| `dst_amount_z` | This amount in standard deviations of what the beneficiary usually receives. | 98% | 50% | 95% |
+| `dst_amount_z` | This amount in standard deviations of what the beneficiary usually receives. | 98% | 50% | 96% |
 | `dst_is_first_ever_inbound` | Nobody has ever paid this beneficiary before. A brand-new payee is the C2 and C3 opening move. | 1% | 43% | 2% |
 | `dst_account_age_s` | Seconds since the beneficiary was first seen at all; -1 if this is its first row. | 99% | 57% | 99% |
 
@@ -135,7 +136,7 @@ Money in versus money out at the same account inside the hour. The dwell-time bl
 | --- | --- | ---: | ---: | ---: |
 | `src_in_cnt_3600s` | Payments the *sender* received in the last 1h. A mule forwards what has just arrived. | 28% | **dead** | 2% |
 | `src_in_sum_3600s` | Value the sender received in the last 1h. The denominator of the ratio below. | 28% | **dead** | 2% |
-| `src_seconds_since_last_in` | Dwell time: seconds between money arriving at this account and this payment leaving it; -1 if it has never received. The single knob C3 trades detectability against. | 71% | &lt;1% | 92% |
+| `src_seconds_since_last_in` | Dwell time: seconds between money arriving at this account and this payment leaving it; -1 if it has never received. The single knob C3 trades detectability against. | 71% | &lt;1% | 94% |
 | `src_passthrough_ratio_3600s` | Sent over received in the last 1h. Near 1.0 is a pass-through; a real account keeps some of it. | 19% | **dead** | &lt;1% |
 | `dst_out_cnt_3600s` | Payments the *beneficiary* sent in the last 1h. Paying into an account that is already forwarding is layering, not commerce. | 13% | &lt;1% | 2% |
 
@@ -145,9 +146,9 @@ This payer to this payee. Whether the pair has ever transacted, and how recently
 
 | feature | why it is here | amlsim | paysim | synthetic |
 | --- | --- | ---: | ---: | ---: |
-| `pair_is_first_payment` | First-ever payment from this account to this beneficiary. The APP-scam (C2) tell, and informative even where there is no other history at all. | 5% | **dead** | 27% |
-| `pair_txn_count` | How many times this account has paid this beneficiary before. | 95% | **dead** | 27% |
-| `pair_seconds_since_last` | Seconds since the last payment on this pair; -1 if first. | 62% | **dead** | 27% |
+| `pair_is_first_payment` | First-ever payment from this account to this beneficiary. The APP-scam (C2) tell, and informative even where there is no other history at all. | 5% | **dead** | 30% |
+| `pair_txn_count` | How many times this account has paid this beneficiary before. | 95% | **dead** | 30% |
+| `pair_seconds_since_last` | Seconds since the last payment on this pair; -1 if first. | 62% | **dead** | 30% |
 
 ### device
 
@@ -155,9 +156,9 @@ Devices seen on the paying account. The takeover (S3) block. Neither real anchor
 
 | feature | why it is here | amlsim | paysim | synthetic |
 | --- | --- | ---: | ---: | ---: |
-| `src_uniq_devices` | Distinct devices ever seen on this account, as of now. Device churn is the takeover (S3) signature. | **dead** | **dead** | 21% |
-| `device_is_new` | This device has not been seen on this account before. | **dead** | **dead** | 4% |
-| `device_seconds_since_first` | How long this device has been on the account; -1 if it is new or absent. A device minted an hour ago is not a trusted one. | **dead** | **dead** | 96% |
+| `src_uniq_devices` | Distinct devices ever seen on this account, as of now. Device churn is the takeover (S3) signature. | **dead** | **dead** | 19% |
+| `device_is_new` | This device has not been seen on this account before. | **dead** | **dead** | 3% |
+| `device_seconds_since_first` | How long this device has been on the account; -1 if it is new or absent. A device minted an hour ago is not a trusted one. | **dead** | **dead** | 97% |
 
 ## Where the numbers came from
 
