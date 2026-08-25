@@ -28,6 +28,12 @@ artifacts/**
 # gate each dataset failed and by how much. Committed for the same reason as the split.
 !artifacts/transfer/
 !artifacts/transfer/**
+# the zero-day layer's evidence: five systems on one leave-one-attack-out fold, the blend
+# sweep, the commensurability audit of the injected family against its anchor, and the
+# batch-independence check. `docs/anomaly.md` is generated from these files, and the result it
+# reports is a negative one — which is exactly the kind that has to stay checkable.
+!artifacts/anomaly/
+!artifacts/anomaly/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/

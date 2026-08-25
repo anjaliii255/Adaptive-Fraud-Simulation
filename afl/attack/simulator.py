@@ -7,6 +7,7 @@ haystack is not a detection problem.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta
 
@@ -19,6 +20,8 @@ from afl.attack.templates import registry
 from afl.contract.schema import AttackBatch, AttackParams, Entity, EntityRole, Transaction
 from afl.utils.seed import child_seed
 from afl.utils.seed import rng as make_rng
+
+log = logging.getLogger(__name__)
 
 DEFAULT_START = datetime(2024, 1, 1)
 
@@ -63,6 +66,7 @@ class Simulator:
         payees = list(self.envelope.active_payees) if self.envelope else []
         relays = sorted(set(self.envelope.relays)) if self.envelope else []
         senders = list(self.envelope.active_senders) if self.envelope else []
+        minted = 0
         taken = 0
         for i in range(self.n_entities):
             if i < n_merchant:
@@ -79,15 +83,45 @@ class Simulator:
                 )
                 pool, index = senders, taken
                 taken += 1
+            # An anchored run draws every account from the anchor's own namespace, and wraps the
+            # pool rather than inventing an id when the population is larger than the pool. An id
+            # the anchor has never seen is a perfect label: `sender_in_anchor` alone separated
+            # the held-out family from PaySim at PR-AUC 1.000 while this minted 332 of them.
+            # Only the un-anchored synthetic default has no namespace to draw from.
+            if pool:
+                entity_id = pool[index % len(pool)]
+            else:
+                entity_id = f"e{i:05d}"
+                minted += self.envelope is not None
             ents.append(
                 Entity(
-                    entity_id=pool[index] if index < len(pool) else f"e{i:05d}",
+                    entity_id=entity_id,
                     role=role,
                     opened_at=self.start_ts - timedelta(days=int(r.integers(30, 2_000))),
                     country="IN",
                 )
             )
-        return ents
+        if minted:
+            log.warning(
+                "%d of %d simulated accounts had no anchor entity to stand on and were minted — "
+                "they are separable from %s by account id alone",
+                minted,
+                self.n_entities,
+                self.envelope.dataset,
+            )
+        # Wrapping a short pool means two population slots can name the same account. They are
+        # the same account, so the entity list keeps one of it; drawing is unaffected, since the
+        # pools are re-derived from `entities` by role.
+        deduped = list({e.entity_id: e for e in ents}.values())
+        if self.envelope and len(deduped) < len(ents):
+            log.info(
+                "%s supplies %d distinct accounts for a population of %d — the rest of the "
+                "population would have been the same accounts twice",
+                self.envelope.dataset,
+                len(deduped),
+                len(ents),
+            )
+        return deduped
 
     def _pool(self, role: EntityRole) -> list[str]:
         # merchants are drawn in the anchor's own proportions, so the category mix the

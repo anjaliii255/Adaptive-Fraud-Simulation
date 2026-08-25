@@ -415,14 +415,19 @@ def backend_of(detector) -> Backend:
 
 
 def model_card_of(detector) -> dict[str, Any]:
-    """The model card of any detector, or a minimal one for a detector that has no card."""
+    """The model card of any detector, or a minimal one for a detector that has no card.
+
+    A detector's own card wins when it has one; the `supervised` wrapper is the fallback for a
+    composite that does not. See `afl.evaluation.three_system._card`, which makes the same
+    choice for the same reason.
+    """
+    own = getattr(detector, "model_card", None)
+    if callable(own):
+        return own()
     inner = getattr(detector, "supervised", detector)
     card = getattr(inner, "model_card", None)
     if callable(card):
-        out = card()
-        if inner is not detector:
-            out = {"detector": type(detector).__name__, "supervised": out}
-        return out
+        return {"detector": type(detector).__name__, "supervised": card()}
     return {"detector": type(detector).__name__, "backend": UNTRAINED.to_dict()}
 
 

@@ -182,13 +182,26 @@ def _busiest(txns: list[Transaction], side, limit: int = MAX_ACTIVE_ENTITIES) ->
     payment goes from a customer to a merchant, so pooling them and drawing a payee from the
     result pays a customer — a row no real payment ever looks like, and one that carries no
     merchant category at all.
+
+    **A seasoned account is preferred, a real account is required.** The `n > 1` filter used to
+    be absolute, which is right on an anchor where accounts repeat and catastrophic on one where
+    they do not: PaySim's senders are effectively unique per row, so the filter returned *one*
+    sender, `Simulator._build_population` fell back to minting `e00042`-style ids for the other
+    332 entities, and every injected attack then ran on accounts the anchor had never seen.
+    `sender_in_anchor` separated the held-out family from PaySim at PR-AUC 1.000 — the same
+    namespace leak commit 6ef3bb7 fixed on the payee side, still open on the sender side. An
+    account with one prior payment is a worse *history* than one with fifty and a far better
+    *identity* than one that does not exist, so the filter relaxes rather than starving the pool.
     """
     counts: dict[str, int] = {}
     for t in txns:
         key = side(t)
         counts[key] = counts.get(key, 0) + 1
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [entity for entity, n in ranked[:limit] if n > 1]
+    seasoned = [entity for entity, n in ranked[:limit] if n > 1]
+    if len(seasoned) >= limit:
+        return seasoned
+    return [entity for entity, _ in ranked[:limit]]
 
 
 def _proportional_sample(values: list[str], size: int = PAYEE_POOL_SIZE) -> list[str]:

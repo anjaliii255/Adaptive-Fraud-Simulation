@@ -58,6 +58,7 @@ make smoke                     # runs the whole loop on dummy data; has to pass
 make features    # build the feature table over every anchor; record cost and coverage
 make baseline    # tune the detector on every anchor; commit the reference numbers
 make decisions   # price the graded action bands and reason codes; commit them
+make anomaly     # score the zero-day layer against the supervised model on the held-out family
 make fidelity    # build the fidelity scorecard, before trusting any generator
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
@@ -245,6 +246,44 @@ whether flagged ones are. When SHAP is unavailable the fallback to global import
 inside the reason string, so an explanation that is not about this transaction says so wherever it
 is shown.
 
+## The anomaly layer, and the result it did not produce
+
+The supervised model can only catch what it has labels for, and leave-one-attack-out is defined by
+holding one family's labels back. An outlier score fitted on legit traffic alone has no notion of
+"the fraud I have seen", so the design bet was that it degrades more gracefully against the unseen
+family and sits underneath the ensemble as a floor. `docs/anomaly.md` is where that bet was
+settled; `artifacts/anomaly/<anchor>.json` is the evidence.
+
+```bash
+make anomaly     # five systems, one fold, one operating point — and rewrite the write-up
+```
+
+**The bet lost, on both anchors.** The supervised model does not collapse on the held-out family:
+on PaySim it reaches PR-AUC 0.524 and recall@1%FPR 1.000 there, against 0.152 / 0.478 on the
+anchor's own real labelled fraud in the same test window. A family it has never seen is *easier*
+than one it trains on, which is a finding about the injected rows rather than about
+generalisation. And the anomaly layer is nowhere near it — 0.033 on PaySim, 0.003 on AMLSim, where
+sorting by amount alone reaches 0.034. It is not the floor under the ensemble; it is below the
+floor.
+
+**The blend is the part that earns its place, and only on one anchor.** The weight is swept end to
+end on the same pair of score vectors, so both halves appear in the same curve as the blends of
+them. On PaySim the curve has an interior optimum — w=0.5 reaches 0.551 against 0.524 for the
+supervised model alone — so the two together genuinely beat either. On AMLSim it rises
+monotonically to w=1.0 and the shipped 0.7 costs 0.013 PR-AUC. The shipped weight stays where it
+is: a weight chosen on the fold it is reported from is the tuning-on-test the baseline forbids.
+
+**Two things were wrong underneath, and both are the kind that leave the metrics looking fine.**
+The outlier score was min-maxed over whatever batch it was handed, so a transaction's score was a
+statement about its company — 0.25 of drift on the same PaySim rows, invisible to PR-AUC because a
+within-batch min-max is monotone, and blended 0.3-to-0.7 against a probability. And on PaySim the
+simulator had barely any anchor accounts to stage attacks on, because the envelope's "seasoned
+account" filter wanted senders that transact twice and PaySim's senders are unique per row: it
+found 86 for 340 population slots and minted the other 254, so `sender_in_anchor` separated the
+held-out family from the anchor at **PR-AUC 0.800** — 1.000 on a smaller sample, where the pool
+empties entirely. Every anchored PaySim number produced before this ticket inherits that. Both
+are fixed, and both are measured in the artefact rather than asserted in a comment.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -260,7 +299,7 @@ afl/evaluation   out-of-time split, leave-one-attack-out, three-system table    
 serve            FastAPI + Streamlit demo
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
-                 build_fidelity, make_figures
+                 build_anomaly, build_fidelity, make_figures
 ```
 
 ## How it's scored

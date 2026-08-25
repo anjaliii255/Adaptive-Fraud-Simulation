@@ -1,10 +1,19 @@
 # The zero-day layer: trained on legit traffic only, so it degrades gracefully against the
 # family it has never seen — which in a leave-one-attack-out run is the whole point.
+#
+# What this file does NOT have is a `legit_only` switch. It had one, defaulting to true, which
+# made "fits on legit rows only" a setting rather than a property. `AnomalyDetector.fit` filters
+# unconditionally now; the contaminated variant is `anomaly.contaminated_control`, named so that
+# a number produced by it cannot be mistaken for a number produced by the shipped detector, and
+# measured against the shipped one in artifacts/anomaly/.
 
 kind: iforest          # iforest | ae
 contamination: 0.01
-legit_only: true
 
 ensemble:
   enabled: true
-  weight: 0.7          # supervised share of the blend
+  # The supervised share of the blend. Not a constant and not a guess any more: `make anomaly`
+  # sweeps this end to end on each anchor's M3 fold and commits the curve, so the shipped value
+  # is answerable to a measurement. It is deliberately NOT auto-tuned per anchor — a weight
+  # chosen on the fold it is reported from is the same tuning-on-test the baseline forbids.
+  weight: 0.7

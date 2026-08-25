@@ -144,14 +144,20 @@ def _card(detector) -> dict[str, Any]:
 
     Duck-typed rather than imported: `afl.evaluation` measures detectors, it does not know how
     any of them are built, and a concrete import here would be the first thread of that coupling.
+
+    A detector's *own* card wins when it has one. The wrapper below is the fallback for a
+    composite that does not — before ticket 10 it was the only path, so an ensemble's card was
+    its supervised half's card under a different `detector` name and the anomaly layer that
+    produced 30% of every blended score did not appear in the run artefact at all.
     """
+    own = getattr(detector, "model_card", None)
+    if callable(own):
+        return own()
     inner = getattr(detector, "supervised", detector)
     card = getattr(inner, "model_card", None)
     if not callable(card):
         return {"detector": type(detector).__name__}
-    return (
-        card() if inner is detector else {"detector": type(detector).__name__, "supervised": card()}
-    )
+    return {"detector": type(detector).__name__, "supervised": card()}
 
 
 def plain_fit(detector, rows: list[Transaction]) -> None:

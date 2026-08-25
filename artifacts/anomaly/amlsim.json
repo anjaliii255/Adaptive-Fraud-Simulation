@@ -1,0 +1,1425 @@
+{
+  "version": 1,
+  "dataset": "amlsim",
+  "seed": 1337,
+  "held_out_vector": "M3",
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100,
+    "source": "config/eval/leave_one_attack_out.yaml",
+    "band_units": "calibrated probability"
+  },
+  "fold": {
+    "config": "config/data/amlsim.yaml",
+    "sample_fraction": 1.0,
+    "split": {
+      "version": 1,
+      "dataset": "amlsim",
+      "digest": "0400e45485d9de69",
+      "train_end": "2023-05-21T00:00:00",
+      "test_start": "2023-05-23T00:00:00",
+      "embargo_seconds": 172800,
+      "embargo_rationale": "Steps are days and graph features look back one window, so a one-day gap stops a layering chain being half-trained-on and half-tested-on.",
+      "train_frac": 0.7,
+      "time_unit": "days",
+      "epoch": "2023-01-01T00:00:00",
+      "train_end_step": 140,
+      "test_start_step": 142,
+      "stats": {
+        "full": {
+          "rows": 1323234,
+          "row_share": 1.0,
+          "fraud": 1719,
+          "base_rate": 0.00129909
+        },
+        "span": {
+          "start": "2023-01-01T00:00:00",
+          "end": "2023-07-19T00:00:00",
+          "first_step": 0,
+          "last_step": 199
+        },
+        "partition": {
+          "train": {
+            "rows": 930465,
+            "row_share": 0.7032,
+            "fraud": 1170,
+            "base_rate": 0.00125744
+          },
+          "test": {
+            "rows": 385909,
+            "row_share": 0.2916,
+            "fraud": 544,
+            "base_rate": 0.00140966
+          },
+          "embargoed": {
+            "rows": 6860,
+            "row_share": 0.0052,
+            "fraud": 5,
+            "base_rate": 0.00072886
+          }
+        },
+        "sample": {
+          "fraction": 1.0,
+          "note": "no sampling; the loader reads every row"
+        },
+        "integrity": {
+          "non_positive_amounts": 19,
+          "non_positive_amount_share": 1.4359e-05,
+          "self_transfers": 181,
+          "self_transfer_share": 0.000136786
+        },
+        "synthetic_base_rate": 0.040313,
+        "synthetic_base_rate_data_config": 0.014097,
+        "base_rate_ratio_vs_synthetic": 0.0322
+      }
+    },
+    "real": {
+      "rows": 1323234,
+      "fraud": 1719,
+      "base_rate": 0.00129909,
+      "first_ts": "2023-01-01 00:00:00",
+      "last_ts": "2023-07-19 00:00:00"
+    },
+    "pool": {
+      "rows": 1324044,
+      "fraud": 2529,
+      "base_rate": 0.00191006,
+      "first_ts": "2023-01-01 00:00:00",
+      "last_ts": "2023-07-19 00:00:00"
+    },
+    "train": {
+      "rows": 930744,
+      "fraud": 1449,
+      "base_rate": 0.00155682,
+      "first_ts": "2023-01-01 00:00:00",
+      "last_ts": "2023-05-21 00:00:00"
+    },
+    "holdout": {
+      "rows": 385515,
+      "fraud": 150,
+      "base_rate": 0.00038909,
+      "first_ts": "2023-05-23 00:00:00",
+      "last_ts": "2023-07-19 00:00:00"
+    },
+    "calibration_fit": {
+      "rows": 744681,
+      "fraud": 1155,
+      "base_rate": 0.001551,
+      "first_ts": "2023-01-01 00:00:00",
+      "last_ts": "2023-04-23 00:00:00"
+    },
+    "calibration_validation": {
+      "rows": 179218,
+      "fraud": 281,
+      "base_rate": 0.00156792,
+      "first_ts": "2023-04-25 00:00:00",
+      "last_ts": "2023-05-21 00:00:00"
+    },
+    "n_holdout_positives": 150,
+    "enough_positives_to_report": true,
+    "min_meaningful_positives": 30
+  },
+  "commensurability": {
+    "signals": {
+      "log_amount": 0.0027,
+      "hour_of_day": 0.0002,
+      "rail": 0.0002,
+      "sender_in_anchor": 0.0002,
+      "payee_in_anchor": 0.0002,
+      "payee_popularity": 0.0002,
+      "has_device": 0.0002
+    },
+    "worst": "log_amount",
+    "score": 0.0027,
+    "base_rate": 0.0002,
+    "trivially_separable": false
+  },
+  "systems": {
+    "supervised": {
+      "pr_auc": 0.999824,
+      "recall_at_fixed_fpr": 1.0,
+      "fixed_fpr": 0.01,
+      "precision_at_k": 1.0,
+      "held_out_vector": "M3",
+      "k": 100,
+      "n_positives": 150,
+      "evasion_rate": 0.006667,
+      "caught_rate": 0.993333,
+      "false_decline_rate": 0.0,
+      "friction_rate": 0.030581,
+      "amount_evaded": 18.69,
+      "action_allow": 0.9690440060698027,
+      "action_step_up": 0.0018987588031594102,
+      "action_hold": 0.0045497581157672206,
+      "action_review": 0.02417285968120566,
+      "action_decline": 0.000334617330064978
+    },
+    "anomaly": {
+      "pr_auc": 0.003384,
+      "recall_at_fixed_fpr": 0.113333,
+      "fixed_fpr": 0.01,
+      "precision_at_k": 0.02,
+      "held_out_vector": "M3",
+      "k": 100,
+      "n_positives": 150,
+      "evasion_rate": 0.52,
+      "caught_rate": 0.48,
+      "false_decline_rate": 0.0,
+      "friction_rate": 0.096207,
+      "amount_evaded": 5841.03,
+      "action_allow": 0.9036431786052423,
+      "action_step_up": 0.06574582052579017,
+      "action_hold": 3.112719349441656e-05,
+      "action_review": 0.030579873675473067,
+      "action_decline": 0.0
+    },
+    "anomaly_contaminated": {
+      "pr_auc": 0.005135,
+      "recall_at_fixed_fpr": 0.14,
+      "fixed_fpr": 0.01,
+      "precision_at_k": 0.03,
+      "held_out_vector": "M3",
+      "k": 100,
+      "n_positives": 150,
+      "evasion_rate": 0.606667,
+      "caught_rate": 0.393333,
+      "false_decline_rate": 0.0,
+      "friction_rate": 0.056635,
+      "amount_evaded": 8998.58,
+      "action_allow": 0.943234374797349,
+      "action_step_up": 0.02618834545996913,
+      "action_hold": 1.29696639560069e-05,
+      "action_review": 0.03056431007872586,
+      "action_decline": 0.0
+    },
+    "ensemble@0.7": {
+      "pr_auc": 0.986803,
+      "recall_at_fixed_fpr": 0.986667,
+      "fixed_fpr": 0.01,
+      "precision_at_k": 1.0,
+      "held_out_vector": "M3",
+      "k": 100,
+      "n_positives": 150,
+      "evasion_rate": 0.013333,
+      "caught_rate": 0.986667,
+      "false_decline_rate": 0.0,
+      "friction_rate": 0.030576,
+      "amount_evaded": 270.53,
+      "action_allow": 0.9690517878681764,
+      "action_step_up": 0.00018676316096649935,
+      "action_hold": 0.0003527748596033877,
+      "action_review": 0.030035147789320777,
+      "action_decline": 0.0003735263219329987
+    },
+    "amount_only": {
+      "pr_auc": 0.033663,
+      "recall_at_fixed_fpr": 0.033333,
+      "fixed_fpr": 0.01,
+      "precision_at_k": 0.05,
+      "k": 100,
+      "n_positives": 150,
+      "direction": "smallest amount first",
+      "direction_chosen_on": "train"
+    }
+  },
+  "blend_sweep": [
+    {
+      "weight": 0.0,
+      "pr_auc": 0.003384,
+      "recall_at_fixed_fpr": 0.113333,
+      "precision_at_k": 0.02
+    },
+    {
+      "weight": 0.1,
+      "pr_auc": 0.198823,
+      "recall_at_fixed_fpr": 0.606667,
+      "precision_at_k": 0.27
+    },
+    {
+      "weight": 0.2,
+      "pr_auc": 0.903943,
+      "recall_at_fixed_fpr": 0.98,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.3,
+      "pr_auc": 0.980643,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.4,
+      "pr_auc": 0.98667,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.5,
+      "pr_auc": 0.986766,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.6,
+      "pr_auc": 0.986778,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.7,
+      "pr_auc": 0.986803,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.8,
+      "pr_auc": 0.986885,
+      "recall_at_fixed_fpr": 0.986667,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 0.9,
+      "pr_auc": 0.989305,
+      "recall_at_fixed_fpr": 1.0,
+      "precision_at_k": 1.0
+    },
+    {
+      "weight": 1.0,
+      "pr_auc": 0.999824,
+      "recall_at_fixed_fpr": 1.0,
+      "precision_at_k": 1.0
+    }
+  ],
+  "shipped_blend_weight": 0.7,
+  "batch_independence": {
+    "checked": true,
+    "n_rows": 4000,
+    "n_batches": 8,
+    "score_map": {
+      "max_drift": 0.0,
+      "max_drift_under_the_old_min_max": 0.18455,
+      "mean_drift_under_the_old_min_max": 0.02376
+    },
+    "whole_path": {
+      "max_drift": 0.172207,
+      "mean_drift": 0.014284,
+      "why": "FeatureBuilder.transform(update=False) lets a row see earlier rows in the same call, on purpose and identically for the supervised detector"
+    },
+    "raw_score_range_on_the_holdout": [
+      0.358459,
+      0.685208
+    ]
+  },
+  "calibration": {
+    "supervised": {
+      "n_val_rows": 179218,
+      "n_val_positives": 281,
+      "before": {
+        "brier": 1.556e-05,
+        "expected_calibration_error": 1.028e-05
+      },
+      "after": {
+        "brier": 1.528e-05,
+        "expected_calibration_error": 2.191e-05
+      },
+      "calibrator": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 179218,
+        "n_positives": 281,
+        "base_rate": 0.00156792,
+        "note": "sigmoid, fitted on 179,218 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 1.556e-05,
+            "ece": 1.028e-05
+          },
+          "after": {
+            "brier": 1.528e-05,
+            "ece": 2.191e-05
+          },
+          "bins": [
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17921,
+              "predicted": 1.219e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17921,
+              "predicted": 0.01557058,
+              "observed": 0.01567993
+            }
+          ]
+        }
+      }
+    },
+    "anomaly": {
+      "n_val_rows": 179218,
+      "n_val_positives": 281,
+      "before": {
+        "brier": 0.18991148,
+        "expected_calibration_error": 0.42961827
+      },
+      "after": {
+        "brier": 0.00156289,
+        "expected_calibration_error": 0.00049417
+      },
+      "calibrator": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 179218,
+        "n_positives": 281,
+        "base_rate": 0.00156792,
+        "note": "sigmoid, fitted on 179,218 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 0.18991148,
+            "ece": 0.42961827
+          },
+          "after": {
+            "brier": 0.00156289,
+            "ece": 0.00049417
+          },
+          "bins": [
+            {
+              "n": 17922,
+              "predicted": 0.00059388,
+              "observed": 0.00011159
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00068272,
+              "observed": 0.00016739
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00074759,
+              "observed": 0.00016739
+            },
+            {
+              "n": 17922,
+              "predicted": 0.0008066,
+              "observed": 0.00050218
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00087668,
+              "observed": 0.00106015
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00097435,
+              "observed": 0.00106015
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00112714,
+              "observed": 0.00167392
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00140638,
+              "observed": 0.0020087
+            },
+            {
+              "n": 17921,
+              "predicted": 0.0021841,
+              "observed": 0.00323643
+            },
+            {
+              "n": 17921,
+              "predicted": 0.00628048,
+              "observed": 0.00569165
+            }
+          ]
+        }
+      }
+    },
+    "anomaly_contaminated": {
+      "n_val_rows": 179218,
+      "n_val_positives": 281,
+      "before": {
+        "brier": 0.22871682,
+        "expected_calibration_error": 0.46943616
+      },
+      "after": {
+        "brier": 0.00156477,
+        "expected_calibration_error": 0.00028514
+      },
+      "calibrator": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 179218,
+        "n_positives": 281,
+        "base_rate": 0.00156792,
+        "note": "sigmoid, fitted on 179,218 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 0.22871682,
+            "ece": 0.46943616
+          },
+          "after": {
+            "brier": 0.00156477,
+            "ece": 0.00028514
+          },
+          "bins": [
+            {
+              "n": 17922,
+              "predicted": 0.0009211,
+              "observed": 0.00094855
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00101833,
+              "observed": 0.00139493
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00108837,
+              "observed": 0.00133914
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00115542,
+              "observed": 0.00117174
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00123217,
+              "observed": 0.00133914
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00132999,
+              "observed": 0.00078116
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00146772,
+              "observed": 0.00150653
+            },
+            {
+              "n": 17922,
+              "predicted": 0.00174005,
+              "observed": 0.0020645
+            },
+            {
+              "n": 17921,
+              "predicted": 0.0023837,
+              "observed": 0.00150661
+            },
+            {
+              "n": 17921,
+              "predicted": 0.00334292,
+              "observed": 0.00362703
+            }
+          ]
+        }
+      }
+    },
+    "ensemble": {
+      "n_val_rows": 179218,
+      "n_val_positives": 281,
+      "before": {
+        "brier": 0.01710399,
+        "expected_calibration_error": 0.1288783
+      },
+      "after": {
+        "brier": 1.74e-05,
+        "expected_calibration_error": 2.19e-05
+      },
+      "calibrator": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 179218,
+        "n_positives": 281,
+        "base_rate": 0.00156792,
+        "note": "sigmoid, fitted on 179,218 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 0.01710399,
+            "ece": 0.1288783
+          },
+          "after": {
+            "brier": 1.74e-05,
+            "ece": 2.19e-05
+          },
+          "bins": [
+            {
+              "n": 17922,
+              "predicted": 5.86e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 7.03e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 7.91e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 8.72e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 9.69e-06,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.107e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.326e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17922,
+              "predicted": 1.733e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17921,
+              "predicted": 2.884e-05,
+              "observed": 0.0
+            },
+            {
+              "n": 17921,
+              "predicted": 0.01557062,
+              "observed": 0.01567993
+            }
+          ]
+        }
+      }
+    }
+  },
+  "timings": {
+    "supervised": {
+      "fit_seconds": 36.24,
+      "score_seconds": 10.32
+    },
+    "anomaly": {
+      "fit_seconds": 24.15,
+      "score_seconds": 9.8
+    }
+  },
+  "model_cards": {
+    "supervised": {
+      "detector": "LGBMDetector",
+      "backend": {
+        "name": "lightgbm",
+        "version": "4.5.0",
+        "reason": "libomp present, LightGBM loaded",
+        "dropped_params": []
+      },
+      "params": {
+        "objective": "binary",
+        "learning_rate": 0.1465362617972893,
+        "num_leaves": 40,
+        "min_child_samples": 86,
+        "n_estimators": 500,
+        "subsample": 0.9864361649344031,
+        "subsample_freq": 1,
+        "colsample_bytree": 0.9015807280195289,
+        "reg_lambda": 0.7370329761774359,
+        "class_weight": "balanced",
+        "verbosity": -1,
+        "random_state": 1337
+      },
+      "params_source": "artifacts/detector/amlsim.json",
+      "seed": 1337,
+      "training": {
+        "n_rows": 930744,
+        "n_fraud": 1449,
+        "base_rate": 0.00155682,
+        "n_features": 56,
+        "n_weighted_up": 0,
+        "replay_weight": 3.0,
+        "fitted": true
+      },
+      "explain": "flagged",
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 156.71,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 156.71,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 0.62684,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 1.88052,
+          "hold_efficacy": 0.85,
+          "review_cost": 7.8355,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": true,
+          "n_fit": 179218,
+          "n_positives": 281,
+          "base_rate": 0.00156792,
+          "note": "sigmoid, fitted on 179,218 validation rows",
+          "reliability": {
+            "before": {
+              "brier": 1.556e-05,
+              "ece": 1.028e-05
+            },
+            "after": {
+              "brier": 1.528e-05,
+              "ece": 2.191e-05
+            },
+            "bins": [
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17921,
+                "predicted": 1.219e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17921,
+                "predicted": 0.01557058,
+                "observed": 0.01567993
+              }
+            ]
+          }
+        }
+      }
+    },
+    "anomaly": {
+      "detector": "AnomalyDetector",
+      "kind": "iforest",
+      "contamination": 0.01,
+      "seed": 1337,
+      "training": {
+        "n_rows": 929295,
+        "n_fraud_seen": 0,
+        "n_fraud_excluded": 1449,
+        "n_features": 56,
+        "legit_only": true,
+        "fitted": true
+      },
+      "score_map": {
+        "kind": "identity",
+        "scale": 1.0,
+        "batch_dependent": false,
+        "why": "an isolation forest's -score_samples is 2**(-E[h]/c(n)), already in (0,1)"
+      },
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 156.71,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 156.71,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 0.62684,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 1.88052,
+          "hold_efficacy": 0.85,
+          "review_cost": 7.8355,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": true,
+          "n_fit": 179218,
+          "n_positives": 281,
+          "base_rate": 0.00156792,
+          "note": "sigmoid, fitted on 179,218 validation rows",
+          "reliability": {
+            "before": {
+              "brier": 0.18991148,
+              "ece": 0.42961827
+            },
+            "after": {
+              "brier": 0.00156289,
+              "ece": 0.00049417
+            },
+            "bins": [
+              {
+                "n": 17922,
+                "predicted": 0.00059388,
+                "observed": 0.00011159
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00068272,
+                "observed": 0.00016739
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00074759,
+                "observed": 0.00016739
+              },
+              {
+                "n": 17922,
+                "predicted": 0.0008066,
+                "observed": 0.00050218
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00087668,
+                "observed": 0.00106015
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00097435,
+                "observed": 0.00106015
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00112714,
+                "observed": 0.00167392
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00140638,
+                "observed": 0.0020087
+              },
+              {
+                "n": 17921,
+                "predicted": 0.0021841,
+                "observed": 0.00323643
+              },
+              {
+                "n": 17921,
+                "predicted": 0.00628048,
+                "observed": 0.00569165
+              }
+            ]
+          }
+        }
+      }
+    },
+    "anomaly_contaminated": {
+      "detector": "AnomalyDetector",
+      "kind": "iforest",
+      "contamination": 0.01,
+      "seed": 1337,
+      "training": {
+        "n_rows": 930744,
+        "n_fraud_seen": 1449,
+        "n_fraud_excluded": 0,
+        "n_features": 56,
+        "legit_only": false,
+        "fitted": true
+      },
+      "score_map": {
+        "kind": "identity",
+        "scale": 1.0,
+        "batch_dependent": false,
+        "why": "an isolation forest's -score_samples is 2**(-E[h]/c(n)), already in (0,1)"
+      },
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 156.71,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 156.71,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 0.62684,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 1.88052,
+          "hold_efficacy": 0.85,
+          "review_cost": 7.8355,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": true,
+          "n_fit": 179218,
+          "n_positives": 281,
+          "base_rate": 0.00156792,
+          "note": "sigmoid, fitted on 179,218 validation rows",
+          "reliability": {
+            "before": {
+              "brier": 0.22871682,
+              "ece": 0.46943616
+            },
+            "after": {
+              "brier": 0.00156477,
+              "ece": 0.00028514
+            },
+            "bins": [
+              {
+                "n": 17922,
+                "predicted": 0.0009211,
+                "observed": 0.00094855
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00101833,
+                "observed": 0.00139493
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00108837,
+                "observed": 0.00133914
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00115542,
+                "observed": 0.00117174
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00123217,
+                "observed": 0.00133914
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00132999,
+                "observed": 0.00078116
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00146772,
+                "observed": 0.00150653
+              },
+              {
+                "n": 17922,
+                "predicted": 0.00174005,
+                "observed": 0.0020645
+              },
+              {
+                "n": 17921,
+                "predicted": 0.0023837,
+                "observed": 0.00150661
+              },
+              {
+                "n": 17921,
+                "predicted": 0.00334292,
+                "observed": 0.00362703
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ensemble": {
+      "detector": "EnsembleDetector",
+      "weight": 0.7,
+      "supervised": {
+        "detector": "LGBMDetector",
+        "backend": {
+          "name": "lightgbm",
+          "version": "4.5.0",
+          "reason": "libomp present, LightGBM loaded",
+          "dropped_params": []
+        },
+        "params": {
+          "objective": "binary",
+          "learning_rate": 0.1465362617972893,
+          "num_leaves": 40,
+          "min_child_samples": 86,
+          "n_estimators": 500,
+          "subsample": 0.9864361649344031,
+          "subsample_freq": 1,
+          "colsample_bytree": 0.9015807280195289,
+          "reg_lambda": 0.7370329761774359,
+          "class_weight": "balanced",
+          "verbosity": -1,
+          "random_state": 1337
+        },
+        "params_source": "artifacts/detector/amlsim.json",
+        "seed": 1337,
+        "training": {
+          "n_rows": 930744,
+          "n_fraud": 1449,
+          "base_rate": 0.00155682,
+          "n_features": 56,
+          "n_weighted_up": 0,
+          "replay_weight": 3.0,
+          "fitted": true
+        },
+        "explain": "flagged",
+        "decision": {
+          "mode": "cost",
+          "step_up_at": 0.005,
+          "hold_at": 0.16,
+          "review_at": 0.38,
+          "decline_at": 0.75,
+          "bands_source": "derived from the cost model",
+          "band_units": "calibrated probability (see `calibration` below)",
+          "reference_amount": 156.71,
+          "unreachable_bands": [],
+          "costs": {
+            "source": "default",
+            "unit_amount": 156.71,
+            "fraud_loss_rate": 1.0,
+            "false_decline_cost": 0.35,
+            "step_up_cost": 0.62684,
+            "step_up_efficacy": 0.8,
+            "hold_cost": 1.88052,
+            "hold_efficacy": 0.85,
+            "review_cost": 7.8355,
+            "review_efficacy": 0.95,
+            "rationale": {
+              "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+              "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+              "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+              "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+              "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+              "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+              "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+              "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+              "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+            }
+          },
+          "calibration": {
+            "method": "sigmoid",
+            "fitted": true,
+            "n_fit": 179218,
+            "n_positives": 281,
+            "base_rate": 0.00156792,
+            "note": "sigmoid, fitted on 179,218 validation rows",
+            "reliability": {
+              "before": {
+                "brier": 1.556e-05,
+                "ece": 1.028e-05
+              },
+              "after": {
+                "brier": 1.528e-05,
+                "ece": 2.191e-05
+              },
+              "bins": [
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17922,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17921,
+                  "predicted": 1.219e-05,
+                  "observed": 0.0
+                },
+                {
+                  "n": 17921,
+                  "predicted": 0.01557058,
+                  "observed": 0.01567993
+                }
+              ]
+            }
+          }
+        }
+      },
+      "unsupervised": {
+        "detector": "AnomalyDetector",
+        "kind": "iforest",
+        "contamination": 0.01,
+        "seed": 1337,
+        "training": {
+          "n_rows": 929295,
+          "n_fraud_seen": 0,
+          "n_fraud_excluded": 1449,
+          "n_features": 56,
+          "legit_only": true,
+          "fitted": true
+        },
+        "score_map": {
+          "kind": "identity",
+          "scale": 1.0,
+          "batch_dependent": false,
+          "why": "an isolation forest's -score_samples is 2**(-E[h]/c(n)), already in (0,1)"
+        },
+        "decision": {
+          "mode": "cost",
+          "step_up_at": 0.005,
+          "hold_at": 0.16,
+          "review_at": 0.38,
+          "decline_at": 0.75,
+          "bands_source": "derived from the cost model",
+          "band_units": "calibrated probability (see `calibration` below)",
+          "reference_amount": 156.71,
+          "unreachable_bands": [],
+          "costs": {
+            "source": "default",
+            "unit_amount": 156.71,
+            "fraud_loss_rate": 1.0,
+            "false_decline_cost": 0.35,
+            "step_up_cost": 0.62684,
+            "step_up_efficacy": 0.8,
+            "hold_cost": 1.88052,
+            "hold_efficacy": 0.85,
+            "review_cost": 7.8355,
+            "review_efficacy": 0.95,
+            "rationale": {
+              "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+              "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+              "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+              "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+              "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+              "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+              "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+              "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+              "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+            }
+          },
+          "calibration": {
+            "method": "sigmoid",
+            "fitted": true,
+            "n_fit": 179218,
+            "n_positives": 281,
+            "base_rate": 0.00156792,
+            "note": "sigmoid, fitted on 179,218 validation rows",
+            "reliability": {
+              "before": {
+                "brier": 0.18991148,
+                "ece": 0.42961827
+              },
+              "after": {
+                "brier": 0.00156289,
+                "ece": 0.00049417
+              },
+              "bins": [
+                {
+                  "n": 17922,
+                  "predicted": 0.00059388,
+                  "observed": 0.00011159
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00068272,
+                  "observed": 0.00016739
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00074759,
+                  "observed": 0.00016739
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.0008066,
+                  "observed": 0.00050218
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00087668,
+                  "observed": 0.00106015
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00097435,
+                  "observed": 0.00106015
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00112714,
+                  "observed": 0.00167392
+                },
+                {
+                  "n": 17922,
+                  "predicted": 0.00140638,
+                  "observed": 0.0020087
+                },
+                {
+                  "n": 17921,
+                  "predicted": 0.0021841,
+                  "observed": 0.00323643
+                },
+                {
+                  "n": 17921,
+                  "predicted": 0.00628048,
+                  "observed": 0.00569165
+                }
+              ]
+            }
+          }
+        }
+      },
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 156.71,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 156.71,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 0.62684,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 1.88052,
+          "hold_efficacy": 0.85,
+          "review_cost": 7.8355,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": true,
+          "n_fit": 179218,
+          "n_positives": 281,
+          "base_rate": 0.00156792,
+          "note": "sigmoid, fitted on 179,218 validation rows",
+          "reliability": {
+            "before": {
+              "brier": 0.01710399,
+              "ece": 0.1288783
+            },
+            "after": {
+              "brier": 1.74e-05,
+              "ece": 2.19e-05
+            },
+            "bins": [
+              {
+                "n": 17922,
+                "predicted": 5.86e-06,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 7.03e-06,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 7.91e-06,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 8.72e-06,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 9.69e-06,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.107e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.326e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17922,
+                "predicted": 1.733e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17921,
+                "predicted": 2.884e-05,
+                "observed": 0.0
+              },
+              {
+                "n": 17921,
+                "predicted": 0.01557062,
+                "observed": 0.01567993
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "supervised_reference": {
+    "source": "artifacts/detector/amlsim.json",
+    "measured_on": "this anchor's OWN labelled fraud, out of time at the same boundary",
+    "pr_auc": 1.0,
+    "recall_at_fixed_fpr": 1.0,
+    "precision_at_k": 1.0,
+    "n_positives": 544
+  },
+  "meta": {
+    "generated_by": "scripts/build_anomaly.py",
+    "note": "Every positive in this fold is an injected synthetic M3 row and every negative is a real one, so recall here reports the distance between two distributions as well as detection. Read `commensurability` before reading `systems`."
+  }
+}
