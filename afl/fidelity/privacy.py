@@ -95,6 +95,59 @@ def mia_auc(
     return {"mia_auc": round(auc, 6), "advantage": round(abs(auc - 0.5) * 2, 6)}
 
 
+def mia_time_control(
+    holdout: list[Transaction],
+    synth: list[Transaction],
+    seed: int = 1337,
+) -> dict[str, float]:
+    """The same attack, run where the right answer is known to be "no signal".
+
+    Membership inference compares training rows against held-out rows, and on an out-of-time
+    split those two groups differ by *when they happened* as well as by whether the generator
+    saw them. Traffic drifts, so a nearest-neighbour attacker can score above chance on the time
+    boundary alone and the number reads as a membership leak.
+
+    So the identical attack is run on two halves of the **holdout**, split at its own 70% mark.
+    Neither half was ever in training, so any advantage here is the time boundary and nothing
+    else. Read the two numbers together: an observed advantage at or below this control is a
+    statement about drift, not about membership.
+    """
+    rows = sorted(holdout, key=lambda t: t.ts)
+    cut = int(len(rows) * 0.7)
+    early, late = rows[:cut], rows[cut:]
+    if min(len(early), len(late)) < 2 or not synth:
+        return {"mia_auc": 0.5, "advantage": 0.0, "measurable": False}
+    out = mia_auc(early, late, synth, seed)
+    return {**out, "measurable": True}
+
+
+def identifier_reuse(real: list[Transaction], synth: list[Transaction]) -> dict[str, float]:
+    """How often a generated row names an account that exists in the anchor.
+
+    DCR and MIA both look at row *content* in a numeric embedding, so neither can see the one
+    disclosure path this generator actually has: it stages attacks on the anchor's own accounts
+    on purpose, because an attack from an account with no history is separable from real traffic
+    by that fact alone (`afl/attack/envelope.py`).
+
+    Reported, never flagged. It is a design decision with a stated reason, and the number is here
+    so that "synthetic traffic contains no real identifiers" is a claim nobody can make by
+    accident.
+    """
+    real_ids = {t.src for t in real} | {t.dst for t in real}
+    if not synth:
+        return {"src_in_anchor": 0.0, "dst_in_anchor": 0.0, "either_in_anchor": 0.0}
+    src = sum(1 for t in synth if t.src in real_ids)
+    dst = sum(1 for t in synth if t.dst in real_ids)
+    either = sum(1 for t in synth if t.src in real_ids or t.dst in real_ids)
+    n = len(synth)
+    return {
+        "src_in_anchor": round(src / n, 6),
+        "dst_in_anchor": round(dst / n, 6),
+        "either_in_anchor": round(either / n, 6),
+        "n_synth": float(n),
+    }
+
+
 def report(
     train: list[Transaction],
     holdout: list[Transaction],
@@ -106,6 +159,8 @@ def report(
     """DCR plus membership inference, with the flags that matter called out."""
     d = dcr(train, synth, seed)
     m = mia_auc(train, holdout, synth, seed)
+    control = mia_time_control(holdout, synth, seed)
+    ids = identifier_reuse(train + holdout, synth)
     flags = []
     if d.get("dcr_ratio", 0.0) < min_dcr_ratio:
         flags.append(
@@ -114,12 +169,24 @@ def report(
     if d.get("identical_share", 0.0) > 0.0:
         flags.append("exact duplicates of training rows present")
     if m["advantage"] > max_mia_advantage:
-        flags.append("membership is inferable from the synthetic data alone")
+        # Only above the control. An advantage the same attack reaches between two halves of the
+        # holdout — where nothing was ever in training — is drift, and flagging it as a
+        # membership leak would be raising an alarm about the calendar.
+        if control["measurable"] and m["advantage"] <= control["advantage"]:
+            m["reading"] = (
+                f"advantage {m['advantage']} is at or below the {control['advantage']} the same "
+                "attack reaches between two halves of the holdout, so it is the out-of-time "
+                "boundary rather than membership"
+            )
+        else:
+            flags.append("membership is inferable from the synthetic data alone")
 
     return {
         "level": "privacy",
         "dcr": d,
         "mia": m,
+        "mia_time_control": control,
+        "identifier_reuse": ids,
         "flags": flags,
         "score": round(
             min(1.0, d.get("dcr_ratio", 0.0) / min_dcr_ratio) * (1.0 - m["advantage"]), 4
