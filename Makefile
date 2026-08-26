@@ -1,10 +1,11 @@
-.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence loao fidelity fidelity-selftest loop table compare figures demo lint fmt clean
+.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence gnn loao fidelity fidelity-selftest loop table compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
 
-setup-deep: ## the same, plus torch — needed by `make sequence` only. Nothing else requires it,
-          ## and the default suite stays green without it.
+setup-deep: ## the same, plus torch and torch-geometric — needed by `make sequence` and
+          ## `make gnn` only. Nothing else requires them, and the default suite stays green
+          ## without either.
 	uv sync --extra dev --extra deep
 
 smoke:    ## the day-one gate: loop runs end-to-end on dummy data
@@ -31,6 +32,10 @@ anomaly:  ## score the zero-day layer against the supervised model on the held-o
 sequence: ## GRU vs LightGBM on the drift arc, sudden and gradual reported apart. Needs
           ## `make setup-deep`; the gate decides whether the model is reported at all.
 	uv run python scripts/build_sequence.py
+
+gnn:      ## temporal GNN vs hand-rolled graph features on the mule families, several seeds.
+          ## Needs `make setup-deep`; the gate decides which of the two ships.
+	uv run python scripts/build_gnn.py
 
 loao:     ## the leave-one-attack-out matrix: every family held out in turn, with the guards
 	uv run python scripts/build_loao.py
