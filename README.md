@@ -39,6 +39,16 @@ classifier sorts the injected M3 rows from real traffic at PR-AUC 0.970 where th
 reaches 0.893, so the fold cannot tell the two apart. The matrix is in `artifacts/loao/` and
 written up in `docs/loao.md`, generated from it.
 
+The **three-system table is built**, on both anchors, three seeds each — and its one apparent win
+does not survive its own audit. Real-only, SMOTE and the adaptive loop, on one carve-out at one
+operating point, reported in two columns: the held-out family nobody trained on, and the anchor's
+own labelled fraud that everybody did. System C appears to beat SMOTE by **+0.76 recall** on the
+held-out family on AMLSim — and a model given System C's training rows and told *only which rows
+the generator wrote* scores 0.995 on the same column against System C's 0.998. The number is the
+generator's fingerprint, so it is withheld. On the column that is measurable, the three systems
+are within the seed-to-seed spread of each other. `artifacts/three_system/`, written up in
+`docs/three_system.md`.
+
 ## Setup
 
 Needs Python 3.11. **On macOS, install libomp first.** The LightGBM wheel imports cleanly without
@@ -70,7 +80,8 @@ make anomaly     # score the zero-day layer against the supervised model on the 
 make loao        # the leave-one-attack-out matrix: every family held out in turn, with the guards
 make fidelity    # the 3-level scorecard on every real anchor; level 3 is the gate
 make loop        # run the adaptive loop (synthetic default, no download)
-make compare     # real-only vs SMOTE vs adaptive: the three-system table
+make table       # the three-system table: real-only vs SMOTE vs adaptive, both columns, 3 seeds
+make compare     # the same three through the hydra loop on the default config — a pipeline check
 make figures     # convergence curve + table, regenerated from run logs
 make demo        # FastAPI + Streamlit, via Docker
 ```
@@ -400,6 +411,49 @@ PaySim S3 is the one that costs something — detector 0.916, provenance probe 0
 six rows under the floor of 30. Raising the episode count would move ticket 10's committed fold
 too, so it is a decision rather than an oversight, and it was not taken here.
 
+## The three-system table
+
+`make table` is the hero run: real-only, real + SMOTE, and real + the adaptive loop, on one
+carve-out at one operating point, repeated over three seeds, on every real anchor. It writes
+`artifacts/three_system/<anchor>.json` and regenerates `docs/three_system.md` from it —
+`--doc-only` rebuilds the document from the committed artefacts alone, so nothing in it can
+disagree with a run.
+
+**System B is there to make System C falsifiable.** Row-level oversampling can move an amount and
+a timestamp; it cannot invent a new fan-in shape, a new pacing strategy or a beneficiary that
+never existed, which is precisely the gap the adaptive loop claims to fill. If C does not beat B
+on the held-out column, this project is an expensive way of duplicating rows — and the table is
+built to say so, with the reason attached.
+
+**Two columns, because one is not a result.** *unseen* is the held-out family nobody trained on:
+the claim. *known* is the anchor's own labelled fraud, scored on the same window against the same
+legit haystack: the price of the claim. A system that buys the first by giving up the second has
+traded rather than improved, and a one-column table cannot see the trade. The two columns share
+their negatives, asserted rather than assumed — recall at a fixed FPR is a quantile of the
+negatives, so two haystacks would be two operating points wearing one table.
+
+**Every cell carries its spread, and every comparison is paired by seed.** The seed turns the
+whole pipeline — the attack episodes in the pool, the SMOTE draw, the optimiser's search, the
+model's own randomness — so the spread is the spread of the system rather than of a refit. A gap
+smaller than its own spread is reported as inside the noise, whichever way it points, and the
+sign test says plainly that three seeds cannot reach p < 0.05.
+
+**System C gets one check the other two do not need.** It is the only row trained on generated
+rows, so it is the only row whose held-out score can be the generator's fingerprint rather than
+detection — and the fold's own provenance probe cannot settle that, because it learns "injected"
+from the holdout's hundred-odd positives while System C learns it from thousands. So the
+counterfactual is fitted directly: same training rows as System C, labelled only by *who wrote the
+row*, never shown a row of the held-out family, then asked the question System C is scored on. If
+it reaches System C's number, System C's number is provenance, and the cell is withheld with that
+as the reason. On both anchors, it does.
+
+**The held-out column inherits the leave-one-attack-out verdicts.** It is the same carve-out
+`make loao` builds, with the same three guards, the same commensurability audit and the same
+provenance probe — so where that harness withholds, this one withholds too: the numbers move to
+`withheld_metrics` and print in brackets next to the reason. These are not the matrix's numbers
+and are not comparable to them row by row: the fold is the same, but System A trains on the
+anchor's real rows alone where the matrix's detector trains on the whole training side.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -415,7 +469,7 @@ afl/evaluation   out-of-time split, leave-one-attack-out, three-system table    
 serve            FastAPI + Streamlit demo
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
-                 build_anomaly, build_fidelity, build_loao, make_figures
+                 build_anomaly, build_fidelity, build_loao, build_three_system, make_figures
 ```
 
 ## How it's scored
@@ -436,42 +490,76 @@ be quoted at all — are in *Leave-one-attack-out, and what a fold is allowed to
 
 ## Current numbers (honest)
 
-On the synthetic placeholder config, held out on M3, the adaptive system lands below both
-baselines. Regenerated by `make compare` after ticket 09, on LightGBM 4.5.0:
+`make table` on both real anchors, three seeds each, held out on M3, at recall@1% FPR and
+precision@100. Every cell is mean ± sd over the seeds; **numbers in brackets are withheld** —
+they exist, and nothing may be concluded from them. Regenerated from
+`artifacts/three_system/`, written up in `docs/three_system.md`, on LightGBM 4.5.0.
+
+**PaySim** — 446,214 training rows, 369 of them fraud; 385k-row test window.
 
 ```
-system       PR-AUC   recall@1%FPR   precision@100   evasion   friction
-A_baseline   0.567    0.289          0.66            0.113     0.093
-B_smote      0.567    0.289          0.66            0.320     0.076
-C_adaptive   0.145    0.062          0.21            0.354     0.226
+system         known PR-AUC   known rec@1%FPR   unseen PR-AUC     unseen rec@1%FPR
+A_baseline     0.162 ± 0.016  0.437 ± 0.006     [0.064 ± 0.012]   [0.316 ± 0.043]
+B_smote        0.166 ± 0.015  0.417 ± 0.007     [0.277 ± 0.014]   [0.429 ± 0.035]
+C_adaptive     0.163 ± 0.036  0.443 ± 0.005     [0.679 ± 0.055]   [0.997 ± 0.006]
+amount floor   0.057          0.212             0.006             0.040
 ```
 
-**This is a pipeline check, not a result.** `data=synthetic` has no real anchor, and the run says
-so in a banner and in its own artefact. Reportable numbers need `data=paysim`; the detector's
-reference is `docs/detector.md` and the decision layer's is `docs/decisions.md`.
+**AMLSim** — 930,465 training rows, 1,170 of them fraud; 385k-row test window.
 
-Two things about the table have changed since it was last written down, and neither is a
-regression. It runs on **LightGBM** now rather than the sklearn fallback — libomp was missing on
-the machine that produced the older numbers, so none of them were ever LightGBM's, which ticket 08
-found and fixed. And `evasion` and `friction` come from a cost model now rather than from four
-thresholds nobody chose; the three ranking columns cannot move for that reason, and did not.
+```
+system         known PR-AUC   known rec@1%FPR   unseen PR-AUC     unseen rec@1%FPR
+A_baseline     1.000 ± 0.000  1.000 ± 0.000     0.105 ± 0.007     0.214 ± 0.035
+B_smote        0.996 ± 0.002  0.996 ± 0.002     0.121 ± 0.032     0.243 ± 0.044
+C_adaptive     0.994 ± 0.004  0.994 ± 0.003     [0.998 ± 0.003]   [1.000 ± 0.000]
+amount floor   0.456          0.474             0.030             0.034
+```
 
-**A and B are identical, and that is the honest reading.** SMOTE interpolates between existing
-fraud rows; on this holdout it cannot invent the one thing that would help, so it reproduces the
-baseline to six decimals while doubling the training fraud. That is precisely why System B is in
-the table — it makes System C falsifiable, and here it falsifies it.
+**System C's held-out column is withheld on both anchors, and the second reason is the one that
+matters.** On PaySim the whole column goes, for the reason ticket 11 already found: a classifier
+sorts the injected M3 rows from real traffic at PR-AUC 0.970 where the detector reaches 0.285, so
+nothing measured there can tell detection from provenance. On AMLSim that probe scores 0.24–0.36
+and the fold passes it — A and B carry quotable numbers there — but System C's does not, because
+a model given **System C's own training rows and told only which rows the generator wrote** —
+never which are fraud, never a row of the held-out family — scores **0.995** on that column
+against System C's **0.998**. Provenance alone reproduces the number. The +0.76 recall that
+System C appears to win over SMOTE is the generator's fingerprint transferring between families,
+not a detector generalising to an unseen attack.
 
-M3 is a hard holdout on purpose: genuine first-party fraud, where no device changes, no new
-operator appears and no new beneficiary is ever paid, so none of the signals a supervised model
-leans on fire at all. C searching a single vector against a detector that already generalises to
-that holdout is the weak-side reading the design itself predicts. Ticket 12 widened the search and
-`artifacts/abcd/` records what happened: adaptive did not beat non-adaptive, 4 of 7 seeds,
-p = 0.500. Reported as a negative rather than re-run until it wasn't.
+**On the column that is measurable, the three systems are indistinguishable.** PaySim's known
+column — real labelled fraud, 410 positives, out of time — reads 0.162 / 0.166 / 0.163 PR-AUC for
+A / B / C, and every pairwise difference is inside the seed-to-seed spread. Adding 4,972 generated
+fraud rows to a training set with 369 real ones moved nothing that could be measured. On AMLSim
+the same column is at the ceiling for all three (1.000 / 0.996 / 0.994) against an amount floor of
+0.456, which says that anchor's own fraud is trivially separable rather than that anything
+generalised.
+
+**The controls behave exactly as the design predicted, which is the one clean result here.**
+SMOTE beats real-only on the held-out column on both anchors (+0.113 recall on PaySim, +0.029 on
+AMLSim, 3/3 seeds each) and gives a little back on the known one (−0.020 recall on PaySim, −0.004
+PR-AUC on AMLSim) — an oversampler doing precisely what an oversampler can do. The gap between B
+and C is where the argument lives, and the audit takes it away.
+
+**What the loop itself did.** Over twelve rounds evasion falls from 0.86–0.88 to 0.002–0.060 on
+AMLSim and from 0.35–0.62 to 0.000–0.014 on PaySim: the attacker finds the detector's weak surface
+early and the detector closes it. The commensurability gate rejected **none** of the 72 rounds
+across the two anchors under the `envelope` rule, and would have rejected **71 of them** under the
+optimiser's shipped `lift` rule — see `docs/three_system.md` for why the table runs on the former
+and records both verdicts on every round.
+
+**Three seeds cannot reach significance and the table says so.** Every comparison is paired by
+seed and carries a sign test; 3/3 in one direction is p = 0.125 at best. A difference smaller
+than its own spread is reported as inside the noise, whichever way it points.
+
+`make compare` still runs the three systems through the hydra loop on the synthetic default. That
+path is a **pipeline check, not a result** — `data=synthetic` has no real anchor, and the run says
+so in a banner and in its own artefact.
 
 Each numeric regime supersedes the last rather than sitting beside it — the vectors, the holdout,
-the backend and now the decision layer have each moved the table, and a run from before any of
-them is not comparable. **System C in particular does not survive a decision-layer change**, since
-the loop retrains on whatever the policy allowed through.
+the backend and the decision layer have each moved the table, and a run from before any of them is
+not comparable. Ticket 12's A/B/C/D experiment on AMLworld (`artifacts/abcd/`) reported adaptive
+failing to beat non-adaptive at 4 of 7 seeds, p = 0.500; this table is a different fold on
+different anchors and does not overturn it.
 
 ## Vectors
 

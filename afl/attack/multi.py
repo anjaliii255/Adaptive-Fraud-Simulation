@@ -36,6 +36,25 @@ ALLOCATIONS = ("uniform", "search", "fitness")
 #: A candidate the anchor can separate by one field is not an attack, it is a tell.
 AUDIT_LIFT_LIMIT = 3.0
 
+#: Which rule decides that. Both read the same `envelope.audit` report; they disagree about what
+#: counts as separable, and the disagreement is a function of anchor size.
+#:
+#:   `lift`     — reject at `AUDIT_LIFT_LIMIT x base_rate`, where the base rate is the synthetic
+#:                share of anchor + batch. The default, and what ticket 12 shipped. It has no
+#:                floor, so it tightens as the anchor grows: a hundred injected rows in a
+#:                600k-row anchor put the bar at ~5e-4 PR-AUC, which log-amount alone clears.
+#:                On both real anchors it rejects every candidate batch.
+#:   `envelope` — reject on `envelope.audit`'s own `trivially_separable` verdict, floor included.
+#:                The rule the rest of the repo already applies to the same question: it is what
+#:                withholds a leave-one-attack-out fold and what `run_experiment` warns on.
+#:
+#: Ticket 16 runs on `envelope` and says so in its artefact, because a gate that refuses 100% of
+#: candidates on every real anchor makes System C a copy of System A and the hero table vacuous.
+#: Ticket 14 owns the leash and is where the two rules should be reconciled; until then both
+#: verdicts are recorded on every trial, so no run has to be repeated to find out what the other
+#: rule would have done.
+AUDIT_RULES = ("lift", "envelope")
+
 
 @dataclass
 class MultiTrial:
@@ -47,6 +66,12 @@ class MultiTrial:
     realism_penalty: float = 0.0
     audit_score: float = 0.0
     audit_base_rate: float = 0.0
+    audit_worst: str | None = None
+    #: What each rule said about this batch, whichever one was in force. Recorded on every trial
+    #: so a run never has to be repeated to find out what the other rule would have done.
+    audit_rule: str = "lift"
+    rejected_by_lift: bool = False
+    rejected_by_envelope: bool = False
     rejected: bool = False
     fitness: float = 0.0
     n_fraud: int = 0
@@ -69,13 +94,17 @@ class MultiVectorOptimiser:
         allocation: str = "search",
         episodes_per_round: int = 12,
         anchor: list[Transaction] | None = None,
+        audit_rule: str = "lift",
     ) -> None:
         if allocation not in ALLOCATIONS:
             raise ValueError(f"unknown allocation {allocation!r}; expected one of {ALLOCATIONS}")
+        if audit_rule not in AUDIT_RULES:
+            raise ValueError(f"unknown audit rule {audit_rule!r}; expected one of {AUDIT_RULES}")
         self.vectors = tuple(vectors)
         self.specs = {v: registry.get(v) for v in self.vectors}
         self.lambda_realism = lambda_realism
         self.allocation = allocation
+        self.audit_rule = audit_rule
         self.episodes_per_round = episodes_per_round
         self.anchor = anchor or []
         self.rng = make_rng(seed)
@@ -182,7 +211,9 @@ class MultiVectorOptimiser:
         audit = envelope_audit(self.anchor, fraud) if self.anchor else {}
         score = float(audit.get("score", 0.0))
         base = float(audit.get("base_rate", 0.0))
-        rejected = bool(self.anchor) and score >= AUDIT_LIFT_LIMIT * max(base, 1e-9)
+        by_lift = bool(self.anchor) and score >= AUDIT_LIFT_LIMIT * max(base, 1e-9)
+        by_envelope = bool(self.anchor) and bool(audit.get("trivially_separable"))
+        rejected = by_envelope if self.audit_rule == "envelope" else by_lift
 
         self._batch_stats = {
             "n_fraud": len(fraud),
@@ -190,13 +221,17 @@ class MultiVectorOptimiser:
             "audit_score": score,
             "audit_base_rate": base,
             "audit_worst": audit.get("worst"),
+            "audit_rule": self.audit_rule,
+            "rejected_by_lift": by_lift,
+            "rejected_by_envelope": by_envelope,
             "rejected": rejected,
         }
         if rejected:
             self.rejected += 1
             log.warning(
-                "audit gate rejected a candidate: %r at %.4f against a %.4f base rate — "
-                "scoring it would reward the optimiser for finding a leak",
+                "audit gate (%s rule) rejected a candidate: %r at %.4f against a %.4f base "
+                "rate — scoring it would reward the optimiser for finding a leak",
+                self.audit_rule,
                 audit.get("worst"),
                 score,
                 base,
@@ -213,6 +248,10 @@ class MultiVectorOptimiser:
         trial.realism_penalty = float(stats.get("realism_penalty", 0.0))
         trial.audit_score = float(stats.get("audit_score", 0.0))
         trial.audit_base_rate = float(stats.get("audit_base_rate", 0.0))
+        trial.audit_worst = stats.get("audit_worst")
+        trial.audit_rule = str(stats.get("audit_rule", self.audit_rule))
+        trial.rejected_by_lift = bool(stats.get("rejected_by_lift", False))
+        trial.rejected_by_envelope = bool(stats.get("rejected_by_envelope", False))
         trial.rejected = bool(stats.get("rejected", False))
 
         by_vector: dict[str, list[int]] = {v: [0, 0] for v in self.vectors}

@@ -226,6 +226,12 @@ class Fold:
     holdout: list[Transaction]
     embargo: timedelta = timedelta(0)
     guards: dict[str, Any] = field(default_factory=dict)
+    #: The whole test window as it was before the family carve-out. The haystack guard is
+    #: checked against it, and the three-system table's *known* column is built from it — the
+    #: same window, the same legit rows, the held-out family removed instead of everything else.
+    #: Kept on the fold rather than re-derived by the caller, because re-deriving it means a
+    #: second copy of the split rule, and two copies of a split rule drift.
+    test_side: list[Transaction] = field(default_factory=list)
 
     @classmethod
     def carve(
@@ -264,6 +270,7 @@ class Fold:
             holdout=holdout,
             embargo=embargo,
             guards=guards,
+            test_side=list(test_side),
         )
 
     # ── what the fold contains ──────────────────────────────────────────────────

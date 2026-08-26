@@ -19,8 +19,8 @@ import yaml
 
 from afl.attack.simulator import Simulator
 from afl.attack.templates import registry
-from afl.contract.metrics import Action, DetectorScore
-from afl.contract.schema import Rail, Transaction
+from afl.contract.metrics import Action, DetectorScore, MetricResult
+from afl.contract.schema import AttackBatch, AttackParams, Rail, Transaction
 from afl.data.splits import assert_no_leakage, holdout_vector, out_of_time_split
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import leave_one_attack_out as loao
@@ -715,3 +715,391 @@ def test_the_shipped_bars_carry_a_reason_and_an_auditable_origin():
     # if a bar is ever moved on purpose, this is the line that has to be changed with it
     assert prov.origin["readable"], "the origin commit named in the config is not in this repo"
     assert prov.origin["moved_since_origin"] == {}, prov.verdict
+
+
+# ── the three-system table: two columns, several seeds, one verdict ─────────────
+def anchored_pool(n: int = 900) -> list[Transaction]:
+    """Real traffic with its own labelled fraud, plus two injected families in the test window.
+
+    The shape every anchored run has: positives that are the anchor's own (`vector_id is None`)
+    and positives the generator wrote. The two columns exist to keep those apart.
+    """
+    rows = [
+        Transaction(
+            txn_id=f"real{i:04d}",
+            ts=T0 + timedelta(hours=i),
+            src=f"s{i % 40}",
+            dst=f"d{i % 25}",
+            amount=100.0 + (i % 17) * 25,
+            rail=Rail.A2A,
+            is_fraud=i % 9 == 0,
+            vector_id=None,
+        )
+        for i in range(n)
+    ]
+    # injected families land in the last fifth of the window, which is the test side
+    for family, offset, amount in (("M3", 0, 900.0), ("S1", 1, 950.0)):
+        rows += [
+            Transaction(
+                txn_id=f"{family}-{i:04d}",
+                ts=T0 + timedelta(hours=int(n * 0.82) + 2 * i + offset),
+                src=f"s{i % 11}",
+                dst=f"d{i % 7}",
+                amount=amount + i,
+                rail=Rail.A2A,
+                is_fraud=True,
+                vector_id=family,
+                attack_run_id=f"{family}-run",
+            )
+            for i in range(60)
+        ]
+    return sorted(rows, key=lambda t: t.ts)
+
+
+def _metrics(value: float, n_positives: int = 60) -> MetricResult:
+    return MetricResult(
+        pr_auc=value,
+        recall_at_fixed_fpr=value,
+        fixed_fpr=0.01,
+        precision_at_k=value,
+        k=100,
+        n_positives=n_positives,
+    )
+
+
+def _row(
+    name: str,
+    unseen: float,
+    known: float,
+    outcome: str = loao.MEASURED,
+    provenance: dict | None = None,
+    **extra,
+):
+    """One system's row in a hand-built report, at whatever outcome the test needs."""
+    quotable = outcome == loao.MEASURED
+    reason = "" if quotable else "a stand-in reason, because a withheld cell must carry one"
+    return three_system.SystemRow(
+        name=name,
+        known=three_system.ColumnResult(
+            column=three_system.KNOWN,
+            outcome=outcome,
+            reason=reason,
+            metrics=_metrics(known) if quotable else None,
+            withheld_metrics=None if quotable else _metrics(known),
+            floor={"pr_auc": 0.05, "recall_at_fixed_fpr": 0.05, "precision_at_k": 0.05},
+        ),
+        unseen=loao.FoldResult(
+            held_out_vector="M3",
+            outcome=outcome,
+            reason=reason,
+            metrics=_metrics(unseen) if quotable else None,
+            withheld_metrics=None if quotable else _metrics(unseen),
+            floor={"pr_auc": 0.05, "recall_at_fixed_fpr": 0.05, "precision_at_k": 0.05},
+            provenance=provenance,
+        ),
+        **extra,
+    )
+
+
+def a_report(rows_by_seed: dict[int, list], **kwargs) -> three_system.ThreeSystemReport:
+    return three_system.ThreeSystemReport(
+        dataset=kwargs.pop("dataset", "stand-in"),
+        held_out_vector="M3",
+        config={"seeds": list(rows_by_seed), "rounds": 2, "held_out_vector": "M3"},
+        operating_point={"fixed_fpr": 0.01, "k": 100},
+        runs=[three_system.SeedRun(seed=s, systems=r) for s, r in rows_by_seed.items()],
+        **kwargs,
+    )
+
+
+def test_the_two_columns_split_the_test_window_and_share_one_haystack():
+    """The claim and its control, on one window: neither may borrow the other's positives."""
+    fold = loao.Fold.carve(anchored_pool(), "M3", train_frac=0.7, embargo_days=1.0)
+    known = three_system.known_column(fold)
+
+    assert fold.n_positives, "the unseen column needs positives to mean anything"
+    assert all(t.vector_id == "M3" for t in fold.holdout if t.is_fraud)
+    assert all(
+        t.vector_id is None for t in known if t.is_fraud
+    ), "the known column carries the fraud the systems trained on — the anchor's own"
+    assert not [t for t in known if t.vector_id == "M3"], "the holdout family is not known"
+    assert not [
+        t for t in known if t.vector_id == "S1"
+    ], "a family in the pool that nobody trained on belongs to neither column"
+    assert three_system.assert_same_haystack(known, fold.holdout)["shared"]
+    assert {t.txn_id for t in known if not t.is_fraud} == {
+        t.txn_id for t in fold.holdout if not t.is_fraud
+    }
+
+
+def test_two_columns_with_two_haystacks_are_refused():
+    """A fixed-FPR threshold is a quantile of the negatives, so two haystacks are two points."""
+    fold = loao.Fold.carve(anchored_pool(), "M3", train_frac=0.7, embargo_days=1.0)
+    known = three_system.known_column(fold)
+    thinned = [
+        t
+        for t in known
+        if t.is_fraud or t.txn_id != next(t.txn_id for t in known if not t.is_fraud)
+    ]
+    with pytest.raises(loao.GuardFailed, match="haystack"):
+        three_system.assert_same_haystack(thinned, fold.holdout)
+
+
+def test_the_known_column_may_not_contain_the_family_it_is_measured_against():
+    fold = loao.Fold.carve(anchored_pool(), "M3", train_frac=0.7, embargo_days=1.0)
+    with pytest.raises(ValueError, match="held-out family"):
+        three_system.known_column(fold, known_vectors=("S1", "M3"))
+
+
+def test_a_column_that_cannot_carry_a_claim_keeps_its_numbers_out_of_metrics():
+    """Same contract as a leave-one-attack-out fold: `metrics` is what a reader quotes."""
+    withheld = three_system.ColumnResult(
+        column=three_system.KNOWN,
+        outcome=loao.WITHHELD,
+        reason="too thin to move a metric by less than a rounding error",
+        withheld_metrics=_metrics(0.9),
+    )
+    assert withheld.metrics is None
+    assert withheld.any_metrics.pr_auc == 0.9
+    assert not withheld.reported
+
+    with pytest.raises(ValueError, match="withheld_metrics"):
+        three_system.ColumnResult(
+            column=three_system.KNOWN, outcome=loao.WITHHELD, reason="x", metrics=_metrics(0.9)
+        )
+    with pytest.raises(ValueError, match="has to say why"):
+        three_system.ColumnResult(column=three_system.KNOWN, outcome=loao.WITHHELD)
+
+
+def test_a_thin_known_column_is_reported_as_missing_rather_than_as_a_low_score():
+    pool = anchored_pool()
+    fold = loao.Fold.carve(pool, "M3", train_frac=0.7, embargo_days=1.0)
+    detector = LGBMDetector(seed=3, params={"n_estimators": 20})
+    detector.fit(fold.train)
+
+    generous = three_system.measure_known_column(detector, fold, min_positives=1)
+    assert generous.outcome == loao.MEASURED and generous.metrics is not None
+
+    thin = three_system.measure_known_column(detector, fold, min_positives=10_000)
+    assert thin.outcome == loao.WITHHELD
+    assert "against a floor of" in thin.reason
+    assert thin.metrics is None and thin.withheld_metrics is not None
+    assert thin.floor, "the amount floor rides along on every column"
+
+
+def test_the_loop_never_trains_on_a_batch_the_audit_rejected():
+    """The one difference from `run_closed_loop`, and the reason System C needs its own runner."""
+
+    class FakeSimulator:
+        def generate(self, params):
+            return AttackBatch(
+                run_id="r",
+                params=params,
+                transactions=[
+                    t.model_copy(update={"txn_id": f"gen-{t.txn_id}", "is_fraud": True})
+                    for t in txns(6, fraud_every=1)
+                ],
+                seed=1,
+            )
+
+    class Trial:
+        def __init__(self, rejected):
+            self.rejected = rejected
+            self.realism_penalty = 0.0
+            self.audit_score = 0.0
+            self.audit_base_rate = 0.0
+            self.fitness = 0.0
+            self.allocation = {}
+
+    class FakeOptimiser:
+        def __init__(self, verdicts):
+            self.verdicts = list(verdicts)
+            self.trials = []
+
+        def propose(self):
+            return AttackParams(vector_id="S1", engine="graph")
+
+        def update(self, evasions):
+            self.trials.append(Trial(self.verdicts[len(self.trials)]))
+
+    class FakeDetector:
+        def __init__(self):
+            self.retrains = 0
+
+        def score(self, batch):
+            return [
+                DetectorScore(txn_id=t.txn_id, score=0.0, action=Action.ALLOW)
+                for t in batch.transactions
+            ]
+
+        def retrain(self, batch, evasions):
+            self.retrains += 1
+
+    detector = FakeDetector()
+    run = three_system.run_adaptive_loop(
+        FakeSimulator(), FakeOptimiser([True, False, True]), detector, rounds=3
+    )
+    assert run.rejected == 2
+    assert detector.retrains == 1, "a rejected batch must not reach the detector's corpus"
+    assert len(run.rows) == 6, "only the accepted round's rows are kept"
+    assert [h["rejected_by_audit"] for h in run.history] == [True, False, True]
+    assert all(h["evasion_rate"] == 1.0 for h in run.history), "every fraud row was allowed"
+
+
+def test_a_cell_is_withheld_if_any_seed_of_it_is():
+    """A mean of two quotable seeds and one withheld one is not a quotable number."""
+    report = a_report(
+        {
+            1: [_row("A_baseline", 0.4, 0.8), _row("C_adaptive", 0.5, 0.8)],
+            2: [
+                _row("A_baseline", 0.6, 0.8),
+                _row("C_adaptive", 0.7, 0.8, outcome=loao.WITHHELD),
+            ],
+        }
+    )
+    clean = three_system.spread_of(report, "A_baseline", three_system.UNSEEN)
+    assert clean.reported and clean.mean == 0.5 and clean.n == 2
+    assert clean.text().startswith("0.500 ± ")
+
+    dirty = three_system.spread_of(report, "C_adaptive", three_system.UNSEEN)
+    assert dirty.outcome == loao.WITHHELD
+    assert dirty.values == [0.5, 0.7], "the numbers still exist; they are just not quotable"
+    assert dirty.text().startswith("["), "a withheld cell is bracketed wherever it is printed"
+
+
+def test_a_gap_smaller_than_its_own_spread_is_reported_as_inside_the_noise():
+    report = a_report(
+        {
+            1: [_row("B_smote", 0.50, 0.8), _row("C_adaptive", 0.60, 0.8)],
+            2: [_row("B_smote", 0.60, 0.8), _row("C_adaptive", 0.50, 0.8)],
+            3: [_row("B_smote", 0.50, 0.8), _row("C_adaptive", 0.55, 0.8)],
+        }
+    )
+    got = three_system.compare(report)
+    assert got.n == 3 and got.wins == 2
+    assert got.inside_noise, "±0.10 swings around a +0.017 mean is not a result"
+    assert "inside the run-to-run spread" in got.verdict
+    assert got.p_value == three_system.sign_test(2, 3)
+
+
+def test_a_loss_is_reported_as_a_loss():
+    """The table has to be able to say the adaptive loop lost, or it is not a control."""
+    report = a_report(
+        {
+            1: [_row("B_smote", 0.80, 0.8), _row("C_adaptive", 0.40, 0.8)],
+            2: [_row("B_smote", 0.82, 0.8), _row("C_adaptive", 0.41, 0.8)],
+        }
+    )
+    got = three_system.compare(report)
+    assert not got.beats and not got.inside_noise
+    assert got.wins == 0
+    assert "does not beat" in got.verdict
+
+
+def test_the_table_brackets_what_it_will_not_stand_behind():
+    report = a_report(
+        {
+            1: [
+                _row("A_baseline", 0.4, 0.8),
+                _row("B_smote", 0.4, 0.8),
+                _row("C_adaptive", 0.9, 0.8, outcome=loao.WITHHELD),
+            ]
+        }
+    )
+    table = three_system.table_markdown(report)
+    assert table.startswith("| system |")
+    assert "| [0.900] |" in table, "a withheld number is printed in brackets, never hidden"
+    assert "amount floor" in table, "every column carries the bar a model has to clear"
+
+
+def test_diagnose_says_when_smote_only_reproduced_the_baseline():
+    report = a_report(
+        {
+            1: [
+                _row("A_baseline", 0.4, 0.8),
+                _row("B_smote", 0.4, 0.8),
+                _row("C_adaptive", 0.4, 0.8),
+            ],
+            2: [
+                _row("A_baseline", 0.5, 0.8),
+                _row("B_smote", 0.5, 0.8),
+                _row("C_adaptive", 0.5, 0.8),
+            ],
+        }
+    )
+    findings = " ".join(f["finding"] for f in three_system.diagnose(report))
+    assert "SMOTE reproduced the baseline" in findings
+    assert "System A with more rows" in findings
+
+
+def test_seeds_that_ran_different_systems_are_not_one_table():
+    with pytest.raises(ValueError, match="did not run the same systems"):
+        a_report({1: [_row("A_baseline", 0.4, 0.8)], 2: [_row("B_smote", 0.4, 0.8)]})
+    with pytest.raises(ValueError, match="no runs"):
+        a_report({})
+
+
+def test_the_table_artefact_round_trips_and_an_old_one_raises(tmp_path: Path):
+    report = a_report(
+        {1: [_row("A_baseline", 0.4, 0.8), _row("C_adaptive", 0.6, 0.7, n_generated=12, rounds=2)]},
+        dataset="stand-in",
+    )
+    path = report.save(tmp_path)
+    back = three_system.ThreeSystemReport.load("stand-in", tmp_path)
+    assert back.seeds == [1] and back.systems == ("A_baseline", "C_adaptive")
+    assert back.rows_of("C_adaptive")[0].n_generated == 12
+    assert back.cells("A_baseline", three_system.UNSEEN)[0].metrics.pr_auc == 0.4
+
+    stale = json.loads(path.read_text())
+    stale["version"] = three_system.THREE_SYSTEM_ARTEFACT_VERSION + 1
+    path.write_text(json.dumps(stale))
+    with pytest.raises(ValueError, match="artefact version"):
+        three_system.ThreeSystemReport.load("stand-in", tmp_path)
+
+
+def _provenance_only(pr_auc: float) -> dict:
+    """The counterfactual `scripts/build_three_system.py` fits on System C's own training rows."""
+    return {
+        "checked": True,
+        "trained_on": "the loop's own output, which is System C's training set",
+        "pr_auc": pr_auc,
+        "base_rate": 0.0004,
+        "n_train_injected": 5000,
+        "separable": True,
+    }
+
+
+def test_diagnose_calls_out_a_held_out_score_that_provenance_alone_reproduces():
+    """The one reading the fold's own probe is too underpowered to reach.
+
+    System C is the only row trained on generated rows, so it is the only row whose held-out
+    number can be the generator's fingerprint. A model given the same training rows and told
+    *only* which of them the generator wrote — never which are fraud — that reaches the same
+    score has explained it.
+    """
+    report = a_report(
+        {
+            1: [
+                _row("A_baseline", 0.11, 0.9),
+                _row("B_smote", 0.12, 0.9),
+                _row("C_adaptive", 0.99, 0.9, provenance=_provenance_only(0.996)),
+            ]
+        }
+    )
+    findings = " ".join(f["finding"] for f in three_system.diagnose(report))
+    assert "generator's fingerprint" in findings
+    assert "knows nothing except which rows the generator wrote" in findings
+
+
+def test_diagnose_does_not_cry_provenance_when_the_probe_falls_short():
+    report = a_report(
+        {
+            1: [
+                _row("A_baseline", 0.11, 0.9),
+                _row("B_smote", 0.12, 0.9),
+                _row("C_adaptive", 0.99, 0.9, provenance=_provenance_only(0.40)),
+            ]
+        }
+    )
+    findings = " ".join(f["finding"] for f in three_system.diagnose(report))
+    assert "generator's fingerprint" not in findings

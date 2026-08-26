@@ -264,6 +264,23 @@ def provenance_probe(fold: loao.Fold, sup: dict, seed: int) -> dict:
     }
 
 
+def template_gate(spec) -> str:
+    """Why a `template` vector's numbers cannot be claimed for its family, in one sentence.
+
+    Shared with `scripts/build_three_system.py`: the same gate decides the same thing in the
+    matrix and in the hero table, and two copies of this sentence would be two gates the first
+    time either was edited.
+    """
+    if spec.reportable:
+        return ""
+    return (
+        f"{spec.vector_id} is a `{spec.status}` vector: it emits schema-valid traffic of the "
+        f"right shape, but its defining tell is not modelled yet — "
+        f"{' '.join(spec.gap.split()).rstrip('.')}. The number in this row measures the "
+        "pipeline, not the family"
+    )
+
+
 def run_fold(
     composed,
     held_out: str,
@@ -343,16 +360,7 @@ def run_fold(
         min_positives=min_positives,
         separability=separability,
         provenance=provenance,
-        not_reportable=(
-            ""
-            if spec.reportable
-            else (
-                f"{held_out} is a `{spec.status}` vector: it emits schema-valid traffic of the "
-                f"right shape, but its defining tell is not modelled yet — "
-                f"{' '.join(spec.gap.split()).rstrip('.')}. The number in this row measures "
-                "the pipeline, not the family"
-            )
-        ),
+        not_reportable=template_gate(spec),
     )
     log.info("%s / %s: %s", cfg.data.name, held_out, result.summary())
     return result, {

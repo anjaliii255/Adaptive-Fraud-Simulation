@@ -1,4 +1,4 @@
-.PHONY: setup smoke test splits features baseline decisions anomaly loao fidelity fidelity-selftest loop compare figures demo lint fmt clean
+.PHONY: setup smoke test splits features baseline decisions anomaly loao fidelity fidelity-selftest loop table compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -36,7 +36,11 @@ fidelity-selftest: ## prove the harness discriminates, on three cases whose answ
 loop:     ## System C — the adaptive loop
 	uv run python scripts/run_experiment.py experiment=adaptive
 
-compare:  ## the 3-system table: real-only vs SMOTE vs adaptive
+table:    ## THE 3-system table: real-only vs SMOTE vs adaptive, every anchor, every seed
+	uv run python scripts/build_three_system.py
+
+compare:  ## the same three systems through the hydra loop on the default config - a pipeline
+          ## check, not the reportable table. `make table` is the one that carries numbers.
 	uv run python scripts/run_experiment.py -m experiment=baseline,smote,adaptive
 
 figures:  ## convergence curve + 3-system table from logged runs

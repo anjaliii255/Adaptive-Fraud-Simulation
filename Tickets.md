@@ -35,7 +35,7 @@ blocks the frontier for both lanes.
 | 13 | M1 — the optimiser's boundary walk as a vector | ▲ A | 12 |
 | 14 | Realism leash, reported every round | ▲ A | 12 |
 | 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
-| 16 | The three-system table | ■ B | 11, 12 |
+| 16 | ~~The three-system table~~ **done** | ■ B | 11, 12 |
 | 17 | Sequence model — earn it or report it | ■ B | 11 |
 | 18 | Temporal GNN — earn it or fall back | ■ B | 11 |
 | 19 | The convergence artefact | ▲ A | 11, 12 |
@@ -1231,15 +1231,111 @@ The table must be able to say the adaptive loop lost. Today, on the placeholder 
 
 **Blocked by:** 11, 12.
 
-**Status:** ready-for-agent
+**Status:** done — table in `afl/evaluation/three_system.py`, built by `make table`
+(`scripts/build_three_system.py`), evidence in `artifacts/three_system/`, written up in
+`docs/three_system.md`. **The adaptive loop appears to beat SMOTE by +0.76 recall on the held-out
+family, and the number does not survive its own audit.** A model handed System C's training rows
+and told *only which rows the generator wrote* — never which are fraud, never a row of the
+held-out family — scores **0.995** on that column against System C's **0.998**. Provenance alone
+reproduces the result, so System C's held-out cell is withheld on both anchors. On the one column
+that is measurable, PaySim's real labelled fraud, the three systems sit inside each other's
+seed-to-seed spread: 0.162 / 0.166 / 0.163 PR-AUC.
 
-- [ ] All three systems trained and scored on the same holdout at the same fixed operating point
-- [ ] Both columns reported: known attacks and unseen attacks
-- [ ] The table regenerates from run logs by one command, with no hand-entered numbers
-- [ ] Run-to-run variance is reported, so a small difference is not read as a result
-- [ ] If adaptive does not beat SMOTE on the held-out column, the result is reported as-is and
-      the likely reason is stated
-- [ ] The README's current-numbers section is refreshed from this run
+- [x] All three systems trained and scored on the same holdout at the same fixed operating point —
+      one `Fold.carve` per seed against the committed boundary, one `detector_factory` and one
+      `fit` for all three rows *and* for the loop's own detector, and the operating point read
+      from `config/eval/leave_one_attack_out.yaml` rather than passed per system. "The same
+      holdout" is an assertion rather than a claim: `assert_same_haystack` refuses two columns
+      that do not share their negatives, because recall at a fixed FPR is a quantile of them
+- [x] Both columns reported: known attacks and unseen attacks — `unseen` is the held-out family
+      nobody trained on, `known` is the fraud everybody did: the anchor's own labelled rows,
+      scored on the same window against the same haystack. Defined by what reached training
+      rather than by what the pool happens to carry, so the families in the pool that nobody
+      trained on land in **neither** column — they are not the claim and not the control, and
+      counting them as negatives would label real fraud as legit traffic
+- [x] The table regenerates from run logs by one command, with no hand-entered numbers —
+      `make table` runs it; `--doc-only` rebuilds `docs/three_system.md` from the committed
+      artefacts alone, so the document is a pure function of them. Every number in the doc and in
+      the README's current-numbers section traces to `artifacts/three_system/<anchor>.json`,
+      which carries the eval config as read, the committed split digest, every seed, per-column
+      row counts, four guards, both probes, the loop's per-round history and each system's model
+      card. Versioned, and an old file raises rather than being read with the wrong meaning
+- [x] Run-to-run variance is reported, so a small difference is not read as a result — three
+      seeds, mean ± sd in every cell, and every comparison **paired by seed** rather than pooled.
+      A gap smaller than its own spread prints as *inside the noise* whichever way it points, and
+      the sign test says out loud that 3/3 seeds is p = 0.125 at best. The seed turns the whole
+      pipeline — pool, SMOTE draw, optimiser search, model — so the spread is the system's, not a
+      refit's
+- [x] If adaptive does not beat SMOTE on the held-out column, the result is reported as-is and
+      the likely reason is stated — `compare()` reports the direction whichever way it falls
+      (a test builds a losing table and asserts it reads as a loss), and `diagnose()` derives the
+      likely reasons from the run's own logs rather than from a sentence typed after seeing the
+      number: a column that cannot carry a claim, a control that reproduced the baseline, a table
+      under the amount floor, a loop whose output is a rounding error, an evasion rate that
+      collapsed, rounds the audit rejected, a known column at the ceiling, and a held-out score
+      that a provenance-only model reproduces
+- [x] The README's current-numbers section is refreshed from this run — both anchors, both
+      columns, brackets on every withheld cell, and the synthetic `make compare` table it
+      replaced is named as the pipeline check it always was
+- [x] `make test` green (333 passed, up from 316 — 15 new tests in `tests/test_eval.py`, 2 in
+      `tests/test_multi_optimiser.py`), `ruff check` and `ruff format` clean, and `make table`
+      runs both anchors end to end in about fifty minutes
+- [x] **Not on the list, and the reason the table exists at all:** the check that took the result
+      away is not one this ticket was asked for. See the first box below
+
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **The one big number in this project is provenance, and it is now measured rather than
+  suspected.** Ticket 11's probe learns "injected" from the fold's own hundred-odd positives, and
+  its carry-out warned that a low score there is weak evidence of anything. System C learns the
+  same thing from ~5,000 generated rows. So this ticket fits the counterfactual with System C's
+  advantage — same training rows, labelled only by *who wrote the row*, never shown the held-out
+  family — and asks it System C's question. It scores **0.998 / 0.993 / 0.994** on AMLSim against
+  System C's 0.998, and **0.999 / 0.964 / 0.626** on PaySim against 0.679. The fingerprint
+  transfers between families; the recall does not have to. `scripts/build_three_system.py:
+  loop_provenance_probe`, and it decides the cell rather than annotating it.
+- **On AMLSim the fold probe passes and the loop probe does not, which is the whole argument for
+  having both.** The fold probe scores 0.24–0.36 there — under its 0.5 floor — so Systems A and B
+  carry quotable held-out numbers on that anchor (0.105 and 0.121 PR-AUC). Only System C's cell is
+  withheld. A harness with one probe would have published 0.998.
+- **The audit gate has two rules and they disagree by an order of magnitude on a real anchor.**
+  Ticket 12's `AUDIT_LIFT_LIMIT * base_rate` has no floor, so the bar falls as the anchor grows:
+  a hundred injected rows in a 600k-row anchor put it at ~5e-4 PR-AUC, which log-amount alone
+  clears. It would have rejected **71 of the 72 rounds** in this run; `envelope.audit`'s own
+  `trivially_separable` verdict — the rule the rest of the repo applies to the same question —
+  rejected **none**. The table declares `audit_rule=envelope` in its artefact and records both
+  verdicts on every round. **Ticket 14 owns the leash and should settle which rule is the rule**;
+  `MultiVectorOptimiser`'s default is unchanged, so nothing else moved.
+- **System A here is not the leave-one-attack-out matrix's detector, and the numbers are not
+  comparable row by row.** Same fold, same guards, same boundary — different training set: System
+  A sees the anchor's real rows alone, where the matrix's detector trains on the whole training
+  side, injected families included. That difference is the table's subject, which is why it is not
+  a bug and why `docs/three_system.md` says so before it prints a number.
+- **The attacker only sees the training window, and that changed the result.** System C's
+  simulator is anchored to an envelope measured on the training rows rather than on the whole
+  anchor. Generating from the whole-anchor envelope hands the attacker accounts that only exist
+  after the split boundary — knowledge of the future wearing a realism setting — and auditing
+  those rows against the training window then rejects them for `sender_in_anchor`. On PaySim,
+  where no account transacts twice, that rejected *every* batch and made System C a byte-copy of
+  System A for a reason that was an artefact of the harness.
+- **The loop converges, and convergence is not the same as teaching.** Evasion falls from
+  0.86–0.88 to 0.002–0.060 on AMLSim and from 0.35–0.62 to 0.000–0.014 on PaySim over twelve
+  rounds, with zero rounds rejected. `diagnose()` reports that as a finding rather than a success:
+  a loop whose attacker stops evading is a loop whose kept rows are rows the detector already
+  catches.
+- **PaySim's known column is the honest headline of this table.** Real labelled fraud, 410
+  positives, out of time: A 0.162, B 0.166, C 0.163 PR-AUC, every pairwise difference inside the
+  spread. Adding 4,972 generated fraud rows to a training set carrying 369 real ones moved nothing
+  that could be measured. AMLSim's known column is at the ceiling for all three (1.000 / 0.996 /
+  0.994) against a 0.456 amount floor, which is a statement about that anchor rather than about
+  any system on it.
+- **What this hands to the tickets that depend on it.** **20** (one command reproduces a headline
+  number) should point at `make table` and quote the *known* column or the withheld verdict, never
+  the 0.998. **21**'s demo has the same constraint. **22**'s claims audit inherits a hero table
+  whose adaptive row is withheld on both anchors, and the honest version of the pitch is the
+  refusal, not the number. **13** and **14** each own a piece of what would make the held-out
+  column mean something: a vector whose tell is behavioural rather than generated, and a leash
+  whose gate is settled.
 
 ---
 

@@ -47,6 +47,12 @@ artifacts/**
 # one more: a failing scorecard that lives only in a terminal is a scorecard that gets re-run.
 !artifacts/fidelity/
 !artifacts/fidelity/**
+# the hero table: three systems on one guarded fold, over several seeds, in both columns, with
+# the per-seed numbers the spread is computed from and the loop's per-round history. It is the
+# one artefact the deck quotes, `docs/three_system.md` is generated from it, and a slide number
+# that traces to nothing is a slide number nobody can check.
+!artifacts/three_system/
+!artifacts/three_system/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/
