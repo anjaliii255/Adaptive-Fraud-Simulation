@@ -524,6 +524,50 @@ def _level3(score=0.2, gap=0.40, lift=-0.05, tstr_pr_auc=0.30, floor=0.10):
     }
 
 
+def test_a_column_that_never_moves_cannot_manufacture_distance():
+    """PaySim has no sender history, so three of the seven embedding columns are constant.
+
+    Standardising by `std + 1e-9` divided a synthetic row's real sender history by a billionth
+    and called the result a distance: the first PaySim scorecard reported a DCR ratio of 1.0e11
+    and passed the memorisation check because of it.
+    """
+    # every sender unique, exactly as in PaySim: no gaps, no out-degree, no unique-payee count
+    rows = [
+        Transaction(
+            txn_id=f"p{i:04d}",
+            ts=T0 + timedelta(hours=i),
+            src=f"once{i}",
+            dst=f"d{i % 5}",
+            amount=100.0 + i,
+            rail=Rail.A2A,
+            is_fraud=i % 10 == 0,
+        )
+        for i in range(300)
+    ]
+    real = level2_structural.embedding(rows)
+    assert set(level2_structural.dropped_columns(real)) == {
+        "log_gap_s",
+        "src_out_degree",
+        "src_uniq_dst",
+    }
+
+    # senders with a history, i.e. every column populated — the shape a generated batch has
+    synth = [
+        Transaction(
+            txn_id=f"s{i:04d}",
+            ts=T0 + timedelta(minutes=i),
+            src=f"mule{i % 4}",
+            dst=f"d{i % 5}",
+            amount=120.0 + i,
+            rail=Rail.A2A,
+            is_fraud=i % 3 == 0,
+        )
+        for i in range(300)
+    ]
+    ratio = privacy.dcr(rows, synth)["dcr_ratio"]
+    assert ratio < 1_000, f"a constant column is still manufacturing distance: {ratio}"
+
+
 def test_a_drifting_holdout_does_not_read_as_a_membership_leak():
     """The MIA control. Members and non-members differ by *when*, not only by membership.
 

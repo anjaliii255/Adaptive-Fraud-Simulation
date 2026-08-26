@@ -60,7 +60,7 @@ make baseline    # tune the detector on every anchor; commit the reference numbe
 make decisions   # price the graded action bands and reason codes; commit them
 make anomaly     # score the zero-day layer against the supervised model on the held-out family
 make loao        # the leave-one-attack-out matrix: every family held out in turn, with the guards
-make fidelity    # build the fidelity scorecard, before trusting any generator
+make fidelity    # the 3-level scorecard on every real anchor; level 3 is the gate
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
 make figures     # convergence curve + table, regenerated from run logs
@@ -314,6 +314,59 @@ So every fold lands on one of three outcomes, and only the first carries a claim
 The amount floor rides along on every fold — rank by amount, no model, direction chosen on the
 training window. Two earlier results in this repo were walked back for want of that column.
 
+## Fidelity, and the level that decides it
+
+`make fidelity` scores the generator against each real anchor on three levels plus a privacy
+panel, writes `artifacts/fidelity/<anchor>.json` and rewrites `docs/fidelity.md` from it. The
+levels are not equal. **Level 3 is the gate** — does training on this data teach a detector
+anything about real fraud — and levels 1 and 2 are diagnostics that explain where level 3 landed.
+A generator that resembles real traffic and teaches a model nothing has failed, however pretty
+its histograms.
+
+**Both anchors fail, and the gate is what fails them.** On PaySim, the anchor to read:
+
+```
+system         trained on                          PR-AUC   recall@1%FPR   beats the floor
+trtr           real rows, real labels              0.158    0.444          yes
+tstr           real legit + generated fraud        0.005    0.024          no
+augmented      real rows + generated fraud         0.047    0.215          no
+amount floor   nothing                             0.057    0.212          --
+standalone     the generator's whole output        0.003    0.000          no
+```
+
+A detector trained on the generated fraud reaches PR-AUC 0.005 against real PaySim fraud, an
+order of magnitude *below* sorting the test window by amount. Adding those rows to a real
+training set does not help it either: recall at 1% FPR falls from 0.444 to 0.215, a 22.9-point
+loss. Level 1 passes on the same card (0.749, above its 0.70 bar) and rescues nothing — that
+division is the design, and it is enforced in the arithmetic as well as the prose, because the
+headline score is capped at the level-3 score.
+
+**The bars predate the numbers, and that is checked rather than claimed.** They live in
+`config/fidelity/thresholds.yaml`, one bar per stated reason, refused at load if the reason is
+blank. Each names the commit it was first committed in, and every run reads that commit back out
+of git and compares the value committed there against the value being applied now. Six of the
+seven trace unchanged to the day-one skeleton; the seventh — a TSTR score must beat the amount
+floor — was committed before the first anchored run existed. Edit one and the artefact says so,
+names the direction, and spells LOOSENED in capitals. A failing card exits non-zero *after*
+writing itself, so it is committed rather than quietly re-run at a friendlier setting.
+
+**Two measurement bugs were found by running it, and both flattered the generator.** The privacy
+embedding standardised by `std + 1e-9`, and three of its seven columns are exactly constant on
+PaySim — the anchor has no sender history, so no gaps, no out-degree, no unique-payee count. A
+synthetic row with a real sender history was divided by a billionth, and the first PaySim card
+reported a distance-to-closest-record ratio of **1.0e11** and passed the memorisation check
+because of it. Constant columns are now dropped and named; the ratio is 2.43 over four real
+dimensions. And membership inference on an out-of-time split measures the calendar as well as
+membership, so the same attack now runs between two halves of the holdout, where nothing was ever
+in training: on AMLSim it scores 0.343 there against 0.351 observed, so 0.008 of that advantage
+is about membership and the rest is drift.
+
+**What the privacy panel does not say.** DCR and MIA are evidence against memorisation, not a
+guarantee. Neither can see the disclosure path this generator actually has: it stages attacks on
+the anchor's own accounts by design, and 100% of generated rows name an account that exists in
+the anchor. That is measured and reported rather than flagged, because it is the envelope working
+as intended — but nobody should read "synthetic" as "contains no real identifiers".
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -329,7 +382,7 @@ afl/evaluation   out-of-time split, leave-one-attack-out, three-system table    
 serve            FastAPI + Streamlit demo
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
-                 build_anomaly, build_fidelity, make_figures
+                 build_anomaly, build_fidelity, build_loao, make_figures
 ```
 
 ## How it's scored
