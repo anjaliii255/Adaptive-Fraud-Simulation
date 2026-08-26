@@ -31,6 +31,14 @@ before, because libomp was missing and the wheel was silently falling back to sk
 reference numbers are committed per anchor in `artifacts/detector/` and written up in
 `docs/detector.md`. That is System A of the hero table: the bar everything else has to clear.
 
+The **leave-one-attack-out harness is built, and most of what it produced is a refusal to
+report.** Nine families held out in turn on two anchors; three guards on every carve-out; and a
+fourth check that asks whether the fold is measuring detection at all. **Four of the eighteen
+folds carry a quotable number, and the headline fold is not one of them** — on PaySim a
+classifier sorts the injected M3 rows from real traffic at PR-AUC 0.970 where the detector
+reaches 0.893, so the fold cannot tell the two apart. The matrix is in `artifacts/loao/` and
+written up in `docs/loao.md`, generated from it.
+
 ## Setup
 
 Needs Python 3.11. **On macOS, install libomp first.** The LightGBM wheel imports cleanly without
@@ -288,8 +296,19 @@ are fixed, and both are measured in the artefact rather than asserted in a comme
 ## Leave-one-attack-out, and what a fold is allowed to claim
 
 `make loao` holds out every family in turn and writes the matrix to `artifacts/loao/<anchor>.json`
-and `docs/loao.md`. The three guards above make the carve-out airtight. They are not what decides
-most of the table.
+and `docs/loao.md`.
+
+**Three guards make the carve-out airtight,** and all three are assertions with a test that
+deliberately tries to leak a row past them:
+
+- Not one row of the held-out family reaches training — **the detector's replay buffer included**.
+  The audit runs against the fitted detector's `training_rows`, not the list handed to `fit`,
+  because the replay buffer is where a carved-out family walks back into training four rounds
+  later without the split changing. A detector that cannot say what it trained on fails the guard.
+- The split is still out-of-time with the committed embargo intact **after** the carve-out.
+- Every legit row of the test window stays in the holdout. An FPR with no negatives is not an FPR.
+
+They are not what decides most of the table.
 
 **A fold that runs is not a fold that means something.** The carve-out drops the anchor's own
 fraud from the holdout, so in every fold *every positive is an injected synthetic row and every
@@ -313,6 +332,21 @@ So every fold lands on one of three outcomes, and only the first carries a claim
 
 The amount floor rides along on every fold — rank by amount, no model, direction chosen on the
 training window. Two earlier results in this repo were walked back for want of that column.
+
+**What the matrix said.** Four of eighteen folds carry a number: AMLSim C1 (0.975), M3 (0.996)
+and S2 (1.000), and PaySim S1 (0.275). The AMLSim three are on an anchor where the same detector
+already scores 1.000 on the anchor's *own* labelled fraud and sorting by amount alone reaches
+0.456 — a near-perfect fold there says the simulator is legible, not that anything generalised.
+PaySim S1 sits above PaySim's own labelled fraud (0.152), which is ticket 10's reading unchanged.
+PaySim M3 — the headline fold — is withheld: probe 0.970 against the detector's 0.893. The
+sharpest row is PaySim S2, where a classifier separates the injected card-testing rows at 1.000
+and the detector scores 0.005 on them: perfectly identifiable by provenance, and invisible to the
+model.
+
+Seven more folds are withheld only for being thin at the committed `eval.holdout_episodes: 12`.
+PaySim S3 is the one that costs something — detector 0.916, provenance probe 0.042, withheld for
+six rows under the floor of 30. Raising the episode count would move ticket 10's committed fold
+too, so it is a decision rather than an oversight, and it was not taken here.
 
 ## How it's laid out
 
@@ -345,19 +379,8 @@ We report PR-AUC, recall at a fixed false-positive rate, and precision@k. We do 
 accuracy or ROC-AUC alone because, at a sub-2% fraud rate, they can flatter a model that catches
 almost nothing. `afl/defend/baseline.py` refuses to save an artefact containing either.
 
-**Three guards make the carve-out mean something,** and all three are assertions with a test that
-deliberately tries to leak a row past them:
-
-- Not one row of the held-out family reaches training — **the detector's replay buffer included**.
-  The audit runs against the fitted detector's `training_rows`, not the list handed to `fit`,
-  because the replay buffer is where a carved-out family walks back into training four rounds
-  later without the split changing. A detector that cannot say what it trained on fails the guard.
-- The split is still out-of-time with the committed embargo intact **after** the carve-out.
-- Every legit row of the test window stays in the holdout. An FPR with no negatives is not an FPR.
-
-**And a fourth check that is a verdict rather than a guard** — the provenance probe, in
-*Leave-one-attack-out, and what a fold is allowed to claim* above. It is the one that
-decides most of the matrix.
+The guards that make a carve-out mean something — and the check that decides whether a fold may
+be quoted at all — are in *Leave-one-attack-out, and what a fold is allowed to claim* above.
 
 ## Current numbers (honest)
 

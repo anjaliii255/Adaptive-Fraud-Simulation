@@ -959,6 +959,76 @@ is the generator rather than the detector.**
 - [x] `make test` green (305 passed, up from 288 — 17 new tests in `tests/test_eval.py`),
       `ruff check` and `ruff format` clean, and `make loao` runs both anchors end to end
 
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **Four of eighteen folds carry a number, and the headline fold is not one of them.** Nine
+  families across two anchors. `measured`: AMLSim C1 **0.975**, M3 **0.996**, S2 **1.000**, and
+  PaySim S1 **0.275**. The other fourteen are withheld — seven for being too thin, three because
+  a classifier can sort the injected rows from the anchor's own, two because one contract field
+  can, two because the vector is still a template. **PaySim M3, the fold this project's headline
+  rests on, is withheld.** Every number is in `artifacts/loao/`, none of them is gone, and each
+  one sits next to the reason it may not be quoted.
+- **The check that decides the table was not on the ticket's list — ticket 07 put it there.** Its
+  carry-out asked ticket 11 to make the fold say for itself when it is meaningless, and this is
+  it: the carve-out drops the anchor's own fraud from the holdout, so in every fold *every
+  positive is an injected row and every negative is a real one*, and "caught the fraud" and
+  "spotted the synthetic row" are the same label. `scripts/build_loao.py:provenance_probe`
+  cross-validates a classifier on the fold's own feature space to make exactly that call. It
+  takes three rows outright — PaySim C1 (**0.906** against the detector's 0.604), M3 (**0.970**
+  against 0.893) and S2 (**1.000** against 0.005) — and would have taken PaySim M1 (0.945) if the
+  template gate had not fired first. Ticket 07 measured this by hand at AUC 1.00; it is a gate
+  now, so it cannot be quoted around.
+- **PaySim S2 is the sharpest row in the table, and it cuts both ways.** A classifier separates
+  the injected card-testing rows from PaySim traffic at PR-AUC **1.000**. The detector scores
+  **0.005** on the same rows. Perfectly identifiable by provenance and invisible to the model —
+  which is the cleanest available proof that the fold's two questions are not the same question,
+  in the direction nobody expects.
+- **M2 cannot be evaluated by injection into a real anchor at all, and that is structural rather
+  than a bug.** `sender_in_anchor` separates the injected M2 rows at PR-AUC **1.000** on *both*
+  anchors. A synthetic-identity vector invents accounts by definition, so the family's defining
+  behaviour is the thing the commensurability audit flags. Nothing in the generator can fix that
+  while the fold is "inject into real traffic". **Ticket 15** or a fully synthetic anchor is the
+  instrument for M2; leave-one-attack-out is not.
+- **AMLSim's three measured rows are not a result either, and the document says so without being
+  asked.** The same detector scores **1.000** on AMLSim's own labelled fraud in the same test
+  window, where sorting by amount alone already reaches **0.456**. A near-perfect fold on an
+  anchor like that says the simulator is legible — ticket 08's carry-out, arriving from a third
+  direction. The generated write-up puts every measured row next to its anchor's own-fraud
+  reference for exactly this reason.
+- **PaySim's one measured row is easier than the fraud the detector trains on.** S1 at 0.275
+  against **0.152** on PaySim's own labelled fraud in the same window. That is ticket 10's
+  reading, unchanged: an unseen family the detector finds easier than the seen ones is a
+  statement about the injected rows.
+- **The provenance probe is underpowered exactly where the fold is thin, and the asymmetry runs
+  the wrong way.** It learns "injected" from the fold's own positives — at best a hundred of them
+  across three cross-validation folds — while the detector it checks learned from a 930k-row
+  window. Every AMLSim probe scores under 0.36 and every thin fold's probe scores under 0.01. So
+  a **high** probe score is strong evidence a fold is provenance-bound; a **low** one on a thin
+  fold is weak evidence of anything. `MIN_MEANINGFUL_POSITIVES` is applied first so the weakest
+  probes belong to folds that were already withheld, and the positive count travels with every
+  probe score. **Do not read a low probe on a thin fold as a clean bill of health.**
+- **Seven folds are too thin at the committed `eval.holdout_episodes: 12`** — AMLSim C2 (18), C3
+  (12), S1 (20), S3 (12) and PaySim C2 (21), C3 (20), S3 (24) positives. The knob that fixes it
+  is one line of config, and raising it moves ticket 10's committed fold too, so it is a decision
+  rather than an oversight and it was not taken here. **PaySim S3 is the one that costs
+  something**: detector 0.916, provenance probe 0.042, withheld for six rows. It is the most
+  likely candidate in the matrix for a fold that would carry a real claim.
+- **`training_rows` is a new seam on every detector**, and the replay-buffer guard is the reason
+  for it. `LGBMDetector`, `AnomalyDetector` and `EnsembleDetector` each expose what they have
+  fitted on — corpus *and* replay buffer — and the guard audits that rather than the list handed
+  to `fit`. A detector without the property **fails** the guard instead of passing it, because
+  the failure this whole ticket exists to prevent is the silent one.
+- **The withheld numbers live under `withheld_metrics`, never under `metrics`.** A consumer that
+  reads the obvious field on a fold that cannot carry a claim gets `None`, not a number. The
+  document still prints them, in brackets, beside the reason — hiding evidence is its own kind
+  of dishonesty, but a bracketed number next to "withheld" is not one anybody quotes by accident.
+- **What this hands to the tickets that depend on it.** **16** (the three-system table) inherits a
+  headline fold that is withheld on PaySim and vacuous on AMLSim — the table can still be built,
+  but its held-out column needs the same treatment this matrix gives every row. **17** and **18**
+  inherit the same: a sequence model or a GNN measured on PaySim M3 is being scored on a fold
+  whose positives a classifier finds at 0.970. **19**'s convergence artefact is measured through
+  this harness and inherits its verdicts.
+
 ---
 
 # 12: Multi-vector adaptive optimiser
