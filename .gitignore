@@ -73,3 +73,8 @@ skills-lock.json
 
 # spike run logs; the artefact under artifacts/ is the record, not the console output
 *.log
+# the A/B/C/D result: the seven-seed matrix, the per-round convergence for every seed, and the
+# sign tests. Committed because the conclusion is a negative — a null that lives only on one
+# laptop is not a result anyone can check, and ticket 19's figure regenerates from these files.
+!artifacts/abcd/
+!artifacts/abcd/**
