@@ -141,3 +141,49 @@ def test_evasion_is_attributed_back_to_the_vector_that_earned_it():
     per_vector = optimiser.trials[-1].per_vector_evasion
     assert per_vector["S1"] > 0
     assert per_vector["S2"] == 0 and per_vector["S3"] == 0
+
+
+def test_the_two_audit_rules_disagree_at_scale_and_both_verdicts_are_recorded():
+    """The gate's threshold is a choice, and the choice is a function of anchor size.
+
+    `lift` has no floor: the bar is three times the synthetic share of anchor-plus-batch, so it
+    tightens as the anchor grows and on a real 600k-row anchor it refuses every candidate. The
+    `envelope` rule is the verdict `envelope.audit` states for itself, floor included — the same
+    one that withholds a leave-one-attack-out fold. Ticket 16's table runs on it, so the two
+    verdicts travel together on every trial and a run never has to be repeated to find out what
+    the other rule would have said.
+    """
+    real = anchor(n=6_000, senders=200)
+    envelope = AnchorEnvelope.measure(real, "stand-in")
+
+    verdicts = {}
+    for rule in ("lift", "envelope"):
+        # a fresh simulator per rule, or the second batch is a different batch: the generator
+        # carries its population and its clock across calls
+        sim = Simulator(seed=11, n_entities=60, n_background=0, n_episodes=2, envelope=envelope)
+        optimiser = MultiVectorOptimiser(
+            seed=11, backend="random", episodes_per_round=2, anchor=real, audit_rule=rule
+        )
+        batch = optimiser.bind(sim).generate(optimiser.propose())
+        optimiser.update(batch.fraud_transactions[:3])
+        trial = optimiser.trials[-1]
+        assert trial.audit_rule == rule
+        # both verdicts are recorded whichever rule is in force
+        assert isinstance(trial.rejected_by_lift, bool)
+        assert isinstance(trial.rejected_by_envelope, bool)
+        assert trial.rejected == (
+            trial.rejected_by_envelope if rule == "envelope" else trial.rejected_by_lift
+        )
+        verdicts[rule] = trial
+
+    lift, env = verdicts["lift"], verdicts["envelope"]
+    assert lift.audit_score == env.audit_score, "same batch, same audit report"
+    assert lift.rejected_by_lift and not env.rejected_by_envelope, (
+        "on an anchor this size the lift rule refuses a batch the envelope rule accepts — "
+        "which is the whole reason the rule is a stated choice rather than a constant"
+    )
+
+
+def test_an_unknown_audit_rule_is_refused_rather_than_defaulted():
+    with pytest.raises(ValueError, match="audit rule"):
+        MultiVectorOptimiser(backend="random", audit_rule="whatever-passes")
