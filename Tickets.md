@@ -34,7 +34,7 @@ blocks the frontier for both lanes.
 | 12 | ~~Multi-vector adaptive optimiser~~ **done** | ▲ A | 01, 02, 08 |
 | 13 | M1 — the optimiser's boundary walk as a vector | ▲ A | 12 |
 | 14 | Realism leash, reported every round | ▲ A | 12 |
-| 15 | Fidelity scorecard on real anchor data | ■ B | 06, 08 |
+| 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
 | 16 | The three-system table | ■ B | 11, 12 |
 | 17 | Sequence model — earn it or report it | ■ B | 11 |
 | 18 | Temporal GNN — earn it or fall back | ■ B | 11 |
@@ -1145,16 +1145,72 @@ Thresholds are set before any result exists. Moving one afterwards is how a bar 
 
 **Blocked by:** 06, 08.
 
-**Status:** ready-for-agent
+**Status:** done — bars in `config/fidelity/thresholds.yaml`, harness in `afl/fidelity/`,
+scorecards built by `make fidelity`, evidence in `artifacts/fidelity/`, written up in
+`docs/fidelity.md`. **Both anchors FAIL, and the gate is what fails them.** On PaySim a detector
+trained on the generated fraud reaches PR-AUC 0.005 against real fraud, an order of magnitude
+below the 0.057 amount floor, and adding those rows to a real training set drops recall at 1% FPR
+from 0.444 to 0.215. Level 1 passes on the same card at 0.749 and rescues nothing, which is the
+ticket's thesis arriving as a measurement rather than as a design note. Running it also found two
+measurement bugs that had been flattering the generator — see the last box below.
 
-- [ ] All three levels computed against the real anchor and written to a committed artefact
-- [ ] Thresholds are recorded before results are generated, and the record shows they predate them
-- [ ] Level 3 gates the verdict; a Level 1/2 pass cannot rescue a Level 3 fail
-- [ ] TSTR gap and augmentation lift both measured on real held-out data at the standard
-      operating point
-- [ ] DCR and MIA reported as evidence against memorisation, phrased as evidence, not proof
-- [ ] The scorecard regenerates by one command
-- [ ] A failing scorecard is reported, never quietly re-run with looser thresholds
+- [x] All three levels computed against the real anchor and written to a committed artefact —
+      `make fidelity` runs every data config that names a loader, at that anchor's committed
+      split and the operating point in `config/eval/leave_one_attack_out.yaml`, and writes
+      `artifacts/fidelity/<anchor>.json` and `.md` plus the generated `docs/fidelity.md`.
+      Levels 1 and 2 run **twice**: the headline compares generated fraud against the anchor's
+      own labelled fraud, because that is the only part of the batch an anchored run injects,
+      and the whole batch against the whole anchor is reported underneath as the reading the
+      phrase usually has
+- [x] Thresholds are recorded before results are generated, and the record shows they predate
+      them — the bars moved out of six bare floats in `config/config.yaml` into
+      `config/fidelity/thresholds.yaml`, one bar per stated reason, refused at load when the
+      reason is blank (`ThresholdError`, the rule `CostModel.from_config` already applies). Each
+      names the commit it was first committed in, and `afl/fidelity/provenance.py` reads that
+      commit **back out of git** on every run, compares the value committed there against the
+      value being applied now, and writes the comparison into the artefact next to the verdict.
+      Six of the seven bars trace to `6989a9e`, the day-one skeleton, unchanged; the seventh was
+      added by this ticket and committed in `c55dc08` **before the first anchored number
+      existed**. An uncommitted edit to the file makes the record say `UNPROVEN` rather than
+      claim an age it cannot show
+- [x] Level 3 gates the verdict; a Level 1/2 pass cannot rescue a Level 3 fail — enforced twice.
+      `_judge` sorts findings into hard (level 3, privacy) and soft (levels 1 and 2), and only
+      hard findings can fail a card. And the headline `score` is now **capped at the level-3
+      score**: weighting it double still let two diagnostic levels at 1.0 average a level-3 0.1
+      up to 0.62, which reads like half a pass. A test asserts both on the same card
+- [x] TSTR gap and augmentation lift both measured on real held-out data at the standard
+      operating point — four systems, one real test window, one operating point: `trtr` (real
+      rows, real labels), `tstr` (real legit + generated fraud, no real fraud label), `augmented`
+      (real + generated fraud) and the **amount floor**, which is new here and is a hard bar.
+      What "train on synthetic" means is written into the thresholds config *before* the run, so
+      the gate could not be swapped afterwards for whichever of the two readings scored better;
+      the literature's standalone reading is measured beside it and never gates
+- [x] DCR and MIA reported as evidence against memorisation, phrased as evidence, not proof —
+      and the MIA gained the control it needed. On an out-of-time split, members and non-members
+      differ by *when* as well as by membership, so the same attack is run between two halves of
+      the holdout, where nothing was ever in training; an advantage at or below that control is
+      reported as drift rather than flagged as a leak. Identifier reuse is counted separately,
+      because the generator stages attacks on real accounts by design and DCR cannot see that
+      path
+- [x] The scorecard regenerates by one command — `make fidelity`. The day-one discrimination
+      check keeps its own, `make fidelity-selftest`, and still passes all four of its checks
+- [x] A failing scorecard is reported, never quietly re-run with looser thresholds — the
+      artefacts and the doc are written *before* the non-zero exit, so a FAIL is a committed
+      result. If a bar is ever moved, the provenance block names it, states its direction with
+      LOOSENED in capitals, and lists every commit that has ever changed one
+- [x] `make test` green (316 passed, up from 305 — 11 new tests in `tests/test_eval.py`),
+      `ruff check` and `ruff format` clean, and `make fidelity` runs both anchors end to end in
+      about eight minutes
+- [x] **Not on the list, and the reason the harness had to be run rather than reviewed:** three
+      bugs, two of them flattering the generator. The privacy and support metrics standardised
+      by `std + 1e-9`, and three of the seven embedding columns are *exactly constant* on PaySim
+      — the anchor has no sender history — so a synthetic row with a real one was divided by a
+      billionth and the first PaySim card reported a DCR ratio of **1.0e11**, passing the
+      memorisation check on the strength of it. Constant columns are dropped and named now, and
+      the ratio is 2.43 over four real dimensions. Membership inference on an out-of-time split
+      measures the calendar as well as membership, so it gained the control described above. And
+      `_judge` scored a level that never ran as 0.0 and then indexed it for its worst column,
+      inventing a finding about a measurement nobody took
 
 ---
 

@@ -40,11 +40,13 @@ from afl.defend.models.anomaly import AnomalyDetector, EnsembleDetector
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import leave_one_attack_out as loao
 from afl.evaluation import three_system
-from afl.fidelity import scorecard
+from afl.fidelity import provenance, scorecard
 from afl.tracking import get_tracker
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger(__name__)
+
+THRESHOLDS_CONFIG = Path("config/fidelity/thresholds.yaml")
 
 
 # ── assembly ────────────────────────────────────────────────────────────────────
@@ -493,6 +495,13 @@ def _single_system(cfg: DictConfig, pool, detector_factory, split=None, fit_dete
 
 
 def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path, split=None) -> None:
+    """The loop's own scorecard, judged against the same bars `make fidelity` uses.
+
+    The thresholds are read from the file rather than from six floats in the composed config, so
+    the run also carries the record of when they were set. `hydra` has already moved the working
+    directory to the run dir by the time this is called, hence the original cwd — without it the
+    provenance check reads "no git history" and says so, which is honest but useless.
+    """
     real = [t for t in pool if t.vector_id is None]
     synth = [t for t in pool if t.vector_id is not None]
     if split is not None:
@@ -501,24 +510,24 @@ def _fidelity(cfg: DictConfig, pool, detector_factory, artifact_dir: Path, split
         real_train, real_test = out_of_time_split(
             real, train_frac=float(cfg.eval.train_frac), embargo_days=float(cfg.eval.embargo_days)
         )
+    try:
+        root = Path(hydra.utils.get_original_cwd())
+    except ValueError:  # not under a hydra run
+        root = Path.cwd()
+    values, _why, prov = provenance.load(root / THRESHOLDS_CONFIG, repo=root)
     card = scorecard.build(
         real=real,
         synth=synth,
         real_train=real_train,
         real_test=real_test,
         detector_factory=detector_factory,
-        thresholds=scorecard.Thresholds(
-            level1_min=float(cfg.fidelity.level1_min),
-            level2_min=float(cfg.fidelity.level2_min),
-            max_tstr_gap=float(cfg.fidelity.max_tstr_gap),
-            min_recall_lift=float(cfg.fidelity.min_recall_lift),
-            min_dcr_ratio=float(cfg.fidelity.min_dcr_ratio),
-            max_mia_advantage=float(cfg.fidelity.max_mia_advantage),
-        ),
+        thresholds=scorecard.Thresholds.from_values(values),
         seed=int(cfg.seed),
         meta={"run_name": str(cfg.run_name), "data": str(cfg.data.name)},
         fixed_fpr=float(cfg.eval.fixed_fpr),
         k=int(cfg.eval.k),
+        min_positives=int(cfg.eval.min_meaningful_positives),
+        provenance=prov.to_dict(),
     )
     card.save(artifact_dir)
     print(f"\nfidelity verdict: {card.verdict} ({card.score})")

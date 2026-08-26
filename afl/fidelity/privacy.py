@@ -16,13 +16,24 @@ from __future__ import annotations
 import numpy as np
 
 from afl.contract.schema import Transaction
-from afl.fidelity.level2_structural import embedding
+from afl.fidelity.level2_structural import dropped_columns, embedding, informative
 
 MAX_ROWS = 4_000  # pairwise distances are O(n²); subsample rather than melt the machine
 
 
 def _standardised(train: np.ndarray, other: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    mu, sd = train.mean(0), train.std(0) + 1e-9
+    """Standardise on the training rows, over the columns that vary in them.
+
+    A column that never moves in the reference set cannot say how far anything is from it.
+    Keeping it and dividing by `std + 1e-9` turns a synthetic row's ordinary value into a
+    distance of 1e9 — which is how the first PaySim card reported a DCR ratio of 1.0e11 and
+    passed the memorisation check because of it. See `level2_structural.informative`.
+    """
+    keep = informative(train)
+    if not keep.any():
+        return train[:, :0], other[:, :0]
+    train, other = train[:, keep], other[:, keep]
+    mu, sd = train.mean(0), train.std(0)
     return (train - mu) / sd, (other - mu) / sd
 
 
@@ -58,6 +69,8 @@ def dcr(train: list[Transaction], synth: list[Transaction], seed: int = 1337) ->
     d_train = _nearest(tr_s, tr_s, exclude_self=True)
     med_train = float(np.median(d_train)) or 1e-9
     return {
+        # named, because a distance measured in four dimensions must not read as one in seven
+        "dropped_columns": dropped_columns(tr),
         "dcr_synth_median": round(float(np.median(d_synth)), 6),
         "dcr_train_median": round(med_train, 6),
         "dcr_ratio": round(float(np.median(d_synth)) / med_train, 6),
@@ -83,7 +96,13 @@ def mia_auc(
     if min(m.shape[0], n.shape[0], sy.shape[0]) == 0:
         return {"mia_auc": 0.5, "advantage": 0.0}
 
-    mu, sd = sy.mean(0), sy.std(0) + 1e-9
+    # standardised on the synthetic set, over the columns that vary in it — same reason as
+    # `_standardised`: a constant reference column manufactures distance rather than measuring it
+    keep = informative(sy)
+    if not keep.any():
+        return {"mia_auc": 0.5, "advantage": 0.0}
+    m, n, sy = m[:, keep], n[:, keep], sy[:, keep]
+    mu, sd = sy.mean(0), sy.std(0)
     scores = np.concatenate(
         [-_nearest((m - mu) / sd, (sy - mu) / sd), -_nearest((n - mu) / sd, (sy - mu) / sd)]
     )
@@ -93,6 +112,59 @@ def mia_auc(
 
     auc = float(roc_auc_score(labels, scores))
     return {"mia_auc": round(auc, 6), "advantage": round(abs(auc - 0.5) * 2, 6)}
+
+
+def mia_time_control(
+    holdout: list[Transaction],
+    synth: list[Transaction],
+    seed: int = 1337,
+) -> dict[str, float]:
+    """The same attack, run where the right answer is known to be "no signal".
+
+    Membership inference compares training rows against held-out rows, and on an out-of-time
+    split those two groups differ by *when they happened* as well as by whether the generator
+    saw them. Traffic drifts, so a nearest-neighbour attacker can score above chance on the time
+    boundary alone and the number reads as a membership leak.
+
+    So the identical attack is run on two halves of the **holdout**, split at its own 70% mark.
+    Neither half was ever in training, so any advantage here is the time boundary and nothing
+    else. Read the two numbers together: an observed advantage at or below this control is a
+    statement about drift, not about membership.
+    """
+    rows = sorted(holdout, key=lambda t: t.ts)
+    cut = int(len(rows) * 0.7)
+    early, late = rows[:cut], rows[cut:]
+    if min(len(early), len(late)) < 2 or not synth:
+        return {"mia_auc": 0.5, "advantage": 0.0, "measurable": False}
+    out = mia_auc(early, late, synth, seed)
+    return {**out, "measurable": True}
+
+
+def identifier_reuse(real: list[Transaction], synth: list[Transaction]) -> dict[str, float]:
+    """How often a generated row names an account that exists in the anchor.
+
+    DCR and MIA both look at row *content* in a numeric embedding, so neither can see the one
+    disclosure path this generator actually has: it stages attacks on the anchor's own accounts
+    on purpose, because an attack from an account with no history is separable from real traffic
+    by that fact alone (`afl/attack/envelope.py`).
+
+    Reported, never flagged. It is a design decision with a stated reason, and the number is here
+    so that "synthetic traffic contains no real identifiers" is a claim nobody can make by
+    accident.
+    """
+    real_ids = {t.src for t in real} | {t.dst for t in real}
+    if not synth:
+        return {"src_in_anchor": 0.0, "dst_in_anchor": 0.0, "either_in_anchor": 0.0}
+    src = sum(1 for t in synth if t.src in real_ids)
+    dst = sum(1 for t in synth if t.dst in real_ids)
+    either = sum(1 for t in synth if t.src in real_ids or t.dst in real_ids)
+    n = len(synth)
+    return {
+        "src_in_anchor": round(src / n, 6),
+        "dst_in_anchor": round(dst / n, 6),
+        "either_in_anchor": round(either / n, 6),
+        "n_synth": float(n),
+    }
 
 
 def report(
@@ -106,6 +178,8 @@ def report(
     """DCR plus membership inference, with the flags that matter called out."""
     d = dcr(train, synth, seed)
     m = mia_auc(train, holdout, synth, seed)
+    control = mia_time_control(holdout, synth, seed)
+    ids = identifier_reuse(train + holdout, synth)
     flags = []
     if d.get("dcr_ratio", 0.0) < min_dcr_ratio:
         flags.append(
@@ -113,13 +187,29 @@ def report(
         )
     if d.get("identical_share", 0.0) > 0.0:
         flags.append("exact duplicates of training rows present")
+    # How much of the attacker's advantage is left once the calendar is subtracted. Reported
+    # whatever the flag decides, because the flag is a threshold and this is the reading.
+    if control["measurable"]:
+        m["advantage_over_control"] = round(m["advantage"] - control["advantage"], 6)
     if m["advantage"] > max_mia_advantage:
-        flags.append("membership is inferable from the synthetic data alone")
+        # Only above the control. An advantage the same attack reaches between two halves of the
+        # holdout — where nothing was ever in training — is drift, and flagging it as a
+        # membership leak would be raising an alarm about the calendar.
+        if control["measurable"] and m["advantage"] <= control["advantage"]:
+            m["reading"] = (
+                f"advantage {m['advantage']} is at or below the {control['advantage']} the same "
+                "attack reaches between two halves of the holdout, so it is the out-of-time "
+                "boundary rather than membership"
+            )
+        else:
+            flags.append("membership is inferable from the synthetic data alone")
 
     return {
         "level": "privacy",
         "dcr": d,
         "mia": m,
+        "mia_time_control": control,
+        "identifier_reuse": ids,
         "flags": flags,
         "score": round(
             min(1.0, d.get("dcr_ratio", 0.0) / min_dcr_ratio) * (1.0 - m["advantage"]), 4

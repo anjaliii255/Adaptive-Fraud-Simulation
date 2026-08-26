@@ -1,0 +1,284 @@
+{
+  "verdict": "fail",
+  "score": 0.6983,
+  "gate": {
+    "gate": "level3",
+    "level3_measured": true,
+    "hard_findings": [
+      "synthetic rows sit closer to training rows than training rows do to each other",
+      "exact duplicates of training rows present",
+      "membership is inferable from the synthetic data alone"
+    ],
+    "soft_findings": [],
+    "summary": "synthetic rows sit closer to training rows than training rows do to each other; exact duplicates of training rows present; membership is inferable from the synthetic data alone",
+    "note": "levels 1 and 2 are diagnostics: they can annotate this card and lower its score, and they can never fail it or rescue it"
+  },
+  "reasons": [
+    "synthetic rows sit closer to training rows than training rows do to each other",
+    "exact duplicates of training rows present",
+    "membership is inferable from the synthetic data alone"
+  ],
+  "thresholds": {
+    "level1_min": 0.7,
+    "level2_min": 0.6,
+    "max_tstr_gap": 0.15,
+    "min_recall_lift": 0.0,
+    "min_dcr_ratio": 0.8,
+    "max_mia_advantage": 0.2,
+    "require_tstr_beats_amount_floor": true
+  },
+  "threshold_provenance": {
+    "source": "config/fidelity/thresholds.yaml",
+    "sha256": "de751b7998cee773",
+    "values": {
+      "level1_min": 0.7,
+      "level2_min": 0.6,
+      "max_tstr_gap": 0.15,
+      "min_recall_lift": 0.0,
+      "require_tstr_beats_amount_floor": true,
+      "min_dcr_ratio": 0.8,
+      "max_mia_advantage": 0.2
+    },
+    "why": {
+      "level1_min": "Diagnostic, not a gate. 1 - mean distance over KS, Wasserstein, TV, correlation delta and MI delta; 0.70 is \"most marginals within a third of the real spread\". A generator can pass this with the joins shuffled out, which is exactly why passing it decides nothing.",
+      "level2_min": "Diagnostic, not a gate. Lower than level 1 on purpose: motif shares and burstiness are noisier than marginals at these sample sizes, and a structural miss is informative rather than disqualifying \u2014 it is the sentence that explains a level 3 failure.",
+      "max_tstr_gap": "Train-synthetic-test-real against train-real-test-real, same real test window both times. 0.15 PR-AUC is roughly the distance between the tuned PaySim detector and its own untuned control, so a generator inside it is worth as much as a tuning run. Beyond it, a model trained on this data is materially worse than one trained on the real thing.",
+      "min_recall_lift": "Adding the synthetic rows to a real training set must not *lower* held-out recall at the fixed operating point. Zero is the honest bar: the claim this project exists to test is that adaptive synthetic traffic helps, and anything at or below zero falsifies it. A positive bar here would be picking the margin after seeing the margin.",
+      "require_tstr_beats_amount_floor": "Rank the real test window by amount \u2014 no model, no features, no training, direction chosen on the training window \u2014 and a TSTR score below that line has not learned fraud, it has learned nothing at all. Two results in this repo were walked back for want of this column (the transfer test and the BankSim spike), so it is a gate here rather than a footnote.",
+      "min_dcr_ratio": "Median distance from a synthetic row to its closest training row, over the median distance between training rows themselves. At 1.0 the synthetic rows sit no closer to the training data than it sits to itself; below 0.80 they are hugging real records, which is memorisation wearing a distribution's clothes.",
+      "max_mia_advantage": "2 * |AUC - 0.5| for a nearest-neighbour membership attack that sees only the synthetic data. 0.20 is an attacker doing 20% better than a coin flip at telling a training row from a held-out one. Above it, the synthetic data leaks who was in the training set."
+    },
+    "origin": {
+      "commit": "6989a9ef98485428b8ece5833774da7ffa860ed4",
+      "file": "config/config.yaml",
+      "committed_at": "2026-08-23T01:26:05+05:30",
+      "readable": true,
+      "bars_inherited": [
+        "level1_min",
+        "level2_min",
+        "max_mia_advantage",
+        "max_tstr_gap",
+        "min_dcr_ratio",
+        "min_recall_lift"
+      ],
+      "bars_introduced_later": [
+        "require_tstr_beats_amount_floor"
+      ],
+      "unchanged_since_origin": true,
+      "moved_since_origin": {}
+    },
+    "working_copy": {
+      "clean": true,
+      "uncommitted_changes": null,
+      "last_commit": "c55dc089e6e5",
+      "last_committed_at": "2026-08-26T16:52:04+05:30",
+      "last_subject": "Ticket 15: the fidelity bars, committed before the numbers they judge"
+    },
+    "history": [
+      {
+        "commit": "c55dc089e6e5",
+        "committed_at": "2026-08-26T16:52:04+05:30",
+        "subject": "Ticket 15: the fidelity bars, committed before the numbers they judge",
+        "file": "config/fidelity/thresholds.yaml"
+      },
+      {
+        "commit": "6989a9ef9848",
+        "committed_at": "2026-08-23T01:26:05+05:30",
+        "subject": "Skeleton: closed-loop fraud sim + detector, fidelity harness, eval, demo",
+        "file": "config/config.yaml"
+      }
+    ],
+    "checked_at": "2026-08-26T11:53:45+00:00",
+    "predates_results": true,
+    "verdict": "the bars were committed in 6989a9ef9848 on 2026-08-22 and every value still matches that commit; this run started 2026-08-26T11:53:45+00:00"
+  },
+  "meta": {
+    "title": "Fidelity harness self-test \u2014 copy",
+    "case": "copy",
+    "operating_point": {
+      "fixed_fpr": 0.01,
+      "k": 100
+    }
+  },
+  "levels": {
+    "level1": {
+      "level": 1,
+      "n_real": 1530,
+      "n_synth": 1530,
+      "ks": {
+        "log_amount": 0.0,
+        "hour_of_day": 0.0,
+        "day_of_week": 0.0,
+        "log_gap_s": 0.0,
+        "amount_cents": 0.0
+      },
+      "wasserstein": {
+        "log_amount": 0.0,
+        "hour_of_day": 0.0,
+        "day_of_week": 0.0,
+        "log_gap_s": 0.0,
+        "amount_cents": 0.0
+      },
+      "categorical": {
+        "tv_rail": 0.0,
+        "tv_has_device": 0.0
+      },
+      "corr_delta": 0.0,
+      "mi_delta": 0.0,
+      "worst_column": "log_amount",
+      "score": 1.0
+    },
+    "level2": {
+      "level": 2,
+      "motif_delta": {
+        "edge_density": 0.0,
+        "fan_in_share": 0.0,
+        "fan_out_share": 0.0,
+        "pass_through_share": 0.0,
+        "reciprocity": 0.0,
+        "max_in_degree_share": 0.0,
+        "repeat_edge_share": 0.0,
+        "cycle_share": 0.0
+      },
+      "real_motifs": {
+        "edge_density": 0.0105,
+        "fan_in_share": 0.2361,
+        "fan_out_share": 0.7188,
+        "pass_through_share": 0.6366,
+        "reciprocity": 0.0013,
+        "max_in_degree_share": 0.0229,
+        "repeat_edge_share": 0.0281,
+        "cycle_share": 0.0053
+      },
+      "synth_motifs": {
+        "edge_density": 0.0105,
+        "fan_in_share": 0.2361,
+        "fan_out_share": 0.7188,
+        "pass_through_share": 0.6366,
+        "reciprocity": 0.0013,
+        "max_in_degree_share": 0.0229,
+        "repeat_edge_share": 0.0281,
+        "cycle_share": 0.0053
+      },
+      "velocity": {
+        "gap_ks": 0.0,
+        "burst_index_real": -0.1717,
+        "burst_index_synth": -0.1717,
+        "burst_index_delta": 0.0
+      },
+      "support": {
+        "alpha_precision": 0.9497,
+        "beta_recall": 0.9497,
+        "dimensions": 7,
+        "dropped_columns": []
+      },
+      "worst_motif": "edge_density",
+      "score": 0.9916
+    },
+    "level3": {
+      "level": 3,
+      "outcome": "measured",
+      "systems": {
+        "trtr": {
+          "pr_auc": 1.0,
+          "recall_at_fixed_fpr": 1.0,
+          "precision_at_k": 0.1,
+          "trained_on": "real rows, real labels",
+          "n_train": 1089
+        },
+        "tstr": {
+          "pr_auc": 1.0,
+          "recall_at_fixed_fpr": 1.0,
+          "precision_at_k": 0.1,
+          "trained_on": "real legit + generated fraud, no real fraud label",
+          "n_train": 1099
+        },
+        "augmented": {
+          "pr_auc": 1.0,
+          "recall_at_fixed_fpr": 1.0,
+          "precision_at_k": 0.1,
+          "trained_on": "real rows + generated fraud",
+          "n_train": 1119
+        },
+        "amount_floor": {
+          "pr_auc": 0.318554,
+          "recall_at_fixed_fpr": 0.3,
+          "precision_at_k": 0.05,
+          "n_positives": 10,
+          "direction": "largest amount first",
+          "direction_chosen_on": "train",
+          "trained_on": "nothing",
+          "n_train": 0
+        }
+      },
+      "tstr": {
+        "trtr_pr_auc": 1.0,
+        "tstr_pr_auc": 1.0,
+        "trtr_recall": 1.0,
+        "tstr_recall": 1.0,
+        "tstr_gap": 0.0,
+        "tstr_ratio": 1.0
+      },
+      "augmentation": {
+        "base_pr_auc": 1.0,
+        "augmented_pr_auc": 1.0,
+        "base_recall": 1.0,
+        "augmented_recall": 1.0,
+        "recall_lift": 0.0,
+        "pr_auc_lift": 0.0
+      },
+      "amount_floor": {
+        "pr_auc": 0.318554,
+        "recall_at_fixed_fpr": 0.3,
+        "precision_at_k": 0.05,
+        "n_positives": 10,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "beats_amount_floor": {
+        "trtr": true,
+        "tstr": true,
+        "augmented": true
+      },
+      "n_real_train": 1089,
+      "n_real_test": 403,
+      "n_real_test_positives": 10,
+      "n_synth_fraud": 30,
+      "score": 0.75
+    },
+    "privacy": {
+      "level": "privacy",
+      "dcr": {
+        "dropped_columns": [],
+        "dcr_synth_median": 0.0,
+        "dcr_train_median": 0.615724,
+        "dcr_ratio": 0.0,
+        "dcr_5th_percentile": 0.0,
+        "identical_share": 0.711765
+      },
+      "mia": {
+        "mia_auc": 1.0,
+        "advantage": 1.0,
+        "advantage_over_control": 0.779438
+      },
+      "mia_time_control": {
+        "mia_auc": 0.389719,
+        "advantage": 0.220562,
+        "measurable": true
+      },
+      "identifier_reuse": {
+        "src_in_anchor": 1.0,
+        "dst_in_anchor": 1.0,
+        "either_in_anchor": 1.0,
+        "n_synth": 1530.0
+      },
+      "flags": [
+        "synthetic rows sit closer to training rows than training rows do to each other",
+        "exact duplicates of training rows present",
+        "membership is inferable from the synthetic data alone"
+      ],
+      "score": 0.0,
+      "caveat": "evidence, not proof \u2014 no formal privacy guarantee is claimed"
+    }
+  }
+}

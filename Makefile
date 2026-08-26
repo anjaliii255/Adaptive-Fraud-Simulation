@@ -1,4 +1,4 @@
-.PHONY: setup smoke test splits features baseline decisions anomaly loao fidelity loop compare figures demo lint fmt clean
+.PHONY: setup smoke test splits features baseline decisions anomaly loao fidelity fidelity-selftest loop compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -27,8 +27,11 @@ anomaly:  ## score the zero-day layer against the supervised model on the held-o
 loao:     ## the leave-one-attack-out matrix: every family held out in turn, with the guards
 	uv run python scripts/build_loao.py
 
-fidelity: ## harness before generator
+fidelity: ## the 3-level scorecard on every real anchor; level 3 is the gate, and it can fail
 	uv run python scripts/build_fidelity.py
+
+fidelity-selftest: ## prove the harness discriminates, on three cases whose answers are known
+	uv run python scripts/build_fidelity.py --selftest
 
 loop:     ## System C — the adaptive loop
 	uv run python scripts/run_experiment.py experiment=adaptive

@@ -1,0 +1,714 @@
+{
+  "verdict": "fail",
+  "score": 0.0,
+  "gate": {
+    "gate": "level3",
+    "level3_measured": true,
+    "hard_findings": [
+      "TSTR gap 0.153009 exceeds the bar 0.15",
+      "held-out recall lift -0.229268 below 0.0 \u2014 the data does not help",
+      "TSTR PR-AUC 0.004856 loses to the amount floor 0.057261 \u2014 training on this data is worse than sorting the test window by amount",
+      "membership is inferable from the synthetic data alone"
+    ],
+    "soft_findings": [
+      "level 2 score 0.2054 below 0.6 (worst: fan_in_share)",
+      "the generator's standalone output trains a detector to 0.003195, below the amount floor 0.057261 \u2014 reported, not gating"
+    ],
+    "summary": "TSTR gap 0.153009 exceeds the bar 0.15; held-out recall lift -0.229268 below 0.0 \u2014 the data does not help; TSTR PR-AUC 0.004856 loses to the amount floor 0.057261 \u2014 training on this data is worse than sorting the test window by amount; membership is inferable from the synthetic data alone",
+    "note": "levels 1 and 2 are diagnostics: they can annotate this card and lower its score, and they can never fail it or rescue it"
+  },
+  "reasons": [
+    "TSTR gap 0.153009 exceeds the bar 0.15",
+    "held-out recall lift -0.229268 below 0.0 \u2014 the data does not help",
+    "TSTR PR-AUC 0.004856 loses to the amount floor 0.057261 \u2014 training on this data is worse than sorting the test window by amount",
+    "membership is inferable from the synthetic data alone",
+    "level 2 score 0.2054 below 0.6 (worst: fan_in_share)",
+    "the generator's standalone output trains a detector to 0.003195, below the amount floor 0.057261 \u2014 reported, not gating"
+  ],
+  "thresholds": {
+    "level1_min": 0.7,
+    "level2_min": 0.6,
+    "max_tstr_gap": 0.15,
+    "min_recall_lift": 0.0,
+    "min_dcr_ratio": 0.8,
+    "max_mia_advantage": 0.2,
+    "require_tstr_beats_amount_floor": true
+  },
+  "threshold_provenance": {
+    "source": "config/fidelity/thresholds.yaml",
+    "sha256": "de751b7998cee773",
+    "values": {
+      "level1_min": 0.7,
+      "level2_min": 0.6,
+      "max_tstr_gap": 0.15,
+      "min_recall_lift": 0.0,
+      "require_tstr_beats_amount_floor": true,
+      "min_dcr_ratio": 0.8,
+      "max_mia_advantage": 0.2
+    },
+    "why": {
+      "level1_min": "Diagnostic, not a gate. 1 - mean distance over KS, Wasserstein, TV, correlation delta and MI delta; 0.70 is \"most marginals within a third of the real spread\". A generator can pass this with the joins shuffled out, which is exactly why passing it decides nothing.",
+      "level2_min": "Diagnostic, not a gate. Lower than level 1 on purpose: motif shares and burstiness are noisier than marginals at these sample sizes, and a structural miss is informative rather than disqualifying \u2014 it is the sentence that explains a level 3 failure.",
+      "max_tstr_gap": "Train-synthetic-test-real against train-real-test-real, same real test window both times. 0.15 PR-AUC is roughly the distance between the tuned PaySim detector and its own untuned control, so a generator inside it is worth as much as a tuning run. Beyond it, a model trained on this data is materially worse than one trained on the real thing.",
+      "min_recall_lift": "Adding the synthetic rows to a real training set must not *lower* held-out recall at the fixed operating point. Zero is the honest bar: the claim this project exists to test is that adaptive synthetic traffic helps, and anything at or below zero falsifies it. A positive bar here would be picking the margin after seeing the margin.",
+      "require_tstr_beats_amount_floor": "Rank the real test window by amount \u2014 no model, no features, no training, direction chosen on the training window \u2014 and a TSTR score below that line has not learned fraud, it has learned nothing at all. Two results in this repo were walked back for want of this column (the transfer test and the BankSim spike), so it is a gate here rather than a footnote.",
+      "min_dcr_ratio": "Median distance from a synthetic row to its closest training row, over the median distance between training rows themselves. At 1.0 the synthetic rows sit no closer to the training data than it sits to itself; below 0.80 they are hugging real records, which is memorisation wearing a distribution's clothes.",
+      "max_mia_advantage": "2 * |AUC - 0.5| for a nearest-neighbour membership attack that sees only the synthetic data. 0.20 is an attacker doing 20% better than a coin flip at telling a training row from a held-out one. Above it, the synthetic data leaks who was in the training set."
+    },
+    "origin": {
+      "commit": "6989a9ef98485428b8ece5833774da7ffa860ed4",
+      "file": "config/config.yaml",
+      "committed_at": "2026-08-23T01:26:05+05:30",
+      "readable": true,
+      "bars_inherited": [
+        "level1_min",
+        "level2_min",
+        "max_mia_advantage",
+        "max_tstr_gap",
+        "min_dcr_ratio",
+        "min_recall_lift"
+      ],
+      "bars_introduced_later": [
+        "require_tstr_beats_amount_floor"
+      ],
+      "unchanged_since_origin": true,
+      "moved_since_origin": {}
+    },
+    "working_copy": {
+      "clean": true,
+      "uncommitted_changes": null,
+      "last_commit": "c55dc089e6e5",
+      "last_committed_at": "2026-08-26T16:52:04+05:30",
+      "last_subject": "Ticket 15: the fidelity bars, committed before the numbers they judge"
+    },
+    "history": [
+      {
+        "commit": "c55dc089e6e5",
+        "committed_at": "2026-08-26T16:52:04+05:30",
+        "subject": "Ticket 15: the fidelity bars, committed before the numbers they judge",
+        "file": "config/fidelity/thresholds.yaml"
+      },
+      {
+        "commit": "6989a9ef9848",
+        "committed_at": "2026-08-23T01:26:05+05:30",
+        "subject": "Skeleton: closed-loop fraud sim + detector, fidelity harness, eval, demo",
+        "file": "config/config.yaml"
+      }
+    ],
+    "checked_at": "2026-08-26T11:43:22+00:00",
+    "predates_results": true,
+    "verdict": "the bars were committed in 6989a9ef9848 on 2026-08-22 and every value still matches that commit; this run started 2026-08-26T11:43:22+00:00"
+  },
+  "meta": {
+    "title": "Fidelity scorecard \u2014 paysim",
+    "generated_by": "scripts/build_fidelity.py",
+    "generated_at": "2026-08-26T11:49:04+00:00",
+    "anchor": "paysim",
+    "data_config": "config/data/paysim.yaml",
+    "seed": 1337,
+    "sample_fraction": 0.1,
+    "operating_point": {
+      "fixed_fpr": 0.01,
+      "k": 100,
+      "source": "config/eval/leave_one_attack_out.yaml"
+    },
+    "split": {
+      "version": 1,
+      "dataset": "paysim",
+      "digest": "6ea0b94c1c8d3d3a",
+      "train_end": "2023-01-14T11:00:00",
+      "test_start": "2023-01-15T12:00:00",
+      "embargo_seconds": 90000,
+      "embargo_rationale": "Velocity features look back up to 24h. A 24-step embargo stops a test row's features being computed over train-side rows, and stops a fraud ring straddling the boundary.",
+      "train_frac": 0.7,
+      "time_unit": "hours",
+      "epoch": "2023-01-01T00:00:00",
+      "train_end_step": 323,
+      "test_start_step": 348,
+      "stats": {
+        "full": {
+          "rows": 6362620,
+          "row_share": 1.0,
+          "fraud": 8213,
+          "base_rate": 0.00129082
+        },
+        "span": {
+          "start": "2023-01-01T01:00:00",
+          "end": "2023-01-31T23:00:00",
+          "first_step": 1,
+          "last_step": 743
+        },
+        "partition": {
+          "train": {
+            "rows": 4463587,
+            "row_share": 0.7015,
+            "fraud": 3643,
+            "base_rate": 0.00081616
+          },
+          "test": {
+            "rows": 1505969,
+            "row_share": 0.2367,
+            "fraud": 4352,
+            "base_rate": 0.00288983
+          },
+          "embargoed": {
+            "rows": 393064,
+            "row_share": 0.0618,
+            "fraud": 218,
+            "base_rate": 0.00055462
+          }
+        },
+        "sample": {
+          "fraction": 0.1,
+          "sampled_by": "nameDest",
+          "rows": 636409,
+          "fraud": 803,
+          "base_rate": 0.00126177,
+          "base_rate_full": 0.00129082,
+          "base_rate_drift_relative": -0.0225
+        },
+        "integrity": {
+          "non_positive_amounts": 16,
+          "non_positive_amount_share": 2.515e-06,
+          "self_transfers": 0,
+          "self_transfer_share": 0.0
+        },
+        "synthetic_base_rate": 0.040313,
+        "synthetic_base_rate_data_config": 0.014097,
+        "base_rate_ratio_vs_synthetic": 0.032
+      }
+    },
+    "comparison": {
+      "headline": "the generated fraud against the anchor's own labelled fraud",
+      "why": "like against like: an anchored run injects the generated fraud into real traffic and discards the simulator's background, so this is the part of the batch anything downstream sees",
+      "rows_per_side": 20000
+    },
+    "real": {
+      "rows": 636409,
+      "fraud": 803,
+      "base_rate": 0.00126177,
+      "first_ts": "2023-01-01 01:00:00",
+      "last_ts": "2023-01-31 23:00:00"
+    },
+    "real_fraud": {
+      "rows": 803,
+      "fraud": 803,
+      "base_rate": 1.0,
+      "first_ts": "2023-01-01 01:00:00",
+      "last_ts": "2023-01-31 23:00:00"
+    },
+    "generated": {
+      "vectors": [
+        "C1",
+        "C2",
+        "C3",
+        "M1",
+        "M2",
+        "M3",
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "total": {
+        "rows": 19496,
+        "fraud": 635,
+        "base_rate": 0.03257078,
+        "first_ts": "2023-01-01 01:03:12",
+        "last_ts": "2023-01-31 01:00:00"
+      },
+      "fraud": {
+        "rows": 635,
+        "fraud": 635,
+        "base_rate": 1.0,
+        "first_ts": "2023-01-02 04:00:00",
+        "last_ts": "2023-01-31 01:00:00"
+      },
+      "per_vector": {
+        "C1": {
+          "rows": 2348,
+          "fraud": 50,
+          "base_rate": 0.02129472,
+          "first_ts": "2023-01-01 02:30:28",
+          "last_ts": "2023-01-31 01:00:00"
+        },
+        "C2": {
+          "rows": 2014,
+          "fraud": 15,
+          "base_rate": 0.00744786,
+          "first_ts": "2023-01-01 01:42:02",
+          "last_ts": "2023-01-31 00:53:30"
+        },
+        "C3": {
+          "rows": 2020,
+          "fraud": 20,
+          "base_rate": 0.00990099,
+          "first_ts": "2023-01-01 02:19:56",
+          "last_ts": "2023-01-31 00:31:01"
+        },
+        "M1": {
+          "rows": 2075,
+          "fraud": 75,
+          "base_rate": 0.03614458,
+          "first_ts": "2023-01-01 01:07:04",
+          "last_ts": "2023-01-31 00:54:11"
+        },
+        "M2": {
+          "rows": 2163,
+          "fraud": 40,
+          "base_rate": 0.01849283,
+          "first_ts": "2023-01-01 01:05:38",
+          "last_ts": "2023-01-31 01:00:00"
+        },
+        "M3": {
+          "rows": 2425,
+          "fraud": 125,
+          "base_rate": 0.05154639,
+          "first_ts": "2023-01-01 01:20:24",
+          "last_ts": "2023-01-31 01:00:00"
+        },
+        "S1": {
+          "rows": 2046,
+          "fraud": 50,
+          "base_rate": 0.02443793,
+          "first_ts": "2023-01-01 01:20:34",
+          "last_ts": "2023-01-31 00:17:20"
+        },
+        "S2": {
+          "rows": 2199,
+          "fraud": 200,
+          "base_rate": 0.09095043,
+          "first_ts": "2023-01-01 01:10:26",
+          "last_ts": "2023-01-31 00:55:11"
+        },
+        "S3": {
+          "rows": 2206,
+          "fraud": 60,
+          "base_rate": 0.02719855,
+          "first_ts": "2023-01-01 01:03:12",
+          "last_ts": "2023-01-31 00:52:59"
+        }
+      }
+    },
+    "envelope": {
+      "start": "2023-01-01 01:00:00",
+      "window_days": 30,
+      "sender_reuse_rate": 0.000135,
+      "supports_behavioural_vectors": false
+    },
+    "detector": {
+      "detector": "EnsembleDetector",
+      "weight": 0.7,
+      "supervised": {
+        "detector": "LGBMDetector",
+        "backend": {
+          "name": "untrained",
+          "version": "-",
+          "reason": "fit() has not been called",
+          "dropped_params": []
+        },
+        "params": {
+          "objective": "binary",
+          "learning_rate": 0.02347670024204912,
+          "num_leaves": 75,
+          "min_child_samples": 153,
+          "n_estimators": 100,
+          "subsample": 0.9652081482057792,
+          "subsample_freq": 1,
+          "colsample_bytree": 0.7676059191242223,
+          "reg_lambda": 0.17259834660955406,
+          "class_weight": null,
+          "verbosity": -1,
+          "random_state": 1337
+        },
+        "params_source": "artifacts/detector/paysim.json",
+        "seed": 1337,
+        "training": {
+          "n_rows": 0,
+          "n_fraud": 0,
+          "base_rate": 0.0,
+          "n_features": 0,
+          "n_weighted_up": 0,
+          "replay_weight": 3.0,
+          "fitted": false
+        },
+        "explain": "flagged",
+        "decision": {
+          "mode": "cost",
+          "step_up_at": 0.005,
+          "hold_at": 0.16,
+          "review_at": 0.38,
+          "decline_at": 0.75,
+          "bands_source": "derived from the cost model",
+          "band_units": "calibrated probability (see `calibration` below)",
+          "reference_amount": 74812.07,
+          "unreachable_bands": [],
+          "costs": {
+            "source": "default",
+            "unit_amount": 74812.07,
+            "fraud_loss_rate": 1.0,
+            "false_decline_cost": 0.35,
+            "step_up_cost": 299.24828,
+            "step_up_efficacy": 0.8,
+            "hold_cost": 897.74484,
+            "hold_efficacy": 0.85,
+            "review_cost": 3740.6035,
+            "review_efficacy": 0.95,
+            "rationale": {
+              "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+              "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+              "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+              "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+              "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+              "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+              "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+              "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+              "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+            }
+          },
+          "calibration": {
+            "method": "sigmoid",
+            "fitted": false,
+            "n_fit": 0,
+            "n_positives": 0,
+            "base_rate": 0.0,
+            "note": "not fitted - scores pass through unchanged",
+            "reliability": {}
+          }
+        }
+      },
+      "unsupervised": {
+        "detector": "AnomalyDetector",
+        "kind": "iforest",
+        "contamination": 0.01,
+        "seed": 1337,
+        "training": {
+          "n_rows": 0,
+          "n_fraud_seen": 0,
+          "n_fraud_excluded": 0,
+          "n_features": 0,
+          "legit_only": true,
+          "fitted": false
+        },
+        "score_map": {
+          "kind": "identity",
+          "scale": 1.0,
+          "batch_dependent": false,
+          "why": "an isolation forest's -score_samples is 2**(-E[h]/c(n)), already in (0,1)"
+        },
+        "decision": {
+          "mode": "cost",
+          "step_up_at": 0.00625,
+          "hold_at": 0.2,
+          "review_at": 0.25,
+          "decline_at": 0.775,
+          "bands_source": "derived from the cost model",
+          "band_units": "calibrated probability (see `calibration` below)",
+          "reference_amount": 100.0,
+          "unreachable_bands": [],
+          "costs": {
+            "source": "defaults in afl/defend/decision.py",
+            "unit_amount": 1.0,
+            "fraud_loss_rate": 1.0,
+            "false_decline_cost": 0.35,
+            "step_up_cost": 0.5,
+            "step_up_efficacy": 0.8,
+            "hold_cost": 1.5,
+            "hold_efficacy": 0.85,
+            "review_cost": 4.0,
+            "review_efficacy": 0.95,
+            "rationale": {}
+          },
+          "calibration": {
+            "method": "sigmoid",
+            "fitted": false,
+            "n_fit": 0,
+            "n_positives": 0,
+            "base_rate": 0.0,
+            "note": "not fitted - scores pass through unchanged",
+            "reliability": {}
+          }
+        }
+      },
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 74812.07,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 74812.07,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 299.24828,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 897.74484,
+          "hold_efficacy": 0.85,
+          "review_cost": 3740.6035,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": false,
+          "n_fit": 0,
+          "n_positives": 0,
+          "base_rate": 0.0,
+          "note": "not fitted - scores pass through unchanged",
+          "reliability": {}
+        }
+      }
+    },
+    "note": "Levels 1 and 2 are diagnostics; level 3 is the gate. The decision layer is not fitted for level 3 \u2014 every number on it is a ranking metric, which the decision layer cannot move by construction (docs/decisions.md).",
+    "also_measured": {
+      "what": "the generator's whole output against the anchor's whole traffic",
+      "why_not_the_headline": "an anchored run discards the simulator's background and injects the attacks into real traffic, so this comparison is mostly about a haystack nothing downstream uses",
+      "n_real": 20000,
+      "n_synth": 19496,
+      "level1": {
+        "score": 0.6264,
+        "worst_column": "log_gap_s",
+        "ks": {
+          "log_amount": 0.0829,
+          "hour_of_day": 0.3605,
+          "day_of_week": 0.0858,
+          "log_gap_s": 0.9556,
+          "amount_cents": 0.0079
+        }
+      },
+      "level2": {
+        "score": 0.1814,
+        "worst_motif": "fan_out_share",
+        "support": {
+          "alpha_precision": 0.015,
+          "beta_recall": 1.0,
+          "dimensions": 7,
+          "dropped_columns": []
+        }
+      }
+    },
+    "supervised_reference": {
+      "source": "artifacts/detector/paysim.json",
+      "committed_tuned_pr_auc": 0.151741,
+      "committed_amount_floor_pr_auc": 0.057261,
+      "delta_against_this_run": {
+        "trtr_pr_auc": 0.006124,
+        "amount_floor_pr_auc": 0.0
+      },
+      "agrees": false,
+      "note": "the committed baseline is the supervised model alone; this run's TRTR is whatever `config/defend/` composes today, so a non-zero delta is a difference in the system, not necessarily an error in either"
+    },
+    "seconds": 122.8
+  },
+  "levels": {
+    "level1": {
+      "level": 1,
+      "n_real": 803,
+      "n_synth": 635,
+      "ks": {
+        "log_amount": 0.2614,
+        "hour_of_day": 0.1363,
+        "day_of_week": 0.0831,
+        "log_gap_s": 0.3291,
+        "amount_cents": 0.0334
+      },
+      "wasserstein": {
+        "log_amount": 0.6425,
+        "hour_of_day": 0.1904,
+        "day_of_week": 0.1015,
+        "log_gap_s": 1.0,
+        "amount_cents": 0.0421
+      },
+      "categorical": {
+        "tv_rail": 0.0,
+        "tv_has_device": 0.0
+      },
+      "corr_delta": 0.0301,
+      "mi_delta": 0.6571,
+      "worst_column": "log_gap_s",
+      "score": 0.7495
+    },
+    "level2": {
+      "level": 2,
+      "motif_delta": {
+        "edge_density": 0.8301,
+        "fan_in_share": 1.0,
+        "fan_out_share": 1.0,
+        "pass_through_share": 1.0,
+        "reciprocity": 1.0,
+        "max_in_degree_share": 0.9535,
+        "repeat_edge_share": 1.0,
+        "cycle_share": 1.0
+      },
+      "real_motifs": {
+        "edge_density": 0.0003,
+        "fan_in_share": 0.0,
+        "fan_out_share": 0.0,
+        "pass_through_share": 0.0,
+        "reciprocity": 0.0,
+        "max_in_degree_share": 0.0025,
+        "repeat_edge_share": 0.0,
+        "cycle_share": 0.0
+      },
+      "synth_motifs": {
+        "edge_density": 0.0018,
+        "fan_in_share": 0.0228,
+        "fan_out_share": 0.0545,
+        "pass_through_share": 0.0105,
+        "reciprocity": 0.0067,
+        "max_in_degree_share": 0.0535,
+        "repeat_edge_share": 0.0646,
+        "cycle_share": 0.0035
+      },
+      "velocity": {
+        "gap_ks": 1.0,
+        "burst_index_real": 0.0,
+        "burst_index_synth": 0.3976,
+        "burst_index_delta": 0.3976
+      },
+      "support": {
+        "alpha_precision": 0.6457,
+        "beta_recall": 1.0,
+        "dimensions": 4,
+        "dropped_columns": [
+          "log_gap_s",
+          "src_out_degree",
+          "src_uniq_dst"
+        ]
+      },
+      "worst_motif": "fan_in_share",
+      "score": 0.2054
+    },
+    "level3": {
+      "level": 3,
+      "outcome": "measured",
+      "systems": {
+        "trtr": {
+          "pr_auc": 0.157865,
+          "recall_at_fixed_fpr": 0.443902,
+          "precision_at_k": 0.53,
+          "trained_on": "real rows, real labels",
+          "n_train": 446214
+        },
+        "tstr": {
+          "pr_auc": 0.004856,
+          "recall_at_fixed_fpr": 0.02439,
+          "precision_at_k": 0.0,
+          "trained_on": "real legit + generated fraud, no real fraud label",
+          "n_train": 446480
+        },
+        "augmented": {
+          "pr_auc": 0.047476,
+          "recall_at_fixed_fpr": 0.214634,
+          "precision_at_k": 0.14,
+          "trained_on": "real rows + generated fraud",
+          "n_train": 446849
+        },
+        "amount_floor": {
+          "pr_auc": 0.057261,
+          "recall_at_fixed_fpr": 0.212195,
+          "precision_at_k": 0.23,
+          "n_positives": 410,
+          "direction": "largest amount first",
+          "direction_chosen_on": "train",
+          "trained_on": "nothing",
+          "n_train": 0
+        },
+        "standalone": {
+          "pr_auc": 0.003195,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.0,
+          "trained_on": "the generator's whole output, background included",
+          "n_train": 19496,
+          "n_train_fraud": 635,
+          "note": "reported, never gating \u2014 see this module's docstring"
+        }
+      },
+      "tstr": {
+        "trtr_pr_auc": 0.157865,
+        "tstr_pr_auc": 0.004856,
+        "trtr_recall": 0.443902,
+        "tstr_recall": 0.02439,
+        "tstr_gap": 0.153009,
+        "tstr_ratio": 0.03076
+      },
+      "augmentation": {
+        "base_pr_auc": 0.157865,
+        "augmented_pr_auc": 0.047476,
+        "base_recall": 0.443902,
+        "augmented_recall": 0.214634,
+        "recall_lift": -0.229268,
+        "pr_auc_lift": -0.110389
+      },
+      "amount_floor": {
+        "pr_auc": 0.057261,
+        "recall_at_fixed_fpr": 0.212195,
+        "precision_at_k": 0.23,
+        "n_positives": 410,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "beats_amount_floor": {
+        "trtr": true,
+        "tstr": false,
+        "augmented": false,
+        "standalone": false
+      },
+      "n_real_train": 446214,
+      "n_real_test": 150766,
+      "n_real_test_positives": 410,
+      "n_synth_fraud": 635,
+      "score": 0.0
+    },
+    "privacy": {
+      "level": "privacy",
+      "dcr": {
+        "dropped_columns": [
+          "log_gap_s",
+          "src_out_degree",
+          "src_uniq_dst"
+        ],
+        "dcr_synth_median": 0.337379,
+        "dcr_train_median": 0.138744,
+        "dcr_ratio": 2.431659,
+        "dcr_5th_percentile": 0.016023,
+        "identical_share": 0.0
+      },
+      "mia": {
+        "mia_auc": 0.388137,
+        "advantage": 0.223726,
+        "advantage_over_control": 0.143923
+      },
+      "mia_time_control": {
+        "mia_auc": 0.460098,
+        "advantage": 0.079803,
+        "measurable": true
+      },
+      "identifier_reuse": {
+        "src_in_anchor": 0.87874,
+        "dst_in_anchor": 0.984252,
+        "either_in_anchor": 1.0,
+        "n_synth": 635.0
+      },
+      "flags": [
+        "membership is inferable from the synthetic data alone"
+      ],
+      "score": 0.7763,
+      "caveat": "evidence, not proof \u2014 no formal privacy guarantee is claimed"
+    }
+  }
+}
