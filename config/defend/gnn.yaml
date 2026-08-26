@@ -1,15 +1,71 @@
 # Experiment, with a stated fallback. A temporal GNN is the right shape for fan-in and layering,
-# and it is also the easiest place to spend a week for no lift.
+# and it is also the easiest place in this repo to spend a week for no lift — or worse, to produce
+# a lift that does not replicate.
 #
-# Fallback if it does not beat lgbm by the deadline: keep the hand-built graph features in
-# defend/features.py and report the GNN as a negative result. That is a finding, not a failure.
+# So the exit was written first. This layer enters a reported table only by beating the
+# hand-rolled baseline (`afl/defend/models/lgbm.py` over `afl/defend/features.py`) on the same
+# out-of-time split at the same operating point, on a fold that can carry a claim, at enough
+# seeds to have a spread, by a margin larger than that spread. If it does not, the FALLBACK is
+# what ships: hand-rolled graph features + LightGBM, exactly as they are today, and the README
+# says which one shipped. That is a finding, not a failure.
+#
+# Requires the `deep` extra (`uv sync --extra deep`): torch and torch-geometric.
+# `TemporalGNNDetector` raises without them rather than degrading to a stand-in, because a
+# silently substituted model is a number nobody can explain later.
+#
+# `enabled` is the record of the gate's verdict, not a preference, and today it records a
+# refusal: `afl.evaluation.mule_graph.assert_config_matches_promotion` raises on `true` while a
+# committed artifacts/gnn/<anchor>.json says the gate said no, and a test runs it against what is
+# on disk. So the claim "it only ships if it wins" is enforced rather than remembered.
 
 kind: temporal_gnn
 enabled: false
 
-snapshot_hours: 24
-hidden_size: 64
-num_layers: 2
-epochs: 30
+# ── the temporal window: the ticket's first criterion, and the only thing that makes this a
+# *temporal* graph rather than a graph with timestamps on it. A payment landing in a stride is
+# scored against the edges in [stride_start - window, stride_start). Edges older than the window
+# are dropped: a mule account that fanned in six months ago is not fanning in now.
+window_hours: 168      # seven days — a layering chain hops over days, and a shorter window cuts
+                       # the motif in half
+stride_hours: 24       # how often the graph is rebuilt. One snapshot per day is how a batch
+                       # scorer actually runs, and it is what keeps the fit affordable
+
+hidden: 32
+heads: 2               # graph ATTENTION: the weights are also the local explanation the model
+                       # owes a flagged row — see TemporalGNNDetector.reason_codes
+layers: 2              # two hops: payer -> collector -> next hop, which is the S1 motif
+dropout: 0.1
+epochs: 12
 learning_rate: 0.005
-neighbour_sample: 25
+
+# Negatives kept per positive among the rows the LOSS is computed on. The graph keeps every edge
+# either way — this samples what is scored, never what is propagated over — so it changes the
+# cost of the fit and not the structure any row is judged against. On the model card because a
+# training-set composition nobody wrote down is one nobody can reproduce.
+negative_ratio: 20
+
+# A snapshot larger than this keeps only its most recent edges. A guard against one pathological
+# stride, never a silent cap: the dropped count is on the model card and the run logs a warning.
+max_edges: 400000
+
+# The comparison this layer is judged by — `make gnn`, written up in docs/gnn.md.
+mule:
+  # The graph engine's two families: fan-in plus layering (S1) and the single relay hop (C3).
+  # These are the families whose whole tell is topology. The drift and velocity families ride
+  # other engines and are not here — a graph model has nothing to say about an account whose
+  # amounts changed, and asking it anyway measures the fold rather than the model.
+  families: [S1, C3]
+
+  # Episodes generated for the held-out family. Higher than eval.holdout_episodes because a fold
+  # landing under eval.min_meaningful_positives is reported as missing rather than as a low score.
+  episodes: 40
+
+  # THE ticket's fourth criterion: "a single-seed GNN result is not a result". Each seed
+  # regenerates its own pool and refits every system, and the lift is reported as a paired
+  # per-seed difference with its spread and a sign test. Three is what the three-system table
+  # runs, and three seeds cannot reach p < 0.05 — that is a fact about the run and it is
+  # reported rather than worked around.
+  seeds: [1337, 1338, 1339]
+
+  metric: pr_auc
+  material_gap: 0.01   # the difference this project treats as a difference; see docs/anomaly.md

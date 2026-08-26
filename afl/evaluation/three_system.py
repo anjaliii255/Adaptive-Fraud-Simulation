@@ -955,6 +955,23 @@ class Spread:
             "values": self.values,
         }
 
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> Spread:
+        """The constructor fields only — `mean`, `sd`, `lo` and `hi` are recomputed from them.
+
+        Reading them back off the file instead would let a hand-edited artefact carry a mean its
+        own values do not support, which is the one thing a committed number must not be able
+        to do.
+        """
+        return cls(
+            system=raw["system"],
+            column=raw["column"],
+            metric=raw["metric"],
+            values=[float(v) for v in raw.get("values", [])],
+            outcome=raw["outcome"],
+            reason=raw.get("reason", ""),
+        )
+
 
 def spread_of(
     report: ThreeSystemReport, system: str, column: str, metric: str = HEADLINE_METRIC
@@ -1124,6 +1141,24 @@ class Comparison:
             "inside_noise": self.inside_noise,
             "verdict": self.verdict,
         }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> Comparison:
+        """The per-seed deltas and the labels; every summary is recomputed from them.
+
+        Same rule as `Spread.from_dict`: `mean_delta`, `p_value` and `verdict` are written into
+        the artefact for a reader, never read back out of it, so a committed comparison cannot
+        disagree with the seeds it is made of.
+        """
+        return cls(
+            challenger=raw["challenger"],
+            incumbent=raw["incumbent"],
+            column=raw["column"],
+            metric=raw["metric"],
+            per_seed=list(raw.get("per_seed", [])),
+            outcome=raw["outcome"],
+            reason=raw.get("reason", ""),
+        )
 
 
 def compare(

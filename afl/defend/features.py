@@ -273,6 +273,36 @@ def feature_names(windows_s: tuple[int, ...] = VELOCITY_WINDOWS_S) -> list[str]:
     return [spec.name for spec in feature_specs(windows_s)]
 
 
+#: Blocks whose every column is a statement about the transaction *graph* — who paid whom, how
+#: many of them, how fast it left again, and whether this pair has met before. `row` is in the
+#: list because a baseline that cannot see the payment it is scoring is not a baseline, it is a
+#: handicap; ticket 18's comparison is only worth reading if the champion is the strongest
+#: hand-rolled graph model this repo has, not the weakest one that still fits the name.
+GRAPH_FEATURE_GROUPS = ("row", "beneficiary-inbound", "pass-through", "relationship")
+
+#: Graph columns that live inside a block which is otherwise velocity and RFM. Out-degree is
+#: fan-out, and a mule baseline without it is missing half the motif.
+GRAPH_FEATURES_FROM_SRC_OUT = ("src_out_uniq_dst_{w}s", "src_out_uniq_beneficiaries")
+
+
+def graph_feature_names(windows_s: tuple[int, ...] = VELOCITY_WINDOWS_S) -> list[str]:
+    """The hand-rolled *graph* columns, in emission order — ticket 18's narrower baseline.
+
+    Degrees, distinct counterparties, fan-in pressure, dwell time, payee novelty and the pair's
+    own history, plus the row being scored. What it leaves out is the payer's velocity and RFM
+    block, which is a statement about one account's rhythm rather than about the graph.
+
+    Derived from the registry rather than typed out, so a column added to a graph block joins
+    this list by existing; `tests/test_gnn.py` asserts every name here is a real column.
+    """
+    wanted = {n.format(w=w) for n in GRAPH_FEATURES_FROM_SRC_OUT for w in (*windows_s, "")}
+    return [
+        spec.name
+        for spec in feature_specs(windows_s)
+        if spec.group in GRAPH_FEATURE_GROUPS or spec.name in wanted
+    ]
+
+
 # ── per-entity state ────────────────────────────────────────────────────────────
 class _Stream:
     """One direction of one entity's history — what it sent, or what it received.
@@ -776,6 +806,24 @@ def _undo(journal: list) -> None:
             stream.other[i:] = other_tail
             stream.cum[i + 1 :] = cum_tail
             stream.cum2[i + 1 :] = cum2_tail
+
+
+class GraphFeatureBuilder(FeatureBuilder):
+    """`FeatureBuilder`, with everything but the graph columns dropped on the way out.
+
+    Ticket 18 asks for the temporal GNN to be read against "graph features + LightGBM". The
+    detector that ships is LightGBM over the *whole* hand-rolled table, and that is the champion
+    the gate is decided on — a GNN promoted over a deliberately narrowed baseline would be a
+    number that does not survive contact with what is actually deployed. This builder produces
+    the narrower column as well, so the reader can see whether the GNN loses to graph features or
+    only to the velocity block sitting next to them.
+
+    Subclassed rather than parameterised because the buffer `_row` fills is positional: the full
+    row is always computed, and the projection happens once, here, on the way out.
+    """
+
+    def transform(self, txns: list[Transaction], update: bool = True) -> pd.DataFrame:
+        return super().transform(txns, update)[graph_feature_names(self.windows_s)]
 
 
 def assert_no_forbidden_columns(X: pd.DataFrame) -> None:
