@@ -5,6 +5,10 @@
 # operator and no ring. It breaks the assumption every supervised feature rests on, which is
 # what makes it a generalisation test rather than just a harder fold. Reason of record lives
 # in afl/evaluation/leave_one_attack_out.py:DEFAULT_HOLDOUT.
+#
+# Any vector may be named here — `python scripts/build_loao.py --held-out C2` overrides it for
+# one run, and `make loao` runs every fold in `folds` regardless, so this key chooses which row
+# is the headline rather than which rows exist.
 held_out_vector: M3
 fixed_fpr: 0.01
 k: 100
@@ -17,5 +21,17 @@ embargo_days: 1.0
 # set with no positives and metrics that read 0.0 without having measured anything.
 holdout_episodes: 12
 
+# Which families the harness holds out, one at a time. `auto` is every vector the registry can
+# generate today, so a vector that lands in ticket 13 joins the matrix without an edit here.
+# A list (`[M3, C2]`) restricts it. Folds that cannot be run are still named in the output with
+# the reason — a fold that vanishes reads as "not applicable" when it means "we did not look".
+folds: auto
+
+# Below this many positives in the holdout, the fold is reported as too thin to carry a claim
+# rather than as a low score. Recall on 20 rows moves five points per row.
+min_meaningful_positives: 30
+
 # Run the full matrix (hold out each family in turn) rather than a single flattering row.
+# `make loao` always does; this is the knob for `scripts/run_experiment.py`, whose job is the
+# adaptive loop rather than the evaluation matrix.
 sweep_all_vectors: false

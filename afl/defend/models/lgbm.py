@@ -286,6 +286,17 @@ class LGBMDetector:
         self._explainer = None
         return self
 
+    @property
+    def training_rows(self) -> list[Transaction]:
+        """Every row this detector has ever fitted on, replay buffer included.
+
+        The leave-one-attack-out guard audits *this*, not the list handed to `fit`. The corpus
+        accumulates across rounds and the replay buffer accumulates across evasions, so both are
+        places a carved-out family can reappear in training long after the split that excluded
+        it — which is the one failure the fold cannot survive and the one nobody would see.
+        """
+        return [*self._corpus, *self._replay]
+
     def sample_weights(self, txns: list[Transaction]) -> np.ndarray:
         """`replay_weight` on every row that once evaded, 1.0 on the rest.
 

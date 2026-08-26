@@ -59,6 +59,7 @@ make features    # build the feature table over every anchor; record cost and co
 make baseline    # tune the detector on every anchor; commit the reference numbers
 make decisions   # price the graded action bands and reason codes; commit them
 make anomaly     # score the zero-day layer against the supervised model on the held-out family
+make loao        # the leave-one-attack-out matrix: every family held out in turn, with the guards
 make fidelity    # build the fidelity scorecard, before trusting any generator
 make loop        # run the adaptive loop (synthetic default, no download)
 make compare     # real-only vs SMOTE vs adaptive: the three-system table
@@ -284,6 +285,35 @@ held-out family from the anchor at **PR-AUC 0.800** — 1.000 on a smaller sampl
 empties entirely. Every anchored PaySim number produced before this ticket inherits that. Both
 are fixed, and both are measured in the artefact rather than asserted in a comment.
 
+## Leave-one-attack-out, and what a fold is allowed to claim
+
+`make loao` holds out every family in turn and writes the matrix to `artifacts/loao/<anchor>.json`
+and `docs/loao.md`. The three guards above make the carve-out airtight. They are not what decides
+most of the table.
+
+**A fold that runs is not a fold that means something.** The carve-out drops the anchor's own
+fraud from the holdout, so in every fold *every positive is an injected synthetic row and every
+negative is a real one* — "caught the fraud" and "spotted the synthetic row" are the same label.
+Ticket 07 noticed this and measured it by hand at AUC 1.00; it is a check in the harness now, and
+it decides rows. A classifier gets the fold's own features and is asked to sort injected from
+real. Where it succeeds, the fold's recall is a statement about the generator and the numbers are
+withheld — they move out of `metrics` into `withheld_metrics`, so a reader who quotes the obvious
+field gets `None` rather than a number they should not have.
+
+So every fold lands on one of three outcomes, and only the first carries a claim:
+
+- **measured** — the numbers stand.
+- **withheld** — the fold ran and the numbers exist, but nothing follows from them: too few
+  positives to move a metric by less than a rounding error per row, separable from the anchor by
+  one contract field, separable by a whole model, or a `template` vector whose defining tell is
+  not modelled yet.
+- **skipped** — the fold never ran, and the reason sits where the number would be. Every
+  requested fold gets a row either way; a fold that vanishes reads as "not applicable" when it
+  means "we did not look".
+
+The amount floor rides along on every fold — rank by amount, no model, direction chosen on the
+training window. Two earlier results in this repo were walked back for want of that column.
+
 ## How it's laid out
 
 The one rule that makes two teams possible: the red side and the blue side never import each
@@ -307,11 +337,27 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 The split is out-of-time, never random, because random splits leak the future.
 
 We use leave-one-attack-out evaluation: train without an attack family, then measure recall on it.
-That's the number that matters; everything else is supporting evidence.
+That's the number that matters; everything else is supporting evidence. Any vector can be the
+holdout — `config/eval/leave_one_attack_out.yaml` names which fold is the headline, and `make
+loao` runs the whole matrix regardless.
 
 We report PR-AUC, recall at a fixed false-positive rate, and precision@k. We do not rely on
 accuracy or ROC-AUC alone because, at a sub-2% fraud rate, they can flatter a model that catches
-almost nothing.
+almost nothing. `afl/defend/baseline.py` refuses to save an artefact containing either.
+
+**Three guards make the carve-out mean something,** and all three are assertions with a test that
+deliberately tries to leak a row past them:
+
+- Not one row of the held-out family reaches training — **the detector's replay buffer included**.
+  The audit runs against the fitted detector's `training_rows`, not the list handed to `fit`,
+  because the replay buffer is where a carved-out family walks back into training four rounds
+  later without the split changing. A detector that cannot say what it trained on fails the guard.
+- The split is still out-of-time with the committed embargo intact **after** the carve-out.
+- Every legit row of the test window stays in the holdout. An FPR with no negatives is not an FPR.
+
+**And a fourth check that is a verdict rather than a guard** — the provenance probe, in
+*Leave-one-attack-out, and what a fold is allowed to claim* above. It is the one that
+decides most of the matrix.
 
 ## Current numbers (honest)
 

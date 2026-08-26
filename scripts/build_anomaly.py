@@ -105,9 +105,9 @@ ANOMALY_ARTEFACT_VERSION = 1
 BLEND_WEIGHTS = tuple(round(0.1 * i, 1) for i in range(11))
 
 #: Below this many positives the fold is reported as too thin to carry a claim rather than as a
-#: low score. Recall on 20 rows moves 5 points per row; the number is the same order as
-#: `calibration.MIN_POSITIVES` for the same reason.
-MIN_MEANINGFUL_POSITIVES = 30
+#: low score. Read from the harness rather than restated here: ticket 11 owns the rule, and two
+#: files holding the same threshold is two files that can disagree about what a thin fold is.
+MIN_MEANINGFUL_POSITIVES = loao.MIN_MEANINGFUL_POSITIVES
 
 #: A PR-AUC gap smaller than this is not called a change in the generated write-up. Two numbers
 #: that both round to 1.000 produced the sentence "degrades from 1.000 to 1.000" before it

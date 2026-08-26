@@ -30,7 +30,7 @@ blocks the frontier for both lanes.
 | 08 | ~~LightGBM baseline at a fixed operating point~~ **done** | ■ B | 07 |
 | 09 | ~~Graded decisions and SHAP reason codes~~ **done** | ■ B | 08 |
 | 10 | ~~Anomaly layer scored on the holdout family~~ **done** | ■ B | 08, 03 |
-| 11 | Leave-one-attack-out harness with leakage guards | ■ B | 08, 03 |
+| 11 | ~~Leave-one-attack-out harness with leakage guards~~ **done** | ■ B | 08, 03 |
 | 12 | ~~Multi-vector adaptive optimiser~~ **done** | ▲ A | 01, 02, 08 |
 | 13 | M1 — the optimiser's boundary walk as a vector | ▲ A | 12 |
 | 14 | Realism leash, reported every round | ▲ A | 12 |
@@ -917,16 +917,47 @@ should run whatever exists and say plainly which folds it skipped and why.
 **Blocked by:** 08, 03. *(Additional folds unblock as 04, 05 and 06 land; the harness must not
 wait on them.)*
 
-**Status:** ready-for-agent
+**Status:** done — harness in `afl/evaluation/leave_one_attack_out.py`, matrix built by
+`make loao`, evidence in `artifacts/loao/`, written up in `docs/loao.md`. **The guards all hold
+and almost nothing survives them: on both anchors the matrix is mostly withheld, and the reason
+is the generator rather than the detector.**
 
-- [ ] Any vector can be named as the holdout via config
-- [ ] Assertion: zero rows of the held-out family in training, replay buffer included, and the
-      assertion fires in a test that deliberately tries to leak one
-- [ ] Assertion: the split is still out-of-time with the embargo intact after the carve-out
-- [ ] All legit rows are retained in the holdout
-- [ ] A fold with too few positives to be meaningful is reported as such, never as a low score
-- [ ] Skipped folds are named, with the reason, in the output
-- [ ] Results write to an artefact with the config and seed that produced them
+- [x] Any vector can be named as the holdout via config — `eval.held_out_vector` picks the
+      headline row, `eval.folds` picks which rows exist (`auto` is every vector the registry
+      knows), and `--held-out` / `--folds` override either for one run. A test carves S1, S2 and
+      M3 out of the same pool and asserts each one leaves training clean
+- [x] Assertion: zero rows of the held-out family in training, replay buffer included, and the
+      assertion fires in a test that deliberately tries to leak one — **two** tests, because the
+      two leaks are different bugs. `assert_family_held_out` audits the training list, and with a
+      detector it audits `detector.training_rows`, a new property on `LGBMDetector`,
+      `AnomalyDetector` and `EnsembleDetector` that returns the corpus *and the replay buffer*.
+      One test leaks a row into the split; the other leaves the split spotless and pushes an M3
+      row into `_replay`, which is the leak a split-side assertion cannot see. A detector with no
+      `training_rows` **fails** the guard rather than passing it: unauditable is not clean
+- [x] Assertion: the split is still out-of-time with the embargo intact after the carve-out —
+      `assert_embargo_intact` compares the realised gap against the committed boundary's own
+      embargo, not against a config number, and the test closes the gap to an hour and watches it
+      raise. The arithmetic says a carve-out can only widen the gap; an argument is what an
+      assertion replaces
+- [x] All legit rows are retained in the holdout — `assert_haystack_intact` diffs the test
+      window's legit ids against the holdout's and names the dropped ones. Recorded in every
+      artefact as `guards.haystack`, so a committed number says the haystack was whole
+- [x] A fold with too few positives to be meaningful is reported as such, never as a low score —
+      and the numbers move out of `metrics` into `withheld_metrics` when it happens, so a reader
+      who quotes the obvious field gets `None`. The floor is `MIN_MEANINGFUL_POSITIVES = 30`,
+      which `scripts/build_anomaly.py` now imports rather than restating
+- [x] Skipped folds are named, with the reason, in the output — every requested fold gets a row
+      in the artefact, the doc and the console, whether it ran or not. A fold that vanishes reads
+      as "not applicable" when it means "we did not look"
+- [x] Results write to an artefact with the config and seed that produced them —
+      `artifacts/loao/<anchor>.json` carries the eval config as read, the seed, the committed
+      split digest, the sample fraction, per-fold row counts, all three guard reports, the amount
+      floor, the provenance probe and the model card. Versioned, and an old file raises rather
+      than being read with the wrong meaning
+- [x] **Not on the list, and the finding of the ticket:** ticket 07's carry-out asked this ticket
+      to make the fold say for itself when it is meaningless. It does — see below
+- [x] `make test` green (305 passed, up from 288 — 17 new tests in `tests/test_eval.py`),
+      `ruff check` and `ruff format` clean, and `make loao` runs both anchors end to end
 
 ---
 

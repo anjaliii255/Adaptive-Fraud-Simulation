@@ -231,6 +231,16 @@ class AnomalyDetector:
         self.training.fitted = True
         return self
 
+    @property
+    def training_rows(self) -> list[Transaction]:
+        """Every row this detector has fitted on — the legit ones, after the fraud filter.
+
+        What the leave-one-attack-out guard audits. `fit` drops the fraud rows before it gets
+        here, so a carved-out family reaching this list would mean the carve-out failed on the
+        *legit* side, which is the case nobody checks for.
+        """
+        return list(self._corpus)
+
     def retrain(self, batch: AttackBatch, evasions: list[Transaction]) -> None:
         """Widen the notion of normal with this round's legit traffic; never narrow it to it."""
         known = {t.txn_id for t in self._corpus}
@@ -360,6 +370,11 @@ class EnsembleDetector:
         self.supervised.fit(txns, sample_weight=sample_weight)
         self.unsupervised.fit(txns)
         return self
+
+    @property
+    def training_rows(self) -> list[Transaction]:
+        """Both halves' training rows. Either one is enough to lose a carve-out."""
+        return [*self.supervised.training_rows, *self.unsupervised.training_rows]
 
     def split_proba(self, txns: list[Transaction]) -> tuple[np.ndarray, np.ndarray]:
         """(supervised, unsupervised) probabilities for the same rows, computed once.

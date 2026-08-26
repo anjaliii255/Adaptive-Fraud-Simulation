@@ -48,7 +48,11 @@ log = logging.getLogger(__name__)
 
 
 # ── assembly ────────────────────────────────────────────────────────────────────
-def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) -> Simulator:
+def build_simulator(
+    cfg: DictConfig,
+    anchor: list[Transaction] | None = None,
+    envelope: AnchorEnvelope | None = None,
+) -> Simulator:
     """The attack simulator, with its window aligned to the real anchor when there is one.
 
     Alignment is not cosmetic. `config/attack/engines.yaml` starts the simulation on 2024-01-01;
@@ -56,6 +60,10 @@ def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) ->
     fraud row lands a year after every real row, so the out-of-time split degenerates into
     "real = train, synthetic = test" and the held-out family is separable by timestamp alone.
     An attack has to happen inside the traffic it is hiding in.
+
+    `envelope` short-circuits the measurement for a caller that builds many simulators over the
+    same anchor — the leave-one-attack-out matrix rebuilds one per fold, and re-measuring 600k
+    rows nine times says the same thing nine times.
 
     The same argument applies to size. PaySim's median payment is ~67,000 and the actor bundles
     were authored around ~25, so uncalibrated attacks land three orders of magnitude below every
@@ -66,11 +74,11 @@ def build_simulator(cfg: DictConfig, anchor: list[Transaction] | None = None) ->
     from datetime import datetime
 
     e = cfg.attack.engines
-    envelope = None
     start = datetime.fromisoformat(str(e.start_ts))
     window = int(e.window_days)
-    if anchor:
+    if anchor and envelope is None:
         envelope = AnchorEnvelope.measure(anchor, str(cfg.data.name))
+    if envelope is not None:
         log.info(
             "simulator anchored to %s: %s + %d days, amount median %.0f",
             envelope.dataset,
@@ -432,6 +440,8 @@ def main(cfg: DictConfig) -> None:
     (artifact_dir / "config.yaml").write_text(OmegaConf.to_yaml(cfg))
 
     if cfg.eval.sweep_all_vectors:
+        # Every requested fold gets a row, including the ones that could not be run — a fold
+        # that vanishes from the file reads as "not applicable" when it means "we did not look".
         matrix = loao.sweep(
             pool,
             detector_factory,
@@ -440,10 +450,14 @@ def main(cfg: DictConfig) -> None:
             fixed_fpr=float(cfg.eval.fixed_fpr),
             k=int(cfg.eval.k),
             split=split,
+            min_positives=int(cfg.eval.min_meaningful_positives),
+            fit=build_fit(cfg),
         )
         (artifact_dir / "loao_matrix.json").write_text(
-            json.dumps({k: v.model_dump() for k, v in matrix.items()}, indent=2)
+            json.dumps([f.to_dict() for f in matrix], indent=2, default=str)
         )
+        for fold in matrix:
+            log.info("loao %s", fold.summary())
 
     if cfg.fidelity.enabled:
         _fidelity(cfg, pool, detector_factory, artifact_dir, split)

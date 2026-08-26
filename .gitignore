@@ -34,6 +34,13 @@ artifacts/**
 # reports is a negative one — which is exactly the kind that has to stay checkable.
 !artifacts/anomaly/
 !artifacts/anomaly/**
+# the leave-one-attack-out matrix: one row per family, the three guard reports that make each
+# carve-out checkable, the amount floor, and the provenance probe that decides whether a fold's
+# numbers may be quoted at all. `docs/loao.md` is generated from these files, and most of what
+# they record is a refusal to report — which is exactly the kind of claim that has to be
+# auditable rather than asserted.
+!artifacts/loao/
+!artifacts/loao/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/
