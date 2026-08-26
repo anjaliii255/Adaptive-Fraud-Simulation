@@ -16,13 +16,24 @@ from __future__ import annotations
 import numpy as np
 
 from afl.contract.schema import Transaction
-from afl.fidelity.level2_structural import embedding
+from afl.fidelity.level2_structural import dropped_columns, embedding, informative
 
 MAX_ROWS = 4_000  # pairwise distances are O(n²); subsample rather than melt the machine
 
 
 def _standardised(train: np.ndarray, other: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    mu, sd = train.mean(0), train.std(0) + 1e-9
+    """Standardise on the training rows, over the columns that vary in them.
+
+    A column that never moves in the reference set cannot say how far anything is from it.
+    Keeping it and dividing by `std + 1e-9` turns a synthetic row's ordinary value into a
+    distance of 1e9 — which is how the first PaySim card reported a DCR ratio of 1.0e11 and
+    passed the memorisation check because of it. See `level2_structural.informative`.
+    """
+    keep = informative(train)
+    if not keep.any():
+        return train[:, :0], other[:, :0]
+    train, other = train[:, keep], other[:, keep]
+    mu, sd = train.mean(0), train.std(0)
     return (train - mu) / sd, (other - mu) / sd
 
 
@@ -58,6 +69,8 @@ def dcr(train: list[Transaction], synth: list[Transaction], seed: int = 1337) ->
     d_train = _nearest(tr_s, tr_s, exclude_self=True)
     med_train = float(np.median(d_train)) or 1e-9
     return {
+        # named, because a distance measured in four dimensions must not read as one in seven
+        "dropped_columns": dropped_columns(tr),
         "dcr_synth_median": round(float(np.median(d_synth)), 6),
         "dcr_train_median": round(med_train, 6),
         "dcr_ratio": round(float(np.median(d_synth)) / med_train, 6),
@@ -83,7 +96,13 @@ def mia_auc(
     if min(m.shape[0], n.shape[0], sy.shape[0]) == 0:
         return {"mia_auc": 0.5, "advantage": 0.0}
 
-    mu, sd = sy.mean(0), sy.std(0) + 1e-9
+    # standardised on the synthetic set, over the columns that vary in it — same reason as
+    # `_standardised`: a constant reference column manufactures distance rather than measuring it
+    keep = informative(sy)
+    if not keep.any():
+        return {"mia_auc": 0.5, "advantage": 0.0}
+    m, n, sy = m[:, keep], n[:, keep], sy[:, keep]
+    mu, sd = sy.mean(0), sy.std(0)
     scores = np.concatenate(
         [-_nearest((m - mu) / sd, (sy - mu) / sd), -_nearest((n - mu) / sd, (sy - mu) / sd)]
     )
@@ -168,6 +187,10 @@ def report(
         )
     if d.get("identical_share", 0.0) > 0.0:
         flags.append("exact duplicates of training rows present")
+    # How much of the attacker's advantage is left once the calendar is subtracted. Reported
+    # whatever the flag decides, because the flag is a threshold and this is the reading.
+    if control["measurable"]:
+        m["advantage_over_control"] = round(m["advantage"] - control["advantage"], 6)
     if m["advantage"] > max_mia_advantage:
         # Only above the control. An advantage the same attack reaches between two halves of the
         # holdout — where nothing was ever in training — is drift, and flagging it as a

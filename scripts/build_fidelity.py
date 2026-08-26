@@ -78,6 +78,7 @@ ANOMALY_CONFIG = Path("config/defend/anomaly.yaml")
 EVAL_CONFIG = Path("config/eval/leave_one_attack_out.yaml")
 ENGINES_CONFIG = Path("config/attack/engines.yaml")
 COSTS_CONFIG = Path("config/costs/default.yaml")
+DETECTOR_DIR = Path("artifacts/detector")
 THRESHOLDS_CONFIG = Path("config/fidelity/thresholds.yaml")
 ARTIFACT_DIR = Path("artifacts/fidelity")
 DOC_PATH = Path("docs/fidelity.md")
@@ -187,6 +188,39 @@ def secondary_comparison(real: list[Transaction], synth: list[Transaction], seed
     }
 
 
+def supervised_reference(name: str, l3: dict) -> dict | None:
+    """What `make baseline` committed for this anchor, next to what this run just measured.
+
+    A cross-check rather than a decoration. The TRTR row and the amount floor here are the same
+    two measurements that artefact holds — same anchor, same committed boundary, same operating
+    point — so if the numbers disagree, one of the two harnesses is measuring something else and
+    a reader should know before quoting either.
+    """
+    path = DETECTOR_DIR / f"{name}.json"
+    if not path.exists() or l3.get("outcome") != "measured":
+        return None
+    metrics = json.loads(path.read_text())["metrics"]
+    mine = l3["systems"]
+    deltas = {
+        "trtr_pr_auc": round(mine["trtr"]["pr_auc"] - metrics["tuned"]["pr_auc"], 6),
+        "amount_floor_pr_auc": round(
+            mine["amount_floor"]["pr_auc"] - metrics["amount_only"]["pr_auc"], 6
+        ),
+    }
+    return {
+        "source": str(path),
+        "committed_tuned_pr_auc": metrics["tuned"]["pr_auc"],
+        "committed_amount_floor_pr_auc": metrics["amount_only"]["pr_auc"],
+        "delta_against_this_run": deltas,
+        "agrees": all(abs(v) < 1e-6 for v in deltas.values()),
+        "note": (
+            "the committed baseline is the supervised model alone; this run's TRTR is whatever "
+            "`config/defend/` composes today, so a non-zero delta is a difference in the system, "
+            "not necessarily an error in either"
+        ),
+    }
+
+
 def run_anchor(cfg: dict, args, values: dict, prov) -> tuple[scorecard.Scorecard, dict]:
     """One anchor's whole scorecard, at the operating point everything else here is measured at."""
     name = cfg["name"]
@@ -282,6 +316,7 @@ def run_anchor(cfg: dict, args, values: dict, prov) -> tuple[scorecard.Scorecard
         },
     )
     card.meta["also_measured"] = secondary_comparison(real, synth_all, seed)
+    card.meta["supervised_reference"] = supervised_reference(name, card.levels.get("level3") or {})
     card.meta["seconds"] = round(time.perf_counter() - started, 1)
     return card, {"split": split, "real": real}
 
@@ -308,7 +343,7 @@ def _verdict_line(card: dict) -> str:
     return f"{marks.get(card['verdict'], '')} **{card['verdict'].upper()}** — score {card['score']}"
 
 
-def fidelity_doc(cards: dict[str, dict], missing: list[str]) -> str:
+def fidelity_doc(cards: dict[str, dict], skipped: dict[str, str]) -> str:
     """`docs/fidelity.md`, generated from the committed artefacts and never hand-typed."""
     out = [
         "# Fidelity, on the real anchor",
@@ -338,17 +373,18 @@ def fidelity_doc(cards: dict[str, dict], missing: list[str]) -> str:
     for name, card in sorted(cards.items()):
         out += _anchor_section(name, card)
 
-    if missing:
+    if skipped:
         out += [
             "",
             "## Not measured",
             "",
             _wrap(
-                "These anchors have a data config but no scorecard in `artifacts/fidelity/`: "
-                + ", ".join(sorted(missing))
-                + ". An anchor that is absent from a table reads as one that passed."
+                "These anchors have a data config and no scorecard. An anchor that is absent "
+                "from a table reads as one that passed, so each gets a row and a reason."
             ),
+            "",
         ]
+        out += [f"- **{name}** — {reason}" for name, reason in sorted(skipped.items())]
 
     out += [
         "",
@@ -433,13 +469,19 @@ def _anchor_section(name: str, card: dict) -> list[str]:
     p = lv.get("privacy") or {}
     if p:
         ids = p.get("identifier_reuse", {})
+        control = p.get("mia_time_control", {})
         out += [
             "",
             _wrap(
                 f"Privacy, as evidence rather than proof: DCR ratio "
-                f"{p.get('dcr', {}).get('dcr_ratio')}, exact duplicates of training rows "
+                f"{p.get('dcr', {}).get('dcr_ratio')} over "
+                f"{len(p.get('dcr', {}).get('dropped_columns') or [])} dropped constant "
+                f"column(s), exact duplicates of training rows "
                 f"{p.get('dcr', {}).get('identical_share')}, membership-inference advantage "
-                f"{p.get('mia', {}).get('advantage')}. "
+                f"{p.get('mia', {}).get('advantage')} against {control.get('advantage')} for "
+                f"the same attack between two halves of the holdout, where nothing was ever in "
+                f"training — leaving {p.get('mia', {}).get('advantage_over_control')} that is "
+                f"about membership rather than about the calendar. "
                 f"{ids.get('either_in_anchor')} of generated rows name an account that exists in "
                 f"the anchor, which is the envelope working as designed and is reported rather "
                 f"than flagged."
@@ -605,12 +647,21 @@ def main() -> int:
     if args.selftest:
         return selftest(args, values, prov)
 
+    skipped: dict[str, str] = {}
     if not args.doc_only:
         selected = anchors(args.anchors)
         if not selected:
             raise SystemExit(f"no real anchor matched {args.anchors or 'any data config'}")
         for cfg in selected:
-            card, _ = run_anchor(cfg, args, values, prov)
+            try:
+                card, _ = run_anchor(cfg, args, values, prov)
+            except loaders.DatasetNotDownloaded as exc:
+                # An anchor nobody has the file for is not a failing anchor and not an absent
+                # one. It gets a row saying which, because "not measured" and "measured and
+                # fine" have to be different words in the table.
+                skipped[cfg["name"]] = str(exc).splitlines()[0]
+                log.warning("%s: skipped — %s", cfg["name"], skipped[cfg["name"]])
+                continue
             paths = card.save(args.out, stem=cfg["name"])
             print(f"\n{cfg['name']}: {card.verdict.upper()} (score {card.score})")
             for reason in card.reasons:
@@ -625,9 +676,11 @@ def main() -> int:
     if not cards:
         log.warning("no scorecards in %s — nothing to write a doc from", args.out)
         return 1
-    missing = [c["name"] for c in anchors([]) if c["name"] not in cards]
+    for cfg in anchors([]):
+        if cfg["name"] not in cards:
+            skipped.setdefault(cfg["name"], "no scorecard in the artefact directory")
     args.doc.parent.mkdir(parents=True, exist_ok=True)
-    args.doc.write_text(fidelity_doc(cards, missing))
+    args.doc.write_text(fidelity_doc(cards, skipped))
     print(f"\ndoc -> {args.doc}")
 
     # The artefacts are written and the doc is rewritten *before* this line. A failing scorecard
