@@ -41,6 +41,12 @@ artifacts/**
 # auditable rather than asserted.
 !artifacts/loao/
 !artifacts/loao/**
+# the fidelity scorecard: three levels, a privacy panel and the verdict, per anchor, plus the
+# record of when the bars were set — read back out of git on every run rather than asserted.
+# `docs/fidelity.md` is generated from these files. Committed for the reason the rest are, and
+# one more: a failing scorecard that lives only in a terminal is a scorecard that gets re-run.
+!artifacts/fidelity/
+!artifacts/fidelity/**
 mlruns/
 # hydra run dirs (no inline comments here: git treats the whole line as the pattern)
 outputs/

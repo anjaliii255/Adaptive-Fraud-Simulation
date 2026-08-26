@@ -28,6 +28,31 @@ EMBED_COLUMNS = (
 )
 
 
+def informative(reference: np.ndarray, tol: float = 1e-12) -> np.ndarray:
+    """Mask of embedding columns that actually vary in the reference set.
+
+    Not a nicety. Three of these seven columns are **exactly constant** on PaySim — `log_gap_s`,
+    `src_out_degree` and `src_uniq_dst` — because `nameOrig` is effectively unique per row and no
+    sender there has a past (see `docs/data-cards/paysim.md`). Standardising by `std + 1e-9` then
+    divides a synthetic row's real sender history by a billionth and reports the result as
+    distance: the first PaySim scorecard put the distance-to-closest-record ratio at 1.0e11 and
+    passed the memorisation check on the strength of it.
+
+    A column with no variance in the reference carries no information about distance from it.
+    Dropping it is the honest arithmetic; the dropped names are reported so nobody reads a
+    distance in seven dimensions that was measured in four.
+    """
+    if reference.size == 0:
+        return np.zeros(reference.shape[1] if reference.ndim > 1 else 0, dtype=bool)
+    return reference.std(0) > tol
+
+
+def dropped_columns(reference: np.ndarray) -> list[str]:
+    """The embedding columns `informative` had to throw away, by name."""
+    mask = informative(reference)
+    return [c for c, keep in zip(EMBED_COLUMNS, mask, strict=False) if not keep]
+
+
 def embedding(txns: list[Transaction]) -> np.ndarray:
     """One row per transaction: amount, timing, pacing, and running graph position."""
     rows = sorted(txns, key=lambda t: t.ts)
@@ -176,7 +201,11 @@ def alpha_precision_beta_recall(
     """
     if real.size == 0 or synth.size == 0:
         return {"alpha_precision": 0.0, "beta_recall": 0.0}
-    mu, sd = real.mean(0), real.std(0) + 1e-9
+    keep = informative(real)
+    if not keep.any():
+        return {"alpha_precision": 0.0, "beta_recall": 0.0, "dropped_columns": list(EMBED_COLUMNS)}
+    real, synth = real[:, keep], synth[:, keep]
+    mu, sd = real.mean(0), real.std(0)
     r, s = (real - mu) / sd, (synth - mu) / sd
 
     r_centre, s_centre = r.mean(0), s.mean(0)
@@ -185,6 +214,8 @@ def alpha_precision_beta_recall(
     return {
         "alpha_precision": float((np.linalg.norm(s - r_centre, axis=1) <= r_radius).mean()),
         "beta_recall": float((np.linalg.norm(r - s_centre, axis=1) <= s_radius).mean()),
+        "dimensions": int(keep.sum()),
+        "dropped_columns": [c for c, k in zip(EMBED_COLUMNS, keep, strict=False) if not k],
     }
 
 
@@ -206,7 +237,10 @@ def report(real: list[Transaction], synth: list[Transaction]) -> dict[str, objec
         "real_motifs": {k: round(v, 4) for k, v in graph_stats(real).items()},
         "synth_motifs": {k: round(v, 4) for k, v in graph_stats(synth).items()},
         "velocity": velocity,
-        "support": {k: round(v, 4) for k, v in support.items()},
+        # the support block carries the dropped-column names alongside its two numbers
+        "support": {
+            k: (round(v, 4) if isinstance(v, int | float) else v) for k, v in support.items()
+        },
         "worst_motif": max(motifs, key=motifs.get) if motifs else None,
         "score": round(1.0 - float(np.mean(distances)), 4),
     }
