@@ -59,6 +59,17 @@ injected episodes from real PaySim rows at PR-AUC 0.933 and 0.985. `config/defen
 stays `enabled: false` and a test refuses to let it be turned on against the committed evidence.
 `artifacts/sequence/`, written up in `docs/sequence.md`.
 
+The **temporal GNN was built, measured against those hand-rolled graph features, and did not earn
+its seat** — so the fallback ticket 18 named up front is what ships. Graph attention over the
+account-beneficiary graph inside an explicit seven-day window, on the two mule families, at three
+seeds with the lift paired across them. On AMLSim it loses by almost the whole scale (PR-AUC 0.023
+against LightGBM's 0.998 on S1) and that fold is *still* withheld, because AMLSim's clock is whole
+days: an injected ring is instantaneous on it, and only 8.2% of its rows can see any earlier edge
+of their own episode, so a causal temporal graph was asked about a shape it cannot see. On PaySim,
+where the clock has the resolution, it is level with what ships and ahead of the graph-blocks-only
+baseline — and those folds are withheld too, because a quarter of the injected rows sit in a
+neighbourhood made only of other injected rows. `artifacts/gnn/`, written up in `docs/gnn.md`.
+
 ## Setup
 
 Needs Python 3.11. **On macOS, install libomp first.** The LightGBM wheel imports cleanly without
@@ -74,9 +85,10 @@ source .venv/bin/activate
 pip install -e '.[dev]'        # or: uv sync --extra dev
 ```
 
-`make sequence` is the only target that needs anything more — torch, via `make setup-deep` (or
-`uv sync --extra dev --extra deep`). Nothing else imports it, `SequenceDetector` raises rather
-than degrading to a stand-in when it is absent, and the default suite stays green without it.
+`make sequence` and `make gnn` are the only targets that need anything more — torch and
+torch-geometric, via `make setup-deep` (or `uv sync --extra dev --extra deep`). Nothing else
+imports them, `SequenceDetector` and `TemporalGNNDetector` raise rather than degrading to a
+stand-in when they are absent, and the default suite stays green without either.
 
 Sanity check before you do anything else:
 
@@ -93,6 +105,7 @@ make decisions   # price the graded action bands and reason codes; commit them
 make anomaly     # score the zero-day layer against the supervised model on the held-out family
 make loao        # the leave-one-attack-out matrix: every family held out in turn, with the guards
 make sequence    # GRU vs LightGBM on the drift arc, sudden and gradual apart (needs setup-deep)
+make gnn         # temporal GNN vs hand-rolled graph features on the mule families (setup-deep)
 make fidelity    # the 3-level scorecard on every real anchor; level 3 is the gate
 make loop        # run the adaptive loop (synthetic default, no download)
 make table       # the three-system table: real-only vs SMOTE vs adaptive, both columns, 3 seeds
@@ -401,6 +414,57 @@ is far better powered here — and at that size it separates injected from real 
 over the bar, where the matrix measured 0.236 and reported the fold. Nothing about the generator
 changed; the episode count did. `docs/sequence.md` names it, and `docs/loao.md`'s AMLSim C1 row
 should be read as underpowered until `make loao` is re-run at this episode count.
+
+## The temporal GNN, and which one shipped
+
+`make gnn` puts graph attention over the account-beneficiary graph against the hand-rolled
+graph features + LightGBM baseline on the mule families — S1 fan-in and layering, C3 instant
+relay — writes `artifacts/gnn/<anchor>.json` and generates `docs/gnn.md` from it. Like `make
+sequence` it needs the `deep` extra (`make setup-deep`), and `TemporalGNNDetector` raises without
+it rather than degrading to a stand-in.
+
+**The window is the design.** Time is cut into daily strides, and a payment is scored against the
+graph of the previous seven days *up to the start of its own stride* — nothing at or after it,
+and nothing older than the window. That is what makes the graph temporal rather than a graph with
+timestamps on it, and it is also the constraint that decides the whole ticket: a model that may
+only read what happened earlier cannot see a ring that has not formed yet.
+
+**Three seeds, and the lift is paired across them.** Each seed regenerates its own pool and
+refits every system, and the margin is reported as a per-seed difference with its spread and a
+sign test — the same `Spread` and `Comparison` the three-system table uses, so the two are read
+at one bar. A margin smaller than its own seed-to-seed spread does not promote anything, and
+neither does one seed.
+
+**It did not earn its seat, and the two anchors refused it for opposite reasons.** On AMLSim it
+loses by almost the whole scale: PR-AUC 0.023 ± 0.038 on S1 against LightGBM's 0.998 and 0.002 ±
+0.002 on C3 against 0.984, 0/3 seeds in its favour — but that fold is withheld rather than
+counted, because AMLSim's rows are whole **days**. An injected mule ring is instantaneous on that
+clock, and only **8.2%** of its rows (0.6% for C3) can see any earlier edge of their own episode,
+against a floor of 20%. The model was asked about a shape it structurally cannot see. On PaySim,
+whose clock is hourly and where 86% of injected rows can watch their own ring form, it is level
+with what ships — −0.023 ± 0.229 on S1 (1/3 seeds) and +0.024 ± 0.343 on C3 (2/3), both inside
+their own spread — and ahead of the graph-blocks-only baseline by +0.079 and +0.139. It costs
+more either way: 47s to fit against LightGBM's 30s on AMLSim, 38s against 15s on PaySim.
+
+**All four folds are withheld, and on PaySim the audit that catches them was built for this
+model.** A row's *neighbourhood provenance* — what share of its endpoints' in-window neighbours
+are injected rows — sorts injected S1 and C3 from real PaySim traffic at PR-AUC 0.53 and 0.54,
+because a quarter to a third of the injected rows sit in a neighbourhood made only of other
+injected rows. PaySim accounts appear roughly once, so a staged ring there is its own synthetic
+island, and message passing over an island returns "synthetic" before it returns anything about
+topology. The ordinary provenance probe agrees on S1 at 0.865.
+
+**So the hand-rolled graph features are what ship**, which is the fallback ticket 18 named before
+the experiment ran rather than after it. `config/defend/gnn.yaml` stays `enabled: false`,
+`assert_config_matches_promotion` refuses to let it be turned on while the committed artefacts say
+no, and a test checks both that config and this sentence against `artifacts/gnn/`.
+
+One more thing fell out of it, and it revises a row we already published — the same way `make
+sequence` did. These folds carry 173 injected PaySim S1 rows where the leave-one-attack-out matrix
+carries 50, and at that size the provenance probe separates injected from real at 0.865 where the
+matrix measured 0.298 and reported the fold. Nothing about the generator changed; the episode
+count did. `docs/gnn.md` names it, and `docs/loao.md`'s PaySim S1 row should be read as
+underpowered until `make loao` is re-run at this episode count.
 
 ## Fidelity, and the level that decides it
 
