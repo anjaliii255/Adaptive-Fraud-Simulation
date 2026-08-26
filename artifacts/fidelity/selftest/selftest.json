@@ -1,0 +1,46 @@
+{
+  "cases": {
+    "copy": {
+      "verdict": "fail",
+      "score": 0.6983,
+      "level1": 1.0,
+      "level2": 0.9916,
+      "level3": 0.75,
+      "privacy": 0.0,
+      "reasons": [
+        "synthetic rows sit closer to training rows than training rows do to each other",
+        "exact duplicates of training rows present",
+        "membership is inferable from the synthetic data alone"
+      ]
+    },
+    "shuffled": {
+      "verdict": "pass",
+      "score": 0.427,
+      "level1": 0.9897,
+      "level2": 0.8761,
+      "level3": 0.427,
+      "privacy": 0.8552,
+      "reasons": []
+    },
+    "noise": {
+      "verdict": "fail",
+      "score": 0.25,
+      "level1": 0.8166,
+      "level2": 0.3092,
+      "level3": 0.25,
+      "privacy": 0.6593,
+      "reasons": [
+        "TSTR gap 0.724376 exceeds the bar 0.15",
+        "TSTR PR-AUC 0.275624 loses to the amount floor 0.318554 \u2014 training on this data is worse than sorting the test window by amount",
+        "membership is inferable from the synthetic data alone",
+        "level 2 score 0.3092 below 0.6 (worst: pass_through_share)"
+      ]
+    }
+  },
+  "checks": {
+    "copy scores above noise": true,
+    "shuffled scores above noise": true,
+    "shuffled loses more structure than marginals": true,
+    "copying is flagged by privacy": true
+  }
+}
