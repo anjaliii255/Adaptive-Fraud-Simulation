@@ -47,6 +47,14 @@ artifacts/**
 # one more: a failing scorecard that lives only in a terminal is a scorecard that gets re-run.
 !artifacts/fidelity/
 !artifacts/fidelity/**
+# the sequence-model comparison: a GRU against LightGBM on the drift arc, with the sudden and
+# gradual ends of that arc reported apart, the compute cost next to the lift, and the three
+# audits that decide whether the fold means anything — including the one specific to this model,
+# whether window length alone sorts the injected rows from the anchor's own. `docs/sequence.md`
+# is generated from these files, and the gate's verdict lives here rather than in a branch
+# somebody deleted: "it didn't help" is a published result or it is nothing.
+!artifacts/sequence/
+!artifacts/sequence/**
 # the hero table: three systems on one guarded fold, over several seeds, in both columns, with
 # the per-seed numbers the spread is computed from and the loop's per-round history. It is the
 # one artefact the deck quotes, `docs/three_system.md` is generated from it, and a slide number

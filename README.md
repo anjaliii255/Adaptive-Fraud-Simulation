@@ -49,6 +49,16 @@ generator's fingerprint, so it is withheld. On the column that is measurable, th
 are within the seed-to-seed spread of each other. `artifacts/three_system/`, written up in
 `docs/three_system.md`.
 
+The **sequence model was built, measured against LightGBM, and did not earn its seat.** A GRU over
+per-entity history on the drift arc — S3 takeover and C1 bust-out, each generated at both ends of
+the `ramp` axis so sudden and gradual drift are reported apart. On the anchor whose accounts have
+real pasts it loses on merit: PR-AUC 0.391 against LightGBM's 0.997 on gradual S3, 0.300 against
+0.998 on gradual C1, at a *lower* compute cost than the baseline. On the anchor with no per-entity
+history it wins — and the win is what disqualifies it, because window length alone sorts the
+injected episodes from real PaySim rows at PR-AUC 0.933 and 0.985. `config/defend/sequence.yaml`
+stays `enabled: false` and a test refuses to let it be turned on against the committed evidence.
+`artifacts/sequence/`, written up in `docs/sequence.md`.
+
 ## Setup
 
 Needs Python 3.11. **On macOS, install libomp first.** The LightGBM wheel imports cleanly without
@@ -64,6 +74,10 @@ source .venv/bin/activate
 pip install -e '.[dev]'        # or: uv sync --extra dev
 ```
 
+`make sequence` is the only target that needs anything more — torch, via `make setup-deep` (or
+`uv sync --extra dev --extra deep`). Nothing else imports it, `SequenceDetector` raises rather
+than degrading to a stand-in when it is absent, and the default suite stays green without it.
+
 Sanity check before you do anything else:
 
 ```bash
@@ -78,6 +92,7 @@ make baseline    # tune the detector on every anchor; commit the reference numbe
 make decisions   # price the graded action bands and reason codes; commit them
 make anomaly     # score the zero-day layer against the supervised model on the held-out family
 make loao        # the leave-one-attack-out matrix: every family held out in turn, with the guards
+make sequence    # GRU vs LightGBM on the drift arc, sudden and gradual apart (needs setup-deep)
 make fidelity    # the 3-level scorecard on every real anchor; level 3 is the gate
 make loop        # run the adaptive loop (synthetic default, no download)
 make table       # the three-system table: real-only vs SMOTE vs adaptive, both columns, 3 seeds
@@ -344,6 +359,49 @@ So every fold lands on one of three outcomes, and only the first carries a claim
 The amount floor rides along on every fold — rank by amount, no model, direction chosen on the
 training window. Two earlier results in this repo were walked back for want of that column.
 
+## The sequence model, and the seat it did not earn
+
+`make sequence` puts a GRU over per-entity history against the tuned LightGBM baseline on the
+drift arc, writes `artifacts/sequence/<anchor>.json` and generates `docs/sequence.md` from it.
+It needs the `deep` extra (`make setup-deep`); nothing else in the repo does, and the default
+suite stays green without it.
+
+**The axis is the experiment.** `ramp` is the drift engine's shape knob: 0 is a hard switch at the
+takeover event, 1 is escalation spread across the whole tail. Sudden takeover is an *event* — the
+amount jumps, the beneficiary is new, the device changes — and a per-row feature table sees all
+three on the row itself. Gradual drift has no event to anchor on, and that is where per-row
+features are supposed to run out. So each family is generated twice, at both ends of its own
+declared search space with nothing else changed, and the two ends are reported separately against
+the same haystack at the same threshold. The gate is decided on the gradual end only: a win on
+sudden drift is a win at the easy end and does not promote anything.
+
+**It lost, and the two anchors lost it differently.** On AMLSim, whose accounts carry 28 steps of
+real history apiece, the sequence model reaches PR-AUC 0.391 on gradual S3 against LightGBM's
+0.997, and 0.300 against 0.998 on gradual C1 — while fitting in 21s against LightGBM's 32s and
+scoring at twice the rate. It is not an expensive model that bought a small lift; it is a cheap
+model that lost. On PaySim it wins C1 by 0.987 to 0.773 — and PaySim's `nameOrig` is effectively
+unique per row, so a real window there is **one step long** while the injected episodes carry
+eight or nine. Window length alone sorts the two at PR-AUC 0.985. The win is the fold's shape, not
+the model's skill, and the audit built for exactly this model is what catches it.
+
+**None of those four numbers is quotable, and the refusal is the point.** All four folds are
+withheld — two on the provenance probe, two on the history audit this ticket added — so the
+comparison is printed in brackets in `docs/sequence.md` and quoted nowhere. What stands is the
+decision, not the margin: a layer nothing could measure honestly is a layer that does not enter
+the reported table, which is the same answer a measured loss would have given.
+
+**Enabling it is not a preference.** `assert_config_matches_promotion` refuses
+`defend.sequence.enabled: true` while a committed artefact says the gate said no, and a test runs
+it against what is on disk. The claim "it only ships if it wins" is enforced rather than
+remembered.
+
+One more thing fell out of it, and it revises a row we already published. These folds carry 550
+injected AMLSim C1 rows where the leave-one-attack-out matrix carries 80, so the provenance probe
+is far better powered here — and at that size it separates injected from real at PR-AUC 0.688,
+over the bar, where the matrix measured 0.236 and reported the fold. Nothing about the generator
+changed; the episode count did. `docs/sequence.md` names it, and `docs/loao.md`'s AMLSim C1 row
+should be read as underpowered until `make loao` is re-run at this episode count.
+
 ## Fidelity, and the level that decides it
 
 `make fidelity` scores the generator against each real anchor on three levels plus a privacy
@@ -469,7 +527,8 @@ afl/evaluation   out-of-time split, leave-one-attack-out, three-system table    
 serve            FastAPI + Streamlit demo
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
-                 build_anomaly, build_fidelity, build_loao, build_three_system, make_figures
+                 build_anomaly, build_sequence, build_fidelity, build_loao, build_three_system,
+                 make_figures
 ```
 
 ## How it's scored
@@ -614,5 +673,10 @@ Synthetic-only data lowers exposure but does not automatically mean DPDP complia
 
 Frontier vectors are demonstrated capabilities, not necessarily mass-exploited attack patterns,
 and we label them that way.
+
+The sequence model's negative result is about *this* GRU, on *these* two anchors, at one seed and
+one set of hyperparameters — not about sequence models. What would change the answer is an anchor
+with real per-entity histories on both sides of the label, which is the precondition
+`docs/sequence.md`'s history audit measures and the one PaySim does not meet.
 
 Saying this plainly is deliberate.
