@@ -10,6 +10,7 @@ defaults:
   - defend@defend.supervised: lgbm
   - defend@defend.unsupervised: anomaly
   - eval: leave_one_attack_out
+  - fidelity: thresholds
   - experiment: adaptive
 
 seed: 1337
@@ -20,14 +21,10 @@ artifact_dir: artifacts
 # depends on a tracking server being up.
 tracker: auto
 
-fidelity:
-  enabled: true
-  level1_min: 0.70
-  level2_min: 0.60
-  max_tstr_gap: 0.15
-  min_recall_lift: 0.0
-  min_dcr_ratio: 0.80
-  max_mia_advantage: 0.20
+# The fidelity bars used to sit here as six bare numbers. They live in
+# `config/fidelity/thresholds.yaml` now — one bar, one stated reason, one origin commit that
+# `afl/fidelity/provenance.py` reads back out of git on every run. Composed in above, so the
+# loop's scorecard and `make fidelity` are judged against the same file.
 
 hydra:
   run:

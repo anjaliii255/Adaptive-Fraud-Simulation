@@ -349,8 +349,8 @@ def run_fold(
             else (
                 f"{held_out} is a `{spec.status}` vector: it emits schema-valid traffic of the "
                 f"right shape, but its defining tell is not modelled yet — "
-                f"{' '.join(spec.gap.split()).rstrip('.')}. The number below measures the "
-                "pipeline, not the family"
+                f"{' '.join(spec.gap.split()).rstrip('.')}. The number in this row measures "
+                "the pipeline, not the family"
             )
         ),
     )
@@ -476,7 +476,7 @@ def _wrap(text: str, indent: str = "") -> str:
     )
 
 
-def _fold_row(fold: loao.FoldResult) -> str:
+def _fold_row(fold: loao.FoldResult, own_fraud: float | None = None) -> str:
     """One line of the matrix.
 
     A withheld fold still shows its numbers, in brackets, next to the reason they are withheld.
@@ -502,11 +502,19 @@ def _fold_row(fold: loao.FoldResult) -> str:
         return value if fold.reported else f"_({value})_"
 
     floor = float((fold.floor or {}).get("pr_auc", 0.0))
-    note = fold.reason or (
-        f"clears the amount floor ({floor:.3f})"
-        if m.pr_auc > floor
-        else f"**loses to the amount floor ({floor:.3f})**"
-    )
+    if fold.reason:
+        note = fold.reason
+    elif m.pr_auc <= floor:
+        note = f"**loses to the amount floor ({floor:.3f})** — it has not detected anything"
+    elif own_fraud is not None and m.pr_auc > own_fraud:
+        # ticket 10's reading: an unseen family that is easier than the seen one is a statement
+        # about the injected rows, not a generalisation result
+        note = (
+            f"clears the floor ({floor:.3f}), but **beats this anchor's own fraud "
+            f"({own_fraud:.3f})** — easier unseen than seen"
+        )
+    else:
+        note = f"clears the floor ({floor:.3f}); the anchor's own fraud scores {own_fraud:.3f}"
     return (
         f"| {label} | {'measured' if fold.reported else '**' + fold.outcome + '**'} | "
         f"{cell(f'{m.pr_auc:.3f}')} | {cell(f'{m.recall_at_fixed_fpr:.3f}')} | "
@@ -517,7 +525,8 @@ def _fold_row(fold: loao.FoldResult) -> str:
 
 def _anchor_section(report: loao.LeaveOneAttackOutReport) -> str:
     nl = chr(10)
-    rows = nl.join(_fold_row(f) for f in report.folds)
+    own_fraud = (report.data.get("supervised_reference") or {}).get("pr_auc")
+    rows = nl.join(_fold_row(f, own_fraud) for f in report.folds)
     head = report.headline
     guards = (head.guards if head else {}) or {}
     family, embargo, haystack = (
@@ -620,6 +629,52 @@ The headline fold trains on {counts.get("train_rows", 0):,} rows \
 {ref_line}{guard_block}{sep_line}{probe_line}"""
 
 
+def _anchor_readings(reports: dict[str, loao.LeaveOneAttackOutReport]) -> str:
+    """What the measured rows say once each is put next to its anchor's own labelled fraud.
+
+    A fold's PR-AUC on its own is not a claim. Ticket 08 established that a near-perfect number
+    on AMLSim says the simulator is legible; ticket 10 established that an unseen family the
+    detector finds *easier* than the seen one is a statement about the injected rows. Both
+    readings are arithmetic over numbers this artefact already carries, so the document does the
+    arithmetic rather than leaving it to a reader who may not know to.
+    """
+    lines: list[str] = []
+    for report in reports.values():
+        measured = [f for f in report.measured if f.metrics]
+        if not measured:
+            lines.append(
+                _wrap(
+                    f"- **{report.dataset}** — no fold carries a quotable number.", indent="  "
+                ).lstrip()
+            )
+            continue
+        ref = report.data.get("supervised_reference") or {}
+        own = float(ref.get("pr_auc", 0.0))
+        own_floor = float(ref.get("amount_floor_pr_auc", 0.0))
+        scores = ", ".join(f"`{f.held_out_vector}` {f.metrics.pr_auc:.3f}" for f in measured)
+        if own >= 0.99:
+            reading = (
+                f"The same detector scores {own:.3f} on {report.dataset}'s own labelled fraud in "
+                f"the same window, where sorting by amount alone already reaches {own_floor:.3f}. "
+                "A near-perfect fold on an anchor like that says the generator is legible, not "
+                "that anything generalised."
+            )
+        elif all(f.metrics.pr_auc > own for f in measured):
+            subject = "It sits" if len(measured) == 1 else "Every one of them sits"
+            reading = (
+                f"{subject} above {report.dataset}'s own labelled fraud ({own:.3f}) in the same "
+                "window. An unseen family the detector finds *easier* than the ones it trains on "
+                "is a statement about the injected rows."
+            )
+        else:
+            reading = (
+                f"Against {own:.3f} on {report.dataset}'s own labelled fraud in the same window "
+                f"and a {own_floor:.3f} amount floor on it."
+            )
+        lines.append(_wrap(f"- **{report.dataset}** — {scores}. {reading}", indent="  ").lstrip())
+    return "**What the measured rows say next to their anchor's own fraud.**\n\n" + "\n".join(lines)
+
+
 def loao_doc(reports: dict[str, loao.LeaveOneAttackOutReport], missing: list[str]) -> str:
     """The matrix, generated from the artefacts that produced it."""
     nl = chr(10)
@@ -647,6 +702,7 @@ def loao_doc(reports: dict[str, loao.LeaveOneAttackOutReport], missing: list[str
     )
     n_measured = sum(len(r.measured) for r in reports.values())
     n_folds = sum(len(r.folds) for r in reports.values())
+    survivors = _anchor_readings(reports)
     verdict = _wrap(
         f"**{n_measured} of {n_folds} folds across {len(reports)} anchor(s) carry a quotable "
         "number.** Read a fold's provenance probe before quoting its recall: the two are the "
@@ -721,6 +777,8 @@ the first carries a claim:
 - **skipped** — the fold never ran, and the reason sits in the cell where the number would be.
 
 {verdict}
+
+{survivors}
 
 ## The matrix
 

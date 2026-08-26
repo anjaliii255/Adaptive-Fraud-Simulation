@@ -1,0 +1,93 @@
+# The fidelity bars. Set before any result exists — that is the whole point of the file.
+#
+# A threshold moved after seeing the number it judges is not a threshold, it is a caption. So
+# every bar below carries three things: the value, the reason it is that value, and the commit
+# it was first committed in. `afl/fidelity/provenance.py` checks the third one **mechanically**
+# on every run — it reads the origin commit out of git, compares the value that was committed
+# there against the value being applied now, and writes the comparison into the artefact. Edit a
+# number here and the scorecard says so, in the artefact and in `docs/fidelity.md`, next to the
+# verdict that number produced.
+#
+# Same division as `config/costs/default.yaml`: a bar with a blank `why` is refused at load,
+# because a number nobody can justify is a number somebody tuned.
+
+# The six numeric bars were committed on day one, in the skeleton, before there was a generator
+# to judge — `git log -S max_tstr_gap -- config/config.yaml` returns exactly one commit.
+origin_commit: 6989a9ef98485428b8ece5833774da7ffa860ed4
+origin_file: config/config.yaml   # where they were committed before this file existed
+origin_block: fidelity            # the mapping key to read them out of, in that commit
+
+enabled: true
+
+# ── what "train on synthetic" means, written down before the run ─────────────────
+# A definition chosen after seeing two numbers is a result. This generator injects attacks into
+# a real anchor's traffic; it does not claim to synthesise a payment system. So the gate trains
+# on the anchor's real legit rows plus the generated fraud and never sees a real fraud label —
+# the same system the transfer test called `synthetic` in commit de254c0, so the two are one
+# question rather than two wearing one name. The literature's stricter reading, training on the
+# generator's whole standalone output, is reported beside it and never gates: failing a test of
+# something the generator does not claim says nothing about the generator.
+tstr_definition:
+  gate: real legit + generated fraud, no real fraud label, tested on the real test window
+  also_reported: the generator's whole standalone output, background included
+  why: >
+    Fixed before the first anchored run so the gate cannot be swapped for whichever of the two
+    numbers reads better afterwards.
+
+# ── level 1: do the marginals and the joints match? ──────────────────────────────
+level1_min:
+  value: 0.70
+  why: >
+    Diagnostic, not a gate. 1 - mean distance over KS, Wasserstein, TV, correlation delta and
+    MI delta; 0.70 is "most marginals within a third of the real spread". A generator can pass
+    this with the joins shuffled out, which is exactly why passing it decides nothing.
+
+# ── level 2: is the structure and the pacing right? ──────────────────────────────
+level2_min:
+  value: 0.60
+  why: >
+    Diagnostic, not a gate. Lower than level 1 on purpose: motif shares and burstiness are
+    noisier than marginals at these sample sizes, and a structural miss is informative rather
+    than disqualifying — it is the sentence that explains a level 3 failure.
+
+# ── level 3: does training on it teach a detector anything? THE GATE ─────────────
+max_tstr_gap:
+  value: 0.15
+  why: >
+    Train-synthetic-test-real against train-real-test-real, same real test window both times.
+    0.15 PR-AUC is roughly the distance between the tuned PaySim detector and its own untuned
+    control, so a generator inside it is worth as much as a tuning run. Beyond it, a model
+    trained on this data is materially worse than one trained on the real thing.
+
+min_recall_lift:
+  value: 0.0
+  why: >
+    Adding the synthetic rows to a real training set must not *lower* held-out recall at the
+    fixed operating point. Zero is the honest bar: the claim this project exists to test is
+    that adaptive synthetic traffic helps, and anything at or below zero falsifies it. A
+    positive bar here would be picking the margin after seeing the margin.
+
+require_tstr_beats_amount_floor:
+  value: true
+  since: ticket-15                # introduced with this harness, before it was ever run
+  why: >
+    Rank the real test window by amount — no model, no features, no training, direction chosen
+    on the training window — and a TSTR score below that line has not learned fraud, it has
+    learned nothing at all. Two results in this repo were walked back for want of this column
+    (the transfer test and the BankSim spike), so it is a gate here rather than a footnote.
+
+# ── privacy: evidence, never proof ───────────────────────────────────────────────
+min_dcr_ratio:
+  value: 0.80
+  why: >
+    Median distance from a synthetic row to its closest training row, over the median distance
+    between training rows themselves. At 1.0 the synthetic rows sit no closer to the training
+    data than it sits to itself; below 0.80 they are hugging real records, which is memorisation
+    wearing a distribution's clothes.
+
+max_mia_advantage:
+  value: 0.20
+  why: >
+    2 * |AUC - 0.5| for a nearest-neighbour membership attack that sees only the synthetic data.
+    0.20 is an attacker doing 20% better than a coin flip at telling a training row from a
+    held-out one. Above it, the synthetic data leaks who was in the training set.

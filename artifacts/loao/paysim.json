@@ -1,0 +1,1365 @@
+{
+  "version": 1,
+  "dataset": "paysim",
+  "seed": 1337,
+  "config": {
+    "held_out_vector": "M3",
+    "fixed_fpr": 0.01,
+    "k": 100,
+    "train_frac": 0.7,
+    "embargo_days": 1.0,
+    "holdout_episodes": 12,
+    "folds": "auto",
+    "min_meaningful_positives": 30,
+    "sweep_all_vectors": false,
+    "source": "config/eval/leave_one_attack_out.yaml",
+    "folds_requested": [
+      "C1",
+      "C2",
+      "C3",
+      "M1",
+      "M2",
+      "M3",
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "sample_fraction": 0.1,
+    "seed": 1337
+  },
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100,
+    "source": "config/eval/leave_one_attack_out.yaml",
+    "min_meaningful_positives": 30,
+    "band_units": "calibrated probability"
+  },
+  "split": {
+    "version": 1,
+    "dataset": "paysim",
+    "digest": "6ea0b94c1c8d3d3a",
+    "train_end": "2023-01-14T11:00:00",
+    "test_start": "2023-01-15T12:00:00",
+    "embargo_seconds": 90000,
+    "embargo_rationale": "Velocity features look back up to 24h. A 24-step embargo stops a test row's features being computed over train-side rows, and stops a fraud ring straddling the boundary.",
+    "train_frac": 0.7,
+    "time_unit": "hours",
+    "epoch": "2023-01-01T00:00:00",
+    "train_end_step": 323,
+    "test_start_step": 348,
+    "stats": {
+      "full": {
+        "rows": 6362620,
+        "row_share": 1.0,
+        "fraud": 8213,
+        "base_rate": 0.00129082
+      },
+      "span": {
+        "start": "2023-01-01T01:00:00",
+        "end": "2023-01-31T23:00:00",
+        "first_step": 1,
+        "last_step": 743
+      },
+      "partition": {
+        "train": {
+          "rows": 4463587,
+          "row_share": 0.7015,
+          "fraud": 3643,
+          "base_rate": 0.00081616
+        },
+        "test": {
+          "rows": 1505969,
+          "row_share": 0.2367,
+          "fraud": 4352,
+          "base_rate": 0.00288983
+        },
+        "embargoed": {
+          "rows": 393064,
+          "row_share": 0.0618,
+          "fraud": 218,
+          "base_rate": 0.00055462
+        }
+      },
+      "sample": {
+        "fraction": 0.1,
+        "sampled_by": "nameDest",
+        "rows": 636409,
+        "fraud": 803,
+        "base_rate": 0.00126177,
+        "base_rate_full": 0.00129082,
+        "base_rate_drift_relative": -0.0225
+      },
+      "integrity": {
+        "non_positive_amounts": 16,
+        "non_positive_amount_share": 2.515e-06,
+        "self_transfers": 0,
+        "self_transfer_share": 0.0
+      },
+      "synthetic_base_rate": 0.040313,
+      "synthetic_base_rate_data_config": 0.014097,
+      "base_rate_ratio_vs_synthetic": 0.032
+    }
+  },
+  "data": {
+    "config": "config/data/paysim.yaml",
+    "supervised_reference": {
+      "source": "artifacts/detector/paysim.json",
+      "measured_on": "this anchor's OWN labelled fraud, out of time at the same boundary",
+      "pr_auc": 0.151741,
+      "recall_at_fixed_fpr": 0.478049,
+      "precision_at_k": 0.48,
+      "n_positives": 410,
+      "amount_floor_pr_auc": 0.057261
+    },
+    "real": {
+      "rows": 636409,
+      "fraud": 803,
+      "base_rate": 0.00126177,
+      "first_ts": "2023-01-01 01:00:00",
+      "last_ts": "2023-01-31 23:00:00"
+    },
+    "pools": {
+      "C1": {
+        "rows": 637114,
+        "fraud": 1508,
+        "base_rate": 0.00236692,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "C2": {
+        "rows": 637065,
+        "fraud": 1459,
+        "base_rate": 0.00229019,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "C3": {
+        "rows": 637072,
+        "fraud": 1466,
+        "base_rate": 0.00230115,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "M1": {
+        "rows": 637149,
+        "fraud": 1543,
+        "base_rate": 0.00242173,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "M2": {
+        "rows": 637100,
+        "fraud": 1494,
+        "base_rate": 0.002345,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "M3": {
+        "rows": 637219,
+        "fraud": 1613,
+        "base_rate": 0.00253131,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "S1": {
+        "rows": 637114,
+        "fraud": 1508,
+        "base_rate": 0.00236692,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "S2": {
+        "rows": 637324,
+        "fraud": 1718,
+        "base_rate": 0.00269565,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      },
+      "S3": {
+        "rows": 637128,
+        "fraud": 1522,
+        "base_rate": 0.00238884,
+        "first_ts": "2023-01-01 01:00:00",
+        "last_ts": "2023-01-31 23:00:00"
+      }
+    },
+    "fit_seconds": {
+      "C1": 37.29,
+      "C2": 38.89,
+      "C3": 34.66,
+      "M1": 38.98,
+      "M2": 43.09,
+      "M3": 47.75,
+      "S1": 48.04,
+      "S2": 46.82,
+      "S3": 35.89
+    }
+  },
+  "folds": [
+    {
+      "held_out_vector": "C1",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected C1 rows from this anchor's own traffic at PR-AUC 0.906, against 0.604 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.604293,
+        "recall_at_fixed_fpr": 0.991667,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.54,
+        "held_out_vector": "C1",
+        "k": 100,
+        "n_positives": 120
+      },
+      "operational": {
+        "evasion_rate": 0.008333,
+        "caught_rate": 0.991667,
+        "false_decline_rate": 0.002428,
+        "friction_rate": 0.075521,
+        "amount_evaded": 17405.62
+      },
+      "floor": {
+        "pr_auc": 0.037001,
+        "recall_at_fixed_fpr": 0.225,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.06,
+        "k": 100,
+        "n_positives": 120,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446354,
+        "train_fraud": 509,
+        "holdout_rows": 150476,
+        "holdout_positives": 120,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00079747,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "C1",
+          "rows_checked": 1338553,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0043,
+          "hour_of_day": 0.0005,
+          "rail": 0.0002,
+          "sender_in_anchor": 0.0002,
+          "payee_in_anchor": 0.0002,
+          "payee_popularity": 0.0002,
+          "has_device": 0.0002
+        },
+        "worst": "log_amount",
+        "score": 0.0043,
+        "base_rate": 0.0002,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.905901,
+        "base_rate": 0.00079747,
+        "n_rows": 150476,
+        "n_injected": 120,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": true
+      }
+    },
+    {
+      "held_out_vector": "C2",
+      "outcome": "withheld",
+      "reason": "21 positives against a floor of 30 \u2014 recall moves 4.8% per row here, so this is reported as missing rather than as a low score",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.05983,
+        "recall_at_fixed_fpr": 1.0,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.07,
+        "held_out_vector": "C2",
+        "k": 100,
+        "n_positives": 21
+      },
+      "operational": {
+        "evasion_rate": 0.047619,
+        "caught_rate": 0.952381,
+        "false_decline_rate": 0.001443,
+        "friction_rate": 0.07026,
+        "amount_evaded": 9369.27
+      },
+      "floor": {
+        "pr_auc": 0.00769,
+        "recall_at_fixed_fpr": 0.142857,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.01,
+        "k": 100,
+        "n_positives": 21,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446348,
+        "train_fraud": 503,
+        "holdout_rows": 150377,
+        "holdout_positives": 21,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00013965,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "C2",
+          "rows_checked": 1338541,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0024,
+          "hour_of_day": 0.0005,
+          "rail": 0.0001,
+          "sender_in_anchor": 0.0001,
+          "payee_in_anchor": 0.0001,
+          "payee_popularity": 0.0002,
+          "has_device": 0.0001
+        },
+        "worst": "log_amount",
+        "score": 0.0024,
+        "base_rate": 0.0001,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.002317,
+        "base_rate": 0.00013965,
+        "n_rows": 150377,
+        "n_injected": 21,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": false
+      }
+    },
+    {
+      "held_out_vector": "C3",
+      "outcome": "withheld",
+      "reason": "20 positives against a floor of 30 \u2014 recall moves 5.0% per row here, so this is reported as missing rather than as a low score",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.005849,
+        "recall_at_fixed_fpr": 0.6,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.0,
+        "held_out_vector": "C3",
+        "k": 100,
+        "n_positives": 20
+      },
+      "operational": {
+        "evasion_rate": 0.65,
+        "caught_rate": 0.35,
+        "false_decline_rate": 0.001935,
+        "friction_rate": 0.073073,
+        "amount_evaded": 859529.77
+      },
+      "floor": {
+        "pr_auc": 0.000131,
+        "recall_at_fixed_fpr": 0.0,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.0,
+        "k": 100,
+        "n_positives": 20,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446350,
+        "train_fraud": 505,
+        "holdout_rows": 150376,
+        "holdout_positives": 20,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.000133,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "C3",
+          "rows_checked": 1338545,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0001,
+          "hour_of_day": 0.0004,
+          "rail": 0.0001,
+          "sender_in_anchor": 0.0001,
+          "payee_in_anchor": 0.0001,
+          "payee_popularity": 0.0026,
+          "has_device": 0.0001
+        },
+        "worst": "payee_popularity",
+        "score": 0.0026,
+        "base_rate": 0.0001,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.002912,
+        "base_rate": 0.000133,
+        "n_rows": 150376,
+        "n_injected": 20,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": false
+      }
+    },
+    {
+      "held_out_vector": "M1",
+      "outcome": "withheld",
+      "reason": "M1 is a `template` vector: it emits schema-valid traffic of the right shape, but its defining tell is not modelled yet \u2014 Today it paces under a *static* reporting ceiling. The vector the architecture argues for paces under the detector's own learned boundary; that trajectory is the optimiser's search, surfaced as an artefact in ticket 13. The number in this row measures the pipeline, not the family",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.155081,
+        "recall_at_fixed_fpr": 0.977778,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.09,
+        "held_out_vector": "M1",
+        "k": 100,
+        "n_positives": 90
+      },
+      "operational": {
+        "evasion_rate": 0.155556,
+        "caught_rate": 0.844444,
+        "false_decline_rate": 0.001357,
+        "friction_rate": 0.052648,
+        "amount_evaded": 131214.06
+      },
+      "floor": {
+        "pr_auc": 0.000398,
+        "recall_at_fixed_fpr": 0.0,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.0,
+        "k": 100,
+        "n_positives": 90,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446346,
+        "train_fraud": 501,
+        "holdout_rows": 150446,
+        "holdout_positives": 90,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00059822,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "M1",
+          "rows_checked": 1338537,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0008,
+          "hour_of_day": 0.0015,
+          "rail": 0.0003,
+          "sender_in_anchor": 0.0003,
+          "payee_in_anchor": 0.0003,
+          "payee_popularity": 0.0003,
+          "has_device": 0.0003
+        },
+        "worst": "hour_of_day",
+        "score": 0.0015,
+        "base_rate": 0.0003,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.944762,
+        "base_rate": 0.00059822,
+        "n_rows": 150446,
+        "n_injected": 90,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": true
+      }
+    },
+    {
+      "held_out_vector": "M2",
+      "outcome": "withheld",
+      "reason": "`sender_in_anchor` alone separates the injected M2 rows from the anchor at PR-AUC 1.000 \u2014 this fold measures provenance, not detection, and every number in it inherits that",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.679578,
+        "recall_at_fixed_fpr": 0.909091,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.55,
+        "held_out_vector": "M2",
+        "k": 100,
+        "n_positives": 88
+      },
+      "operational": {
+        "evasion_rate": 0.068182,
+        "caught_rate": 0.931818,
+        "false_decline_rate": 0.002321,
+        "friction_rate": 0.05465,
+        "amount_evaded": 1829331.33
+      },
+      "floor": {
+        "pr_auc": 0.084743,
+        "recall_at_fixed_fpr": 0.25,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.08,
+        "k": 100,
+        "n_positives": 88,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446368,
+        "train_fraud": 523,
+        "holdout_rows": 150444,
+        "holdout_positives": 88,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00058494,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "M2",
+          "rows_checked": 1338581,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0157,
+          "hour_of_day": 0.0008,
+          "rail": 0.0002,
+          "sender_in_anchor": 1.0,
+          "payee_in_anchor": 0.0002,
+          "payee_popularity": 0.0002,
+          "has_device": 0.0002
+        },
+        "worst": "sender_in_anchor",
+        "score": 1.0,
+        "base_rate": 0.0002,
+        "trivially_separable": true
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.883993,
+        "base_rate": 0.00058494,
+        "n_rows": 150444,
+        "n_injected": 88,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": true
+      }
+    },
+    {
+      "held_out_vector": "M3",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected M3 rows from this anchor's own traffic at PR-AUC 0.970, against 0.893 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.893187,
+        "recall_at_fixed_fpr": 0.966667,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 1.0,
+        "held_out_vector": "M3",
+        "k": 100,
+        "n_positives": 300
+      },
+      "operational": {
+        "evasion_rate": 0.033333,
+        "caught_rate": 0.966667,
+        "false_decline_rate": 0.002321,
+        "friction_rate": 0.054657,
+        "amount_evaded": 1038456.23
+      },
+      "floor": {
+        "pr_auc": 0.003277,
+        "recall_at_fixed_fpr": 0.05,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.01,
+        "k": 100,
+        "n_positives": 300,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446368,
+        "train_fraud": 523,
+        "holdout_rows": 150656,
+        "holdout_positives": 300,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00199129,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "M3",
+          "rows_checked": 1338581,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0008,
+          "hour_of_day": 0.0031,
+          "rail": 0.0005,
+          "sender_in_anchor": 0.0005,
+          "payee_in_anchor": 0.0005,
+          "payee_popularity": 0.0006,
+          "has_device": 0.0005
+        },
+        "worst": "hour_of_day",
+        "score": 0.0031,
+        "base_rate": 0.0005,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.970149,
+        "base_rate": 0.00199129,
+        "n_rows": 150656,
+        "n_injected": 300,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": true
+      }
+    },
+    {
+      "held_out_vector": "S1",
+      "outcome": "measured",
+      "reason": "",
+      "metrics": {
+        "pr_auc": 0.274878,
+        "recall_at_fixed_fpr": 0.86,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.15,
+        "held_out_vector": "S1",
+        "k": 100,
+        "n_positives": 50
+      },
+      "withheld_metrics": null,
+      "operational": {
+        "evasion_rate": 0.26,
+        "caught_rate": 0.74,
+        "false_decline_rate": 0.000978,
+        "friction_rate": 0.047713,
+        "amount_evaded": 751120.51
+      },
+      "floor": {
+        "pr_auc": 0.000677,
+        "recall_at_fixed_fpr": 0.0,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.0,
+        "k": 100,
+        "n_positives": 50,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446338,
+        "train_fraud": 493,
+        "holdout_rows": 150406,
+        "holdout_positives": 50,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00033243,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "S1",
+          "rows_checked": 1338521,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0004,
+          "hour_of_day": 0.0009,
+          "rail": 0.0002,
+          "sender_in_anchor": 0.0002,
+          "payee_in_anchor": 0.0002,
+          "payee_popularity": 0.0043,
+          "has_device": 0.0002
+        },
+        "worst": "payee_popularity",
+        "score": 0.0043,
+        "base_rate": 0.0002,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.298155,
+        "base_rate": 0.00033243,
+        "n_rows": 150406,
+        "n_injected": 50,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": false
+      }
+    },
+    {
+      "held_out_vector": "S2",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected S2 rows from this anchor's own traffic at PR-AUC 1.000, against 0.005 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.004808,
+        "recall_at_fixed_fpr": 0.125,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.0,
+        "held_out_vector": "S2",
+        "k": 100,
+        "n_positives": 120
+      },
+      "operational": {
+        "evasion_rate": 0.691667,
+        "caught_rate": 0.308333,
+        "false_decline_rate": 0.003199,
+        "friction_rate": 0.051504,
+        "amount_evaded": 9669083.75
+      },
+      "floor": {
+        "pr_auc": 0.017443,
+        "recall_at_fixed_fpr": 0.125,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.03,
+        "k": 100,
+        "n_positives": 120,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446278,
+        "train_fraud": 433,
+        "holdout_rows": 150476,
+        "holdout_positives": 120,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.00079747,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "S2",
+          "rows_checked": 1338401,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0113,
+          "hour_of_day": 0.0024,
+          "rail": 0.0008,
+          "sender_in_anchor": 0.0008,
+          "payee_in_anchor": 0.0008,
+          "payee_popularity": 0.0008,
+          "has_device": 0.0008
+        },
+        "worst": "log_amount",
+        "score": 0.0113,
+        "base_rate": 0.0008,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 1.0,
+        "base_rate": 0.00079747,
+        "n_rows": 150476,
+        "n_injected": 120,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": true
+      }
+    },
+    {
+      "held_out_vector": "S3",
+      "outcome": "withheld",
+      "reason": "24 positives against a floor of 30 \u2014 recall moves 4.2% per row here, so this is reported as missing rather than as a low score",
+      "metrics": null,
+      "withheld_metrics": {
+        "pr_auc": 0.916049,
+        "recall_at_fixed_fpr": 0.958333,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.22,
+        "held_out_vector": "S3",
+        "k": 100,
+        "n_positives": 24
+      },
+      "operational": {
+        "evasion_rate": 0.041667,
+        "caught_rate": 0.958333,
+        "false_decline_rate": 0.001915,
+        "friction_rate": 0.042778,
+        "amount_evaded": 101076.55
+      },
+      "floor": {
+        "pr_auc": 0.094718,
+        "recall_at_fixed_fpr": 0.25,
+        "fixed_fpr": 0.01,
+        "precision_at_k": 0.04,
+        "k": 100,
+        "n_positives": 24,
+        "direction": "largest amount first",
+        "direction_chosen_on": "train"
+      },
+      "counts": {
+        "train_rows": 446478,
+        "train_fraud": 633,
+        "holdout_rows": 150380,
+        "holdout_positives": 24,
+        "holdout_legit": 150356,
+        "holdout_base_rate": 0.0001596,
+        "embargo_seconds": 90000
+      },
+      "guards": {
+        "family": {
+          "held_out_vector": "S3",
+          "rows_checked": 1338801,
+          "leaked_rows": 0,
+          "audited": "the training rows and every row the detector has fitted on, replay included",
+          "detector": "EnsembleDetector"
+        },
+        "embargo": {
+          "checked": true,
+          "embargo_seconds": 90000,
+          "gap_seconds": 90000,
+          "last_train_row": "2023-01-14T11:00:00",
+          "first_holdout_row": "2023-01-15T12:00:00"
+        },
+        "haystack": {
+          "legit_rows_in_window": 150356,
+          "legit_rows_kept": 150356,
+          "dropped": 0
+        }
+      },
+      "separability": {
+        "signals": {
+          "log_amount": 0.0281,
+          "hour_of_day": 0.0008,
+          "rail": 0.0002,
+          "sender_in_anchor": 0.0002,
+          "payee_in_anchor": 0.0002,
+          "payee_popularity": 0.0004,
+          "has_device": 0.0002
+        },
+        "worst": "log_amount",
+        "score": 0.0281,
+        "base_rate": 0.0002,
+        "trivially_separable": false
+      },
+      "provenance": {
+        "checked": true,
+        "question": "injected row, or the anchor's own?",
+        "label_is_exactly_is_fraud": true,
+        "pr_auc": 0.042305,
+        "base_rate": 0.0001596,
+        "n_rows": 150380,
+        "n_injected": 24,
+        "cv_folds": 3,
+        "backend": "lightgbm 4.5.0",
+        "floor": 0.5,
+        "lift": 5.0,
+        "separable": false
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "held_out_vector": "C1",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected C1 rows from this anchor's own traffic at PR-AUC 0.906, against 0.604 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance"
+    },
+    {
+      "held_out_vector": "C2",
+      "outcome": "withheld",
+      "reason": "21 positives against a floor of 30 \u2014 recall moves 4.8% per row here, so this is reported as missing rather than as a low score"
+    },
+    {
+      "held_out_vector": "C3",
+      "outcome": "withheld",
+      "reason": "20 positives against a floor of 30 \u2014 recall moves 5.0% per row here, so this is reported as missing rather than as a low score"
+    },
+    {
+      "held_out_vector": "M1",
+      "outcome": "withheld",
+      "reason": "M1 is a `template` vector: it emits schema-valid traffic of the right shape, but its defining tell is not modelled yet \u2014 Today it paces under a *static* reporting ceiling. The vector the architecture argues for paces under the detector's own learned boundary; that trajectory is the optimiser's search, surfaced as an artefact in ticket 13. The number in this row measures the pipeline, not the family"
+    },
+    {
+      "held_out_vector": "M2",
+      "outcome": "withheld",
+      "reason": "`sender_in_anchor` alone separates the injected M2 rows from the anchor at PR-AUC 1.000 \u2014 this fold measures provenance, not detection, and every number in it inherits that"
+    },
+    {
+      "held_out_vector": "M3",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected M3 rows from this anchor's own traffic at PR-AUC 0.970, against 0.893 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance"
+    },
+    {
+      "held_out_vector": "S2",
+      "outcome": "withheld",
+      "reason": "a classifier sorts the injected S2 rows from this anchor's own traffic at PR-AUC 1.000, against 0.005 for the detector on the same rows \u2014 every positive here is injected and every negative is real, so the fold cannot tell detection apart from provenance"
+    },
+    {
+      "held_out_vector": "S3",
+      "outcome": "withheld",
+      "reason": "24 positives against a floor of 30 \u2014 recall moves 4.2% per row here, so this is reported as missing rather than as a low score"
+    }
+  ],
+  "model_card": {
+    "detector": "EnsembleDetector",
+    "weight": 0.7,
+    "supervised": {
+      "detector": "LGBMDetector",
+      "backend": {
+        "name": "lightgbm",
+        "version": "4.5.0",
+        "reason": "libomp present, LightGBM loaded",
+        "dropped_params": []
+      },
+      "params": {
+        "objective": "binary",
+        "learning_rate": 0.02347670024204912,
+        "num_leaves": 75,
+        "min_child_samples": 153,
+        "n_estimators": 100,
+        "subsample": 0.9652081482057792,
+        "subsample_freq": 1,
+        "colsample_bytree": 0.7676059191242223,
+        "reg_lambda": 0.17259834660955406,
+        "class_weight": null,
+        "verbosity": -1,
+        "random_state": 1337
+      },
+      "params_source": "artifacts/detector/paysim.json",
+      "seed": 1337,
+      "training": {
+        "n_rows": 446368,
+        "n_fraud": 523,
+        "base_rate": 0.00117168,
+        "n_features": 56,
+        "n_weighted_up": 0,
+        "replay_weight": 3.0,
+        "fitted": true
+      },
+      "explain": "flagged",
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.005,
+        "hold_at": 0.16,
+        "review_at": 0.38,
+        "decline_at": 0.75,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 74812.07,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "default",
+          "unit_amount": 74812.07,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 299.24828,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 897.74484,
+          "hold_efficacy": 0.85,
+          "review_cost": 3740.6035,
+          "review_efficacy": 0.95,
+          "rationale": {
+            "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+            "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+            "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+            "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+            "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+            "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+            "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+            "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+            "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+          }
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": true,
+          "n_fit": 61402,
+          "n_positives": 49,
+          "base_rate": 0.00079802,
+          "note": "sigmoid, fitted on 61,402 validation rows",
+          "reliability": {
+            "before": {
+              "brier": 0.01708183,
+              "ece": 0.12727092
+            },
+            "after": {
+              "brier": 0.00061296,
+              "ece": 0.00022465
+            },
+            "bins": [
+              {
+                "n": 6141,
+                "predicted": 0.00019228,
+                "observed": 0.0
+              },
+              {
+                "n": 6141,
+                "predicted": 0.00020819,
+                "observed": 0.0
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00022983,
+                "observed": 0.0
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00026542,
+                "observed": 0.00032573
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00031246,
+                "observed": 0.00032573
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00036802,
+                "observed": 0.00016287
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00043788,
+                "observed": 0.00032573
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00052985,
+                "observed": 0.00081433
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00066741,
+                "observed": 0.0004886
+              },
+              {
+                "n": 6140,
+                "predicted": 0.00477544,
+                "observed": 0.00553746
+              }
+            ]
+          }
+        }
+      }
+    },
+    "unsupervised": {
+      "detector": "AnomalyDetector",
+      "kind": "iforest",
+      "contamination": 0.01,
+      "seed": 1337,
+      "training": {
+        "n_rows": 445845,
+        "n_fraud_seen": 0,
+        "n_fraud_excluded": 523,
+        "n_features": 56,
+        "legit_only": true,
+        "fitted": true
+      },
+      "score_map": {
+        "kind": "identity",
+        "scale": 1.0,
+        "batch_dependent": false,
+        "why": "an isolation forest's -score_samples is 2**(-E[h]/c(n)), already in (0,1)"
+      },
+      "decision": {
+        "mode": "cost",
+        "step_up_at": 0.00625,
+        "hold_at": 0.2,
+        "review_at": 0.25,
+        "decline_at": 0.775,
+        "bands_source": "derived from the cost model",
+        "band_units": "calibrated probability (see `calibration` below)",
+        "reference_amount": 100.0,
+        "unreachable_bands": [],
+        "costs": {
+          "source": "defaults in afl/defend/decision.py",
+          "unit_amount": 1.0,
+          "fraud_loss_rate": 1.0,
+          "false_decline_cost": 0.35,
+          "step_up_cost": 0.5,
+          "step_up_efficacy": 0.8,
+          "hold_cost": 1.5,
+          "hold_efficacy": 0.85,
+          "review_cost": 4.0,
+          "review_efficacy": 0.95,
+          "rationale": {}
+        },
+        "calibration": {
+          "method": "sigmoid",
+          "fitted": false,
+          "n_fit": 0,
+          "n_positives": 0,
+          "base_rate": 0.0,
+          "note": "not fitted - scores pass through unchanged",
+          "reliability": {}
+        }
+      }
+    },
+    "decision": {
+      "mode": "cost",
+      "step_up_at": 0.005,
+      "hold_at": 0.16,
+      "review_at": 0.38,
+      "decline_at": 0.75,
+      "bands_source": "derived from the cost model",
+      "band_units": "calibrated probability (see `calibration` below)",
+      "reference_amount": 74812.07,
+      "unreachable_bands": [],
+      "costs": {
+        "source": "default",
+        "unit_amount": 74812.07,
+        "fraud_loss_rate": 1.0,
+        "false_decline_cost": 0.35,
+        "step_up_cost": 299.24828,
+        "step_up_efficacy": 0.8,
+        "hold_cost": 897.74484,
+        "hold_efficacy": 0.85,
+        "review_cost": 3740.6035,
+        "review_efficacy": 0.95,
+        "rationale": {
+          "fraud_loss_rate": "Share of the amount lost when fraud is allowed through. 1.0 \u2014 the whole amount. On an instant A2A or UPI rail the funds are irrevocable and there is nothing to claw back, which is the property C3 exists to exploit. Card carries some interchange recovery, but the loss-share is scheme- and case-dependent and recovering it takes months, so 1.0 is the reading that does not flatter the detector. A lower value here makes every band wider.",
+          "false_decline_cost": "Cost of wrongly declining a good payment, as a share of its amount. A false decline costs the margin on the payment, the support contact, and a slice of the customer's future volume; the industry's own surveys put the lifetime cost at a multiple of the transaction margin. 0.35 is the mid of the range we are prepared to defend. This is the single number that most moves the decline band, so `make decisions` reports the action mix at 0.20 and 0.50 as well \u2014 the sensitivity is measured, not asserted.",
+          "step_up_efficacy": "Share of fraud a challenge stops. High against a fraudster who does not hold the second factor, which is most of S2 and S3. It stops NOTHING in the two families that matter most here \u2014 C2 (the victim is socially engineered into authorising it) and M3 (the account owner IS the fraudster) \u2014 so 0.80 is a population average across the taxonomy, not a promise about any one vector. It is set below the rungs above it because a challenge cannot be the top of the ladder.",
+          "hold_efficacy": "Share of fraud a hold stops. Above a challenge because it buys the minutes the pass-through families trade against \u2014 C3's whole design is to move funds onward before anyone looks \u2014 but below a review, because a hold with nobody watching it eventually releases.",
+          "review_efficacy": "Share of fraud a human review stops. The best rung short of a decline, and deliberately under 1.0: an analyst working from the same features the model had is not infallible, and a review that stopped everything would dominate the decline outright and remove the top of the ladder. Analysts also let some fraud through on purpose, to keep a case alive.",
+          "step_up_cost": "Flat cost of an OTP or in-app challenge, as a multiple of the anchor's median payment (~300 on PaySim, ~0.6 on AMLSim). It prices roughly fifteen seconds of customer friction plus the small share of good payments that are abandoned at the challenge. Flat rather than amount-scaled because abandonment is a behaviour, not a percentage of value.",
+          "hold_cost": "Flat cost of delaying settlement pending an automated recheck \u2014 3x a challenge. On an instant rail a hold is the product promise being broken rather than a moment of friction, so it costs materially more than an OTP and materially less than an analyst's time.",
+          "review_cost": "Flat cost of putting a case in the analyst queue, as a multiple of the median payment (~3,700 on PaySim, ~8 on AMLSim). About three minutes of a fully loaded analyst, plus the delay to the customer. This is the number that sets how big the queue is, and `precision@100` is what says whether the queue was worth staffing.",
+          "unit_amount": "The currency unit the flat costs below are quoted in. `null` means \"measure it from the anchor\": the median payment in the run's dataset, resolved at load and written into every artefact. A literal here would pin the cost model to one dataset's amount scale, and the same file has to serve PaySim (median 74,872) and AMLSim (median 157)."
+        }
+      },
+      "calibration": {
+        "method": "sigmoid",
+        "fitted": true,
+        "n_fit": 61402,
+        "n_positives": 49,
+        "base_rate": 0.00079802,
+        "note": "sigmoid, fitted on 61,402 validation rows",
+        "reliability": {
+          "before": {
+            "brier": 0.01708183,
+            "ece": 0.12727092
+          },
+          "after": {
+            "brier": 0.00061296,
+            "ece": 0.00022465
+          },
+          "bins": [
+            {
+              "n": 6141,
+              "predicted": 0.00019228,
+              "observed": 0.0
+            },
+            {
+              "n": 6141,
+              "predicted": 0.00020819,
+              "observed": 0.0
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00022983,
+              "observed": 0.0
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00026542,
+              "observed": 0.00032573
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00031246,
+              "observed": 0.00032573
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00036802,
+              "observed": 0.00016287
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00043788,
+              "observed": 0.00032573
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00052985,
+              "observed": 0.00081433
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00066741,
+              "observed": 0.0004886
+            },
+            {
+              "n": 6140,
+              "predicted": 0.00477544,
+              "observed": 0.00553746
+            }
+          ]
+        }
+      }
+    }
+  },
+  "meta": {
+    "generated_by": "scripts/build_loao.py",
+    "note": "Every positive in these folds is an injected synthetic row and every negative is a real one, so a fold's recall reports the distance between two distributions as well as detection. Read each fold's `separability` and `outcome` before reading its `metrics`."
+  }
+}

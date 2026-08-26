@@ -34,7 +34,7 @@ blocks the frontier for both lanes.
 | 12 | ~~Multi-vector adaptive optimiser~~ **done** | ▲ A | 01, 02, 08 |
 | 13 | M1 — the optimiser's boundary walk as a vector | ▲ A | 12 |
 | 14 | Realism leash, reported every round | ▲ A | 12 |
-| 15 | Fidelity scorecard on real anchor data | ■ B | 06, 08 |
+| 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
 | 16 | The three-system table | ■ B | 11, 12 |
 | 17 | Sequence model — earn it or report it | ■ B | 11 |
 | 18 | Temporal GNN — earn it or fall back | ■ B | 11 |
@@ -959,6 +959,76 @@ is the generator rather than the detector.**
 - [x] `make test` green (305 passed, up from 288 — 17 new tests in `tests/test_eval.py`),
       `ruff check` and `ruff format` clean, and `make loao` runs both anchors end to end
 
+**Carried out of this ticket, and worth knowing before you start yours:**
+
+- **Four of eighteen folds carry a number, and the headline fold is not one of them.** Nine
+  families across two anchors. `measured`: AMLSim C1 **0.975**, M3 **0.996**, S2 **1.000**, and
+  PaySim S1 **0.275**. The other fourteen are withheld — seven for being too thin, three because
+  a classifier can sort the injected rows from the anchor's own, two because one contract field
+  can, two because the vector is still a template. **PaySim M3, the fold this project's headline
+  rests on, is withheld.** Every number is in `artifacts/loao/`, none of them is gone, and each
+  one sits next to the reason it may not be quoted.
+- **The check that decides the table was not on the ticket's list — ticket 07 put it there.** Its
+  carry-out asked ticket 11 to make the fold say for itself when it is meaningless, and this is
+  it: the carve-out drops the anchor's own fraud from the holdout, so in every fold *every
+  positive is an injected row and every negative is a real one*, and "caught the fraud" and
+  "spotted the synthetic row" are the same label. `scripts/build_loao.py:provenance_probe`
+  cross-validates a classifier on the fold's own feature space to make exactly that call. It
+  takes three rows outright — PaySim C1 (**0.906** against the detector's 0.604), M3 (**0.970**
+  against 0.893) and S2 (**1.000** against 0.005) — and would have taken PaySim M1 (0.945) if the
+  template gate had not fired first. Ticket 07 measured this by hand at AUC 1.00; it is a gate
+  now, so it cannot be quoted around.
+- **PaySim S2 is the sharpest row in the table, and it cuts both ways.** A classifier separates
+  the injected card-testing rows from PaySim traffic at PR-AUC **1.000**. The detector scores
+  **0.005** on the same rows. Perfectly identifiable by provenance and invisible to the model —
+  which is the cleanest available proof that the fold's two questions are not the same question,
+  in the direction nobody expects.
+- **M2 cannot be evaluated by injection into a real anchor at all, and that is structural rather
+  than a bug.** `sender_in_anchor` separates the injected M2 rows at PR-AUC **1.000** on *both*
+  anchors. A synthetic-identity vector invents accounts by definition, so the family's defining
+  behaviour is the thing the commensurability audit flags. Nothing in the generator can fix that
+  while the fold is "inject into real traffic". **Ticket 15** or a fully synthetic anchor is the
+  instrument for M2; leave-one-attack-out is not.
+- **AMLSim's three measured rows are not a result either, and the document says so without being
+  asked.** The same detector scores **1.000** on AMLSim's own labelled fraud in the same test
+  window, where sorting by amount alone already reaches **0.456**. A near-perfect fold on an
+  anchor like that says the simulator is legible — ticket 08's carry-out, arriving from a third
+  direction. The generated write-up puts every measured row next to its anchor's own-fraud
+  reference for exactly this reason.
+- **PaySim's one measured row is easier than the fraud the detector trains on.** S1 at 0.275
+  against **0.152** on PaySim's own labelled fraud in the same window. That is ticket 10's
+  reading, unchanged: an unseen family the detector finds easier than the seen ones is a
+  statement about the injected rows.
+- **The provenance probe is underpowered exactly where the fold is thin, and the asymmetry runs
+  the wrong way.** It learns "injected" from the fold's own positives — at best a hundred of them
+  across three cross-validation folds — while the detector it checks learned from a 930k-row
+  window. Every AMLSim probe scores under 0.36 and every thin fold's probe scores under 0.01. So
+  a **high** probe score is strong evidence a fold is provenance-bound; a **low** one on a thin
+  fold is weak evidence of anything. `MIN_MEANINGFUL_POSITIVES` is applied first so the weakest
+  probes belong to folds that were already withheld, and the positive count travels with every
+  probe score. **Do not read a low probe on a thin fold as a clean bill of health.**
+- **Seven folds are too thin at the committed `eval.holdout_episodes: 12`** — AMLSim C2 (18), C3
+  (12), S1 (20), S3 (12) and PaySim C2 (21), C3 (20), S3 (24) positives. The knob that fixes it
+  is one line of config, and raising it moves ticket 10's committed fold too, so it is a decision
+  rather than an oversight and it was not taken here. **PaySim S3 is the one that costs
+  something**: detector 0.916, provenance probe 0.042, withheld for six rows. It is the most
+  likely candidate in the matrix for a fold that would carry a real claim.
+- **`training_rows` is a new seam on every detector**, and the replay-buffer guard is the reason
+  for it. `LGBMDetector`, `AnomalyDetector` and `EnsembleDetector` each expose what they have
+  fitted on — corpus *and* replay buffer — and the guard audits that rather than the list handed
+  to `fit`. A detector without the property **fails** the guard instead of passing it, because
+  the failure this whole ticket exists to prevent is the silent one.
+- **The withheld numbers live under `withheld_metrics`, never under `metrics`.** A consumer that
+  reads the obvious field on a fold that cannot carry a claim gets `None`, not a number. The
+  document still prints them, in brackets, beside the reason — hiding evidence is its own kind
+  of dishonesty, but a bracketed number next to "withheld" is not one anybody quotes by accident.
+- **What this hands to the tickets that depend on it.** **16** (the three-system table) inherits a
+  headline fold that is withheld on PaySim and vacuous on AMLSim — the table can still be built,
+  but its held-out column needs the same treatment this matrix gives every row. **17** and **18**
+  inherit the same: a sequence model or a GNN measured on PaySim M3 is being scored on a fold
+  whose positives a classifier finds at 0.970. **19**'s convergence artefact is measured through
+  this harness and inherits its verdicts.
+
 ---
 
 # 12: Multi-vector adaptive optimiser
@@ -1075,16 +1145,72 @@ Thresholds are set before any result exists. Moving one afterwards is how a bar 
 
 **Blocked by:** 06, 08.
 
-**Status:** ready-for-agent
+**Status:** done — bars in `config/fidelity/thresholds.yaml`, harness in `afl/fidelity/`,
+scorecards built by `make fidelity`, evidence in `artifacts/fidelity/`, written up in
+`docs/fidelity.md`. **Both anchors FAIL, and the gate is what fails them.** On PaySim a detector
+trained on the generated fraud reaches PR-AUC 0.005 against real fraud, an order of magnitude
+below the 0.057 amount floor, and adding those rows to a real training set drops recall at 1% FPR
+from 0.444 to 0.215. Level 1 passes on the same card at 0.749 and rescues nothing, which is the
+ticket's thesis arriving as a measurement rather than as a design note. Running it also found two
+measurement bugs that had been flattering the generator — see the last box below.
 
-- [ ] All three levels computed against the real anchor and written to a committed artefact
-- [ ] Thresholds are recorded before results are generated, and the record shows they predate them
-- [ ] Level 3 gates the verdict; a Level 1/2 pass cannot rescue a Level 3 fail
-- [ ] TSTR gap and augmentation lift both measured on real held-out data at the standard
-      operating point
-- [ ] DCR and MIA reported as evidence against memorisation, phrased as evidence, not proof
-- [ ] The scorecard regenerates by one command
-- [ ] A failing scorecard is reported, never quietly re-run with looser thresholds
+- [x] All three levels computed against the real anchor and written to a committed artefact —
+      `make fidelity` runs every data config that names a loader, at that anchor's committed
+      split and the operating point in `config/eval/leave_one_attack_out.yaml`, and writes
+      `artifacts/fidelity/<anchor>.json` and `.md` plus the generated `docs/fidelity.md`.
+      Levels 1 and 2 run **twice**: the headline compares generated fraud against the anchor's
+      own labelled fraud, because that is the only part of the batch an anchored run injects,
+      and the whole batch against the whole anchor is reported underneath as the reading the
+      phrase usually has
+- [x] Thresholds are recorded before results are generated, and the record shows they predate
+      them — the bars moved out of six bare floats in `config/config.yaml` into
+      `config/fidelity/thresholds.yaml`, one bar per stated reason, refused at load when the
+      reason is blank (`ThresholdError`, the rule `CostModel.from_config` already applies). Each
+      names the commit it was first committed in, and `afl/fidelity/provenance.py` reads that
+      commit **back out of git** on every run, compares the value committed there against the
+      value being applied now, and writes the comparison into the artefact next to the verdict.
+      Six of the seven bars trace to `6989a9e`, the day-one skeleton, unchanged; the seventh was
+      added by this ticket and committed in `c55dc08` **before the first anchored number
+      existed**. An uncommitted edit to the file makes the record say `UNPROVEN` rather than
+      claim an age it cannot show
+- [x] Level 3 gates the verdict; a Level 1/2 pass cannot rescue a Level 3 fail — enforced twice.
+      `_judge` sorts findings into hard (level 3, privacy) and soft (levels 1 and 2), and only
+      hard findings can fail a card. And the headline `score` is now **capped at the level-3
+      score**: weighting it double still let two diagnostic levels at 1.0 average a level-3 0.1
+      up to 0.62, which reads like half a pass. A test asserts both on the same card
+- [x] TSTR gap and augmentation lift both measured on real held-out data at the standard
+      operating point — four systems, one real test window, one operating point: `trtr` (real
+      rows, real labels), `tstr` (real legit + generated fraud, no real fraud label), `augmented`
+      (real + generated fraud) and the **amount floor**, which is new here and is a hard bar.
+      What "train on synthetic" means is written into the thresholds config *before* the run, so
+      the gate could not be swapped afterwards for whichever of the two readings scored better;
+      the literature's standalone reading is measured beside it and never gates
+- [x] DCR and MIA reported as evidence against memorisation, phrased as evidence, not proof —
+      and the MIA gained the control it needed. On an out-of-time split, members and non-members
+      differ by *when* as well as by membership, so the same attack is run between two halves of
+      the holdout, where nothing was ever in training; an advantage at or below that control is
+      reported as drift rather than flagged as a leak. Identifier reuse is counted separately,
+      because the generator stages attacks on real accounts by design and DCR cannot see that
+      path
+- [x] The scorecard regenerates by one command — `make fidelity`. The day-one discrimination
+      check keeps its own, `make fidelity-selftest`, and still passes all four of its checks
+- [x] A failing scorecard is reported, never quietly re-run with looser thresholds — the
+      artefacts and the doc are written *before* the non-zero exit, so a FAIL is a committed
+      result. If a bar is ever moved, the provenance block names it, states its direction with
+      LOOSENED in capitals, and lists every commit that has ever changed one
+- [x] `make test` green (316 passed, up from 305 — 11 new tests in `tests/test_eval.py`),
+      `ruff check` and `ruff format` clean, and `make fidelity` runs both anchors end to end in
+      about eight minutes
+- [x] **Not on the list, and the reason the harness had to be run rather than reviewed:** three
+      bugs, two of them flattering the generator. The privacy and support metrics standardised
+      by `std + 1e-9`, and three of the seven embedding columns are *exactly constant* on PaySim
+      — the anchor has no sender history — so a synthetic row with a real one was divided by a
+      billionth and the first PaySim card reported a DCR ratio of **1.0e11**, passing the
+      memorisation check on the strength of it. Constant columns are dropped and named now, and
+      the ratio is 2.43 over four real dimensions. Membership inference on an out-of-time split
+      measures the calendar as well as membership, so it gained the control described above. And
+      `_judge` scored a level that never ran as 0.0 and then indexed it for its worst column,
+      inventing a finding about a measurement nobody took
 
 ---
 
