@@ -26,7 +26,8 @@ from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import leave_one_attack_out as loao
 from afl.evaluation import protocol, three_system
 from afl.evaluation.leave_one_attack_out import LeaveOneAttackOut, make_splits, sweep
-from afl.fidelity import level1_statistical, level2_structural, privacy, scorecard
+from afl.fidelity import level1_statistical, level2_structural, level3_utility, privacy, scorecard
+from afl.fidelity import provenance as fidelity_provenance
 
 T0 = datetime(2024, 1, 1)
 
@@ -507,21 +508,115 @@ def test_privacy_flags_a_verbatim_copy():
     assert report["flags"]
 
 
+def _level3(score=0.2, gap=0.40, lift=-0.05, tstr_pr_auc=0.30, floor=0.10):
+    """A level-3 body shaped exactly as `level3_utility.report` emits one."""
+    return {
+        "outcome": "measured",
+        "score": score,
+        "tstr": {"tstr_gap": gap, "tstr_pr_auc": tstr_pr_auc, "trtr_pr_auc": tstr_pr_auc + gap},
+        "augmentation": {"recall_lift": lift},
+        "amount_floor": {"pr_auc": floor},
+        "beats_amount_floor": {
+            "tstr": tstr_pr_auc > floor,
+            "trtr": tstr_pr_auc + gap > floor,
+            "augmented": True,
+        },
+    }
+
+
+def test_a_drifting_holdout_does_not_read_as_a_membership_leak():
+    """The MIA control. Members and non-members differ by *when*, not only by membership.
+
+    Two halves of the holdout are both non-members, so whatever the same attack scores between
+    them is the out-of-time boundary talking. Without the control, that number is reported as a
+    privacy failure.
+    """
+    rows = txns(400, fraud_every=8)
+    train, holdout = out_of_time_split(rows, train_frac=0.7, embargo_days=1.0)
+    control = privacy.mia_time_control(holdout, train)
+    assert control["measurable"]
+    assert 0.0 <= control["advantage"] <= 1.0
+
+    # a generator that copies the training window trips the flag anyway: its advantage is real
+    copied = [t.model_copy(update={"txn_id": f"c{i}"}) for i, t in enumerate(train)]
+    report = privacy.report(train, holdout, copied)
+    assert report["flags"]
+
+
+def test_identifier_reuse_is_counted_rather_than_assumed_away():
+    """The disclosure path DCR cannot see: the generator stages attacks on real accounts."""
+    rows = txns(100, fraud_every=5)
+    on_anchor = [t.model_copy(update={"txn_id": f"a{i}"}) for i, t in enumerate(rows)]
+    off_anchor = [
+        t.model_copy(update={"txn_id": f"b{i}", "src": f"new{i}", "dst": f"new{i}x"})
+        for i, t in enumerate(rows)
+    ]
+    assert privacy.identifier_reuse(rows, on_anchor)["either_in_anchor"] == 1.0
+    assert privacy.identifier_reuse(rows, off_anchor)["either_in_anchor"] == 0.0
+
+
 def test_scorecard_gates_on_utility_not_on_histograms():
     card = scorecard.Scorecard(
-        levels={
-            "level1": {"score": 0.95},
-            "level2": {"score": 0.90},
-            "level3": {
-                "score": 0.2,
-                "tstr": {"tstr_gap": 0.40},
-                "augmentation": {"recall_lift": -0.05},
-            },
-        }
+        levels={"level1": {"score": 0.95}, "level2": {"score": 0.90}, "level3": _level3()}
     )
     judged = scorecard._judge(card)
     assert judged.verdict == scorecard.FAIL
     assert any("TSTR gap" in r for r in judged.reasons)
+    assert judged.gate["hard_findings"] and not judged.gate["soft_findings"]
+
+
+def test_two_passing_histograms_cannot_rescue_a_failing_gate():
+    """The headline number, not just the verdict. A reader who quotes `score` gets the truth."""
+    card = scorecard._judge(
+        scorecard.Scorecard(
+            levels={
+                "level1": {"score": 1.0},
+                "level2": {"score": 1.0},
+                "privacy": {"score": 1.0, "flags": []},
+                "level3": _level3(score=0.1),
+            }
+        )
+    )
+    assert card.verdict == scorecard.FAIL
+    # the unweighted blend of 1.0, 1.0, 1.0 and a double-weighted 0.1 is 0.62; the cap is the
+    # only thing standing between that and a card that reads as a near-pass
+    assert card.score <= 0.1
+
+
+def test_a_generator_that_loses_to_sorting_by_amount_fails():
+    card = scorecard._judge(
+        scorecard.Scorecard(
+            levels={
+                "level1": {"score": 0.99},
+                "level2": {"score": 0.99},
+                # inside every other bar: a small gap, no recall lost — and still below the floor
+                "level3": _level3(score=0.9, gap=0.01, lift=0.0, tstr_pr_auc=0.04, floor=0.06),
+            }
+        )
+    )
+    assert card.verdict == scorecard.FAIL
+    assert any("amount floor" in r for r in card.reasons)
+
+
+def test_the_floor_gate_can_be_turned_off_but_not_by_accident():
+    levels = {"level3": _level3(score=0.9, gap=0.01, lift=0.0, tstr_pr_auc=0.04, floor=0.06)}
+    off = scorecard.Thresholds(require_tstr_beats_amount_floor=False)
+    assert scorecard._judge(scorecard.Scorecard(levels=levels, thresholds=off)).verdict != (
+        scorecard.FAIL
+    )
+    assert scorecard._judge(scorecard.Scorecard(levels=dict(levels))).verdict == scorecard.FAIL
+
+
+def test_a_thin_test_window_is_withheld_rather_than_failed():
+    rows = txns(200, fraud_every=5)
+    train, test = out_of_time_split(rows, train_frac=0.7, embargo_days=1.0)
+    body = level3_utility.report(train, test, [], lambda: None, min_positives=10_000)
+    assert body["outcome"] == "withheld"
+    assert body["score"] is None
+    card = scorecard._judge(scorecard.Scorecard(levels={"level3": body}))
+    # withheld is not a pass and it is not a failure: nothing was measured
+    assert card.verdict == scorecard.WARN
+    assert any("withheld" in r for r in card.reasons)
 
 
 def test_scorecard_says_when_it_skipped_the_bar():
@@ -530,3 +625,49 @@ def test_scorecard_says_when_it_skipped_the_bar():
     assert card.verdict == scorecard.WARN
     assert any("skipped" in r for r in card.reasons)
     assert "level3" not in card.levels
+
+
+# ── the bars, and whether they predate the numbers ──────────────────────────────
+def test_a_bar_with_no_stated_reason_is_refused(tmp_path):
+    """Same rule as the cost model: a number nobody can justify is a number somebody tuned."""
+    cfg = tmp_path / "thresholds.yaml"
+    cfg.write_text(
+        yaml.safe_dump(
+            {
+                **{k: {"value": 0.5, "why": "measured"} for k in fidelity_provenance.BARS},
+                "max_tstr_gap": {"value": 0.15, "why": "   "},
+            }
+        )
+    )
+    with pytest.raises(fidelity_provenance.ThresholdError, match="max_tstr_gap"):
+        fidelity_provenance.load(cfg, repo=tmp_path)
+
+
+def test_an_unprovable_threshold_file_says_so_rather_than_claiming_age(tmp_path):
+    """No git, no claim. The absence of evidence is reported as the absence of evidence."""
+    cfg = tmp_path / "thresholds.yaml"
+    cfg.write_text(
+        yaml.safe_dump({k: {"value": 0.5, "why": "measured"} for k in fidelity_provenance.BARS})
+    )
+    _values, _why, prov = fidelity_provenance.load(cfg, repo=tmp_path)
+    assert prov.predates_results is False
+    assert "UNPROVEN" in prov.verdict
+
+
+def test_a_bar_that_moved_is_named_and_its_direction_stated():
+    """Loosening and tightening are not the same event and the record must not merge them."""
+    assert fidelity_provenance._direction("max_tstr_gap", 0.15, 0.40) == "LOOSENED"
+    assert fidelity_provenance._direction("max_tstr_gap", 0.15, 0.05) == "tightened"
+    assert fidelity_provenance._direction("min_recall_lift", 0.0, -0.10) == "LOOSENED"
+    assert fidelity_provenance._direction("min_dcr_ratio", 0.80, 0.90) == "tightened"
+    assert fidelity_provenance._direction("level1_min", 0.70, 0.70) == "unchanged"
+
+
+def test_the_shipped_bars_carry_a_reason_and_an_auditable_origin():
+    values, why, prov = fidelity_provenance.load("config/fidelity/thresholds.yaml")
+    assert set(values) == set(fidelity_provenance.BARS)
+    assert all(why[bar].strip() for bar in fidelity_provenance.BARS)
+    # the origin commit is readable and every inherited value still matches what it contains;
+    # if a bar is ever moved on purpose, this is the line that has to be changed with it
+    assert prov.origin["readable"], "the origin commit named in the config is not in this repo"
+    assert prov.origin["moved_since_origin"] == {}, prov.verdict
