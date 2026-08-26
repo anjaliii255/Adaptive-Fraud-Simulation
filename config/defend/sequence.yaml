@@ -1,13 +1,61 @@
-# Additive. Earns its place only by beating lgbm on the same split, or it does not ship.
-# Requires the `deep` extra (torch); falls back to a sklearn MLP over pooled sequences.
+# Additive. This layer enters a reported table only by beating the LightGBM baseline on the same
+# out-of-time split at the same operating point, on the GRADUAL end of the drift axis — the end
+# with no event to anchor on, which is the case a per-row feature table runs out on. A win on the
+# sudden end does not promote it: that end is an event, and the per-row table already sees it.
+#
+# Requires the `deep` extra (`uv sync --extra deep`). There is NO fallback. `SequenceDetector`
+# raises without torch rather than degrading to a pooled-sequence stand-in, because a silently
+# substituted model is a number nobody can explain later — this file used to promise exactly such
+# a fallback and it was the wrong promise to make.
+#
+# `enabled` is the record of the gate's verdict, not a preference, and today it records a
+# refusal: `afl.evaluation.drift_arc.assert_config_matches_promotion` raises on `true` while a
+# committed artifacts/sequence/<anchor>.json says the gate said no, and a test runs it against
+# what is on disk. So the claim "it only ships if it wins" is enforced rather than remembered.
+#
+# Nothing else reads this key yet, deliberately. Wiring a promoted sequence model into the loop
+# means choosing how it blends with the supervised score, and a blend weight picked on the fold it
+# is reported from is the tuning-on-test `docs/anomaly.md` walked back once already. That decision
+# belongs to whichever ticket first has a promotion to spend it on; until then this file records
+# the verdict and `docs/sequence.md` carries the evidence.
 
-kind: gru              # gru | transformer
+kind: sequence
 enabled: false
 
+arch: gru              # gru | transformer
+entity: src            # src | dst — which side of the payment carries the history the model reads
+
+# Steps of that entity's own history a row is judged against, the row itself included. The
+# scoring-time history is carried across the fit/score boundary, the same way the supervised
+# detector's stateful FeatureBuilder carries it: without that, a holdout row whose baseline sits
+# in the training window has no baseline to drift away from, which is the arc this model is for.
 max_len: 32
-hidden_size: 64
-num_layers: 1
+
+hidden: 64
+layers: 1
 dropout: 0.1
-epochs: 20
+epochs: 15
 batch_size: 128
 learning_rate: 0.001
+
+# Negatives kept per positive when the training windows are built. At a 0.13% base rate a full
+# pass is 99.87% padding through a recurrent net. This changes what the fit costs, not where the
+# operating point is: every reported metric is computed on the untouched holdout. It is on the
+# model card because a training-set composition nobody wrote down is one nobody can reproduce.
+negative_ratio: 20
+
+# The comparison this layer is judged by — `make sequence`, written up in docs/sequence.md.
+arc:
+  # The two families the drift engine puts on the sudden-vs-gradual axis. M3 also rides that
+  # engine and is not here: it is the leave-one-attack-out holdout and is gradual by declaration,
+  # so it has no sudden end to be compared against.
+  families: [S3, C1]
+
+  # Episodes generated per arc. Higher than eval.holdout_episodes because the positives are split
+  # two ways here, and an arc that lands under eval.min_meaningful_positives is reported as
+  # missing rather than as a low score.
+  episodes: 60
+
+  metric: pr_auc
+  decided_on: gradual
+  material_gap: 0.01   # the difference this project treats as a difference; see docs/anomaly.md

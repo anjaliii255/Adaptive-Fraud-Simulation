@@ -36,7 +36,7 @@ blocks the frontier for both lanes.
 | 14 | Realism leash, reported every round | ▲ A | 12 |
 | 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
 | 16 | ~~The three-system table~~ **done** | ■ B | 11, 12 |
-| 17 | Sequence model — earn it or report it | ■ B | 11 |
+| 17 | ~~Sequence model — earn it or report it~~ **done — reported, not promoted** | ■ B | 11 |
 | 18 | Temporal GNN — earn it or fall back | ■ B | 11 |
 | 19 | The convergence artefact | ▲ A | 11, 12 |
 | 20 | One command reproduces a headline number | ▲ A | 16, 19 |
@@ -1357,14 +1357,64 @@ degraded model in an ensemble is a number nobody can explain later.
 
 **Blocked by:** 11.
 
-**Status:** ready-for-agent
+**Status:** done — model in `afl/defend/models/sequence.py`, axis and gate in
+`afl/evaluation/drift_arc.py`, built by `make sequence` (`scripts/build_sequence.py`), evidence in
+`artifacts/sequence/`, written up in `docs/sequence.md`. **It did not earn its seat, and the two
+anchors refused it for opposite reasons.** On AMLSim, whose accounts carry ~28 steps of real
+history apiece, it loses on merit: PR-AUC 0.391 on gradual S3 against LightGBM's 0.997, and 0.300
+against 0.998 on gradual C1 — at a *lower* compute cost than the baseline, so it is not an
+expensive model that bought a small lift but a cheap model that lost. On PaySim it wins C1 by
+0.987 to 0.773, and that win is what disqualifies it: `nameOrig` is effectively unique per row, so
+a real window there is **one step long** while the injected episodes carry eight or nine, and
+window length alone sorts injected from real at PR-AUC 0.933 (S3) and 0.985 (C1). All four folds
+are withheld — two on the provenance probe, two on the history audit this ticket added — so the
+comparison is published in brackets and quoted nowhere. `config/defend/sequence.yaml` stays
+`enabled: false`, and `assert_config_matches_promotion` refuses to let it be turned on while the
+committed artefacts say no.
 
-- [ ] Trains on per-entity histories and scores through the standard `score` seam
-- [ ] Compared against LightGBM on the same split at the same operating point
-- [ ] The sudden-drift vs gradual-drift breakdown is reported separately — that is the whole point
-- [ ] Enters the headline table only if it beats the baseline; the comparison is published either way
-- [ ] Raises clearly when torch is missing; the default test suite stays green without the extra
-- [ ] Compute cost is reported next to the lift, so the trade is visible
+**Carry-out for ticket 11.** These folds carry 550 injected AMLSim C1 rows against the matrix's
+80, so the provenance probe is far better powered here — and at that size it separates injected
+from real at PR-AUC 0.688, over the bar, where `artifacts/loao/amlsim.json` measured 0.236 and
+reported the fold. Nothing about the generator changed; the episode count did. AMLSim C1 is one of
+only four measured rows in the whole matrix, and it should be read as underpowered until `make
+loao` is re-run at this episode count.
+
+- [x] Trains on per-entity histories and scores through the standard `score` seam — one window per
+      *transaction*, ending at that transaction and labelled with that transaction's own label.
+      The version this replaced took one window per *entity* labelled
+      `any(t.is_fraud for t in window)` and broadcast the score back onto the account's clean
+      baseline rows, which is a lookup rather than a detector; `sequence_tensor` is deleted rather
+      than deprecated, because leaving it importable leaves the bug importable. Scoring-time
+      history crosses the fit/score boundary the way the stateful `FeatureBuilder`'s does, so a
+      holdout row whose baseline sits in the training window still has a baseline to drift from
+- [x] Compared against LightGBM on the same split at the same operating point — the same
+      `Fold.carve` against the committed boundary, the same calibration on the same validation
+      tail, the same cost model and bands, and `amount_only` under both of them. The champion is
+      `LGBMDetector` rather than the ensemble the loop ships: the ticket's bar is the supervised
+      baseline, and a blend would move two things at once
+- [x] The sudden-drift vs gradual-drift breakdown is reported separately — each family generated
+      twice with `ramp` at the low and high end of *its own* declared search space and nothing
+      else changed, so the arcs stay inside ticket 14's realism envelope and C1's gradual end is
+      0.6 rather than S3's 1.0. Both arcs are ranked against every legit row of the fold, so only
+      the needles change between the two rows; `recall_at_shared_threshold` is computed from the
+      whole fold and asserted to match `recall_at_fixed_fpr`, which is what says the axis was read
+      at one operating point rather than at two
+- [x] Enters the headline table only if it beats the baseline; the comparison is published either
+      way — `drift_arc.decide_promotion` gates on the **gradual** end only, because sudden
+      takeover is an event a per-row table already sees. It refuses a blocked fold first, then a
+      model the amount floor beats, then anything inside `material_gap`. It refused all four, and
+      `assert_config_matches_promotion` makes `enabled` answerable to that rather than to memory
+- [x] Raises clearly when torch is missing; the default test suite stays green without the extra —
+      the constructor calls `require_torch` up front, so a config that enables the layer without
+      the extra fails before it spends an hour generating a pool it cannot score. `config/defend/
+      sequence.yaml` no longer promises a pooled-sequence fallback; there is none. Only the tests
+      that actually build a network are skipped without torch — the window arithmetic, the arc
+      breakdown, the gate and the artefact are pure numpy and run on the default install
+- [x] Compute cost is reported next to the lift, so the trade is visible — fit and score seconds,
+      rows/second and parameter count on the model card and in the same table as the metrics. The
+      answer is not the one the ticket expected: the GRU is *cheaper* than LightGBM on both anchors
+      (21s vs 32s to fit on AMLSim, ~2.3x the scoring throughput) and still loses where the anchor
+      has histories to read
 
 ---
 

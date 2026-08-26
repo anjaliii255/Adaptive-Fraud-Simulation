@@ -1,7 +1,11 @@
-.PHONY: setup smoke test splits features baseline decisions anomaly loao fidelity fidelity-selftest loop table compare figures demo lint fmt clean
+.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence loao fidelity fidelity-selftest loop table compare figures demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
+
+setup-deep: ## the same, plus torch — needed by `make sequence` only. Nothing else requires it,
+          ## and the default suite stays green without it.
+	uv sync --extra dev --extra deep
 
 smoke:    ## the day-one gate: loop runs end-to-end on dummy data
 	uv run pytest tests/test_loop_smoke.py -q
@@ -23,6 +27,10 @@ decisions: ## price the graded action bands and reason codes on every anchor; co
 
 anomaly:  ## score the zero-day layer against the supervised model on the held-out family
 	uv run python scripts/build_anomaly.py
+
+sequence: ## GRU vs LightGBM on the drift arc, sudden and gradual reported apart. Needs
+          ## `make setup-deep`; the gate decides whether the model is reported at all.
+	uv run python scripts/build_sequence.py
 
 loao:     ## the leave-one-attack-out matrix: every family held out in turn, with the guards
 	uv run python scripts/build_loao.py

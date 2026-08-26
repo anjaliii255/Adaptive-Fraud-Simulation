@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import logging
 from bisect import bisect_left, bisect_right
-from collections import defaultdict
 from dataclasses import dataclass, field
 from math import sqrt
 
@@ -789,31 +788,9 @@ def assert_no_forbidden_columns(X: pd.DataFrame) -> None:
         )
 
 
-def sequence_tensor(
-    txns: list[Transaction], max_len: int = 32
-) -> tuple[np.ndarray, np.ndarray, list[str]]:
-    """Per-entity padded sequences for the GRU/transformer layer.
-
-    Returns (X[n_entities, max_len, n_feats], y[n_entities], entity_ids). Right-aligned so the
-    most recent activity is always at the end of the window.
-    """
-    by_src: dict[str, list[Transaction]] = defaultdict(list)
-    for t in sorted(txns, key=lambda t: t.ts):
-        by_src[t.src].append(t)
-
-    ids, seqs, ys = [], [], []
-    for eid, rows in by_src.items():
-        rows = rows[-max_len:]
-        feats = []
-        prev_ts = None
-        for t in rows:
-            gap = (t.ts.timestamp() - prev_ts) if prev_ts else 0.0
-            prev_ts = t.ts.timestamp()
-            feats.append(
-                [np.log1p(t.amount), np.log1p(gap), float(t.ts.hour), float(t.rail == "card")]
-            )
-        pad = [[0.0] * 4] * (max_len - len(feats))
-        seqs.append(pad + feats)
-        ys.append(int(any(t.is_fraud for t in rows)))
-        ids.append(eid)
-    return np.array(seqs, dtype="float32"), np.array(ys, dtype=int), ids
+#: `sequence_tensor` lived here until ticket 17. It returned one window per *entity*, labelled
+#: ``any(t.is_fraud for t in window)`` — so the window containing the fraud row predicted that the
+#: window contains a fraud row, and the score was broadcast back onto that account's legitimate
+#: baseline rows. It is deleted rather than deprecated: the causal per-row replacement lives in
+#: `afl/defend/models/sequence.py` (`window_index` / `step_tensor`), and leaving the old one
+#: importable is leaving the bug importable.
