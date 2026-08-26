@@ -607,6 +607,16 @@ def _wrap(text: str, width: int = 98) -> str:
     return "\n".join(lines)
 
 
+def _period(text: str) -> str:
+    """A generated verdict as prose, ending in exactly one full stop. Never recapitalised.
+
+    `Comparison.verdict` opens with a system name — `gnn`, `lgbm` — and sentence-casing it would
+    print a column that does not exist.
+    """
+    text = " ".join(str(text).split())
+    return text + ("" if not text or text.endswith(".") else ".")
+
+
 def _sentence(text: str) -> str:
     """A generated reason as prose: capitalised, and ending in exactly one full stop."""
     text = " ".join(str(text).split())
@@ -790,7 +800,7 @@ def _fold_section(fold: mule_graph.MuleFold) -> str:
     ):
         if comparison is None:
             continue
-        out.append(f"**Lift {label}.** " + _wrap(_sentence(comparison.verdict)) + "\n")
+        out.append(_wrap(f"**Lift {label}** — {_period(comparison.verdict)}") + "\n")
         out.append("| seed | " + comparison.incumbent + " | gnn | delta |")
         out.append("| --- | ---: | ---: | ---: |")
         for row in comparison.per_seed:
@@ -805,7 +815,8 @@ def _fold_section(fold: mule_graph.MuleFold) -> str:
             _wrap(
                 "**Gate.** Never reached. The fold was refused before the comparison could carry "
                 "anything, so the bracketed rows above are what the gate *would* have read and "
-                f"not what it did. {mule_graph.FALLBACK} ships."
+                "not what it did. What ships is the stated fallback: "
+                f"{mule_graph.FALLBACK}."
             )
             + "\n"
         )
@@ -913,8 +924,7 @@ def _probe_power(reports: dict[str, mule_graph.GNNReport]) -> str:
                     f"{float(here['pr_auc']):.3f}, over the bar. Nothing about the generator "
                     "changed between the two runs — the episode count did. Read the matrix row "
                     "as underpowered rather than as a contradiction, and `make loao` at this "
-                    "episode count would be the way to settle it.",
-                    width=400,
+                    "episode count would be the way to settle it."
                 )
             )
     if not lines:

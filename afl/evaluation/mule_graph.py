@@ -63,7 +63,6 @@ from afl.contract.schema import Transaction
 from afl.evaluation import protocol
 from afl.evaluation.leave_one_attack_out import (
     MEASURED,
-    MIN_MEANINGFUL_POSITIVES,
     OUTCOMES,
     SKIPPED,
     WITHHELD,
@@ -928,11 +927,6 @@ def assert_config_matches_promotion(
         )
 
 
-def min_meaningful_positives() -> int:
-    """Re-exported so a caller does not have to import two evaluation modules to read one bar."""
-    return MIN_MEANINGFUL_POSITIVES
-
-
 __all__ = [
     "FALLBACK",
     "FLOOR",
@@ -954,7 +948,6 @@ __all__ = [
     "compare_across_seeds",
     "decide_promotion",
     "load_all",
-    "min_meaningful_positives",
     "neighbour_provenance",
     "motif_visibility",
     "neighbourhood_audit",

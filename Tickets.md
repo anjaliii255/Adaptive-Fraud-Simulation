@@ -37,7 +37,7 @@ blocks the frontier for both lanes.
 | 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
 | 16 | ~~The three-system table~~ **done** | ■ B | 11, 12 |
 | 17 | ~~Sequence model — earn it or report it~~ **done — reported, not promoted** | ■ B | 11 |
-| 18 | Temporal GNN — earn it or fall back | ■ B | 11 |
+| 18 | ~~Temporal GNN — earn it or fall back~~ **done — fell back, and said so** | ■ B | 11 |
 | 19 | The convergence artefact | ▲ A | 11, 12 |
 | 20 | One command reproduces a headline number | ▲ A | 16, 19 |
 | 21 | The live demo | ▲ A | 19 |
@@ -1433,15 +1433,75 @@ not, hand-rolled graph features are what ship, and the README says so.
 
 **Blocked by:** 11.
 
-**Status:** ready-for-agent
+**Status:** done — model in `afl/defend/models/gnn.py`, families/audits/gate in
+`afl/evaluation/mule_graph.py`, built by `make gnn` (`scripts/build_gnn.py`), evidence in
+`artifacts/gnn/`, written up in `docs/gnn.md`. **It did not earn its seat, so the stated fallback
+is what ships — and the two anchors refused it for opposite reasons.** On AMLSim it loses by
+almost the whole scale (PR-AUC 0.023 ± 0.038 on S1 against LightGBM's 0.998, 0.002 against 0.984
+on C3, 0/3 seeds) at 1.6x the fit cost — and that fold is withheld anyway, on a precondition
+nobody expected to be the deciding one: **AMLSim's rows are whole days**, so `Simulator.generate`
+quantises every injected fraud row to midnight to stay commensurable, an entire mule ring lands on
+one timestamp, and a model that may only read strictly-earlier edges was asked about a shape it
+structurally cannot see. Only 8.2% of injected S1 rows (0.6% for C3) can see any earlier edge of
+their own episode, against a floor of 20%. On PaySim, whose clock is hourly and where 86% can, the
+GNN is **level with what ships** (−0.023 ± 0.229 on S1 at 1/3 seeds, +0.024 ± 0.343 on C3 at 2/3,
+both inside their own spread) and ahead of the graph-blocks-only baseline by +0.079 and +0.139 —
+and those folds are withheld too, on the audit this ticket built for this model: a quarter to a
+third of the injected rows sit in a neighbourhood made only of other injected rows, and that share
+alone sorts injected from real at PR-AUC 0.53–0.54. `config/defend/gnn.yaml` stays `enabled:
+false`, and `assert_config_matches_promotion` refuses to let it be turned on while the committed
+artefacts say no.
 
-- [ ] Builds a temporal graph with an explicit window; edges older than the window are dropped
-- [ ] Scores through the standard `score` seam
-- [ ] Compared against graph-features + LightGBM on the same split at the same operating point
-- [ ] Lift is reported with variance across seeds, because a single-seed GNN result is not a result
-- [ ] The documented fallback is what ships if the lift is not there, and the README says which
-      one shipped
-- [ ] Raises clearly when the deep extra is missing; default suite stays green
+**Carry-out for ticket 11.** Same shape as ticket 17's. These folds carry 173 injected PaySim S1
+rows against the matrix's 50, and at that size the provenance probe separates injected from real
+at PR-AUC 0.865 — over the bar — where `artifacts/loao/paysim.json` measured 0.298 and *reported*
+the fold. Nothing about the generator changed; the episode count did. PaySim S1 is one of only
+four measured rows in the whole matrix, and it should be read as underpowered until `make loao` is
+re-run at this episode count. That is now two families flagged this way from two different
+tickets, so it is a property of `eval.holdout_episodes` rather than of one vector.
+
+- [x] Builds a temporal graph with an explicit window; edges older than the window are dropped —
+      time is cut into `stride_hours` steps and a payment is scored against the edges in
+      `[stride_start - window, stride_start)`. Nothing in a snapshot is at or after the stride it
+      scores, so no row informs its own score and no later row can move an earlier one; a test
+      appends future traffic and asserts the earlier scores do not budge. Self-payments are
+      dropped and counted, because `GATConv` strips them before adding its own and the shift
+      would silently misalign the attention the reason codes are read through
+- [x] Scores through the standard `score` seam — one score per *transaction*, labelled with that
+      transaction's own label, from its two endpoints' embeddings and its own row. The version
+      this replaced labelled the *node*: every beneficiary of a fraud row was marked positive and
+      the node's score was broadcast back onto that account's legitimate inbound payments, which
+      is a lookup rather than a detector. Scoring-time history crosses the fit/score boundary the
+      way the stateful `FeatureBuilder`'s does, and the attention weights become the local
+      explanation `explain.assert_flagged_rows_are_explained` demands — including an honest
+      refusal to narrate a ring over a beneficiary that is an isolated node
+- [x] Compared against graph-features + LightGBM on the same split at the same operating point —
+      the same `Fold.carve` against the committed boundary, the same calibration on the same
+      validation tail, the same cost model and bands, and `amount_only` under all of them. **Two**
+      baselines are reported: `lgbm` over the whole hand-rolled table, and `graph_lgbm` over the
+      graph blocks alone (`features.graph_feature_names`). The gate is decided on the *former* on
+      purpose — a challenger promoted over a deliberately narrowed champion is a number that does
+      not survive contact with the deployed system, and this is the easiest place in the repo to
+      manufacture a lift that way. The narrower column is published because "it loses to graph
+      features" and "it loses to the velocity block next to them" are different findings
+- [x] Lift is reported with variance across seeds — three seeds per fold, each regenerating its
+      own pool *and* refitting every system, so the spread covers the attacker's draw and not
+      only the network's initialisation. The margin is a paired per-seed difference with its
+      standard deviation and a sign test, reusing ticket 16's `Spread` and `Comparison` rather
+      than a second copy of them, so the hero table and this experiment are read at one bar. The
+      gate refuses one seed outright and refuses any margin smaller than its own spread — which
+      is what both PaySim folds fell to
+- [x] The documented fallback is what ships if the lift is not there, and the README says which
+      one shipped — `TemporalGNNDetector.fallback()` returns the hand-rolled detector, every
+      refusal branch names it in `Promotion.shipped`, `GNNReport.shipped` is in the artefact, and
+      a test reads `README.md` and asserts the sentence there agrees with the committed evidence.
+      The claim about what is deployed is enforced rather than remembered
+- [x] Raises clearly when the deep extra is missing; default suite stays green — the constructor
+      calls `require_deep` up front, so a config that enables the layer without torch and
+      torch-geometric fails before it spends an hour generating a pool it cannot score. Only the
+      tests that actually build a network are skipped without the extra: the window arithmetic,
+      the two audits, the seed aggregation, the gate and the artefact are pure numpy and run on
+      the default install
 
 ---
 

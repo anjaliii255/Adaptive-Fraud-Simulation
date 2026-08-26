@@ -55,6 +55,15 @@ artifacts/**
 # somebody deleted: "it didn't help" is a published result or it is nothing.
 !artifacts/sequence/
 !artifacts/sequence/**
+# the temporal-GNN comparison: graph attention against the hand-rolled graph features on the mule
+# families, over three seeds with the lift paired across them, and the audits that decide whether
+# a fold means anything — including the two specific to this model, whether an injected ring is
+# instantaneous on the anchor's own clock and whether its neighbourhood is made of other injected
+# rows. `docs/gnn.md` is generated from these files, and the record of WHICH MODEL SHIPPED lives
+# here: ticket 18's fallback is a claim about deployment, and a claim about deployment that lives
+# only in a doc is one config edit away from being false.
+!artifacts/gnn/
+!artifacts/gnn/**
 # the hero table: three systems on one guarded fold, over several seeds, in both columns, with
 # the per-seed numbers the spread is computed from and the loop's per-round history. It is the
 # one artefact the deck quotes, `docs/three_system.md` is generated from it, and a slide number
