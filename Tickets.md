@@ -38,7 +38,7 @@ blocks the frontier for both lanes.
 | 16 | ~~The three-system table~~ **done** | ■ B | 11, 12 |
 | 17 | ~~Sequence model — earn it or report it~~ **done — reported, not promoted** | ■ B | 11 |
 | 18 | ~~Temporal GNN — earn it or fall back~~ **done — fell back, and said so** | ■ B | 11 |
-| 19 | The convergence artefact | ▲ A | 11, 12 |
+| 19 | ~~The convergence artefact~~ **done — the loop closes, the transfer does not** | ▲ A | 11, 12 |
 | 20 | One command reproduces a headline number | ▲ A | 16, 19 |
 | 21 | The live demo | ▲ A | 19 |
 | 22 | Submission pack and claims audit | ◆ A+B | 15, 16, 20, 21 |
@@ -1519,15 +1519,31 @@ spectacular; a measurable adaptive loop *existing* is the win.
 
 **Blocked by:** 11, 12.
 
-**Status:** ready-for-agent
+**Status:** done — `make figures` draws from `artifacts/abcd/`, the committed 7-seed A/B/C/D run
+on amlworld holding out GATHER-SCATTER. No re-run: the figure is a read of a logged result.
 
-- [ ] `make figures` regenerates the curve from logged runs alone
-- [ ] Both series plotted: evasion rate over fraud rows, and held-out recall at the fixed FPR
-- [ ] Retrain points marked on the curve
-- [ ] The underlying per-round numbers are written next to the figure so it can be checked
-- [ ] Axes and operating point labelled; no unlabelled or rescaled axis
-- [ ] Regenerating twice from the same logs produces an identical figure
-- [ ] If the curves do not cross or converge, the figure still ships and the write-up says so
+- [x] `make figures` regenerates the curve from logged runs alone — reads the committed artefact,
+      runs no model, and is the only way these images are produced.
+- [x] Both series plotted: evasion rate and held-out recall @ 1% FPR, all 7 seeds drawn faintly
+      under the bold mean so a bad round stays visible instead of being averaged away.
+- [x] Retrain points marked — the detector refits at every round boundary, and the marks say so.
+- [x] The per-round numbers are written beside the figure as `..._convergence.md`, mean ± sd plus
+      every seed's raw evasion trace, so a curve can be checked against its values.
+- [x] Axes and operating point labelled, and the fold's own facts are baked into the image
+      caption — 173 positives, base rate 0.0532%, split `f5e33a878d68b792` — because a figure
+      gets screenshotted away from the README that carries its caveats.
+- [x] Regenerating twice produces an identical figure, verified by sha256 and held by a test.
+      Matplotlib stamps its own version into the PNG, which would have broken this silently.
+- [x] The curves do not converge, and the figure ships. Evasion falls 0.915 → 0.201 over six
+      rounds on all 7 seeds; held-out recall stays flat and noisy. **The loop closes on the
+      attacker; what does not materialise is the transfer to a held-out family** — the same
+      thing the A/B/C/D null says, in the picture rather than the table.
+- [x] **Not on the list, and the reason ticket 14 now has a second job:** the same pass drew the
+      realism leash, and it is pinned at 0.065 ± 0.001 in 41 of 42 rounds. Two of `realism.py`'s
+      three soft terms never fire and the third sits at its ceiling, so the penalty is a constant
+      — and a constant subtracted from every trial leaves the argmax alone. **λ is currently a
+      no-op on the search.** Reported here rather than fixed, because fixing it changes the
+      committed A/B/C/D result and that is a decision, not a patch.
 
 ---
 
