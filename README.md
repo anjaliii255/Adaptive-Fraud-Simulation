@@ -16,6 +16,88 @@ The full design, the nine attack vectors, and the reasoning behind each choice l
 architecture doc (`docs/architecture.html`). Read that for intent; this README is for running the
 thing.
 
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph DATA["data"]
+        direction TB
+        ANCHOR[Real anchor<br/>PaySim · AMLSim<br/>BankSim · AMLworld]
+        LOADER[Config-driven loader]
+        SCHEMA[Contract schema]
+        SPLIT[Committed split<br/>digest · embargo]
+        ANCHOR --> LOADER --> SCHEMA --> SPLIT
+    end
+
+    subgraph RED["RED · attack"]
+        direction TB
+        ENV[Anchor envelope<br/>scale · rails · pools]
+        SIM[Simulator<br/>3 engines · 9 vectors]
+        OPT[Adaptive optimiser<br/>search over knobs]
+        ENV --> SIM --> OPT
+    end
+
+    GATE{{Audit gate<br/>separable? reject}}
+
+    subgraph BLUE["BLUE · defend"]
+        direction TB
+        FEAT[Feature engineering<br/>causal · graph]
+        DET[LightGBM detector]
+        ACT[Graded action · SHAP]
+        FEAT --> DET --> ACT
+    end
+
+    subgraph EVAL["evaluation"]
+        direction TB
+        LOAO[Held-out family]
+        ABCD[A/B/C/D]
+        CURVE[Convergence curve]
+        LOAO --> ABCD --> CURVE
+    end
+
+    subgraph INST["INSTRUMENTS · guards"]
+        direction LR
+        COMM[Commensurability audit]
+        FID[Fidelity gate]
+        TRANS[Transfer test]
+        PROV[Provenance probe]
+    end
+
+    SCHEMA --> ENV
+    OPT --> GATE
+    GATE -->|admitted · retrain| FEAT
+    SPLIT --> FEAT
+    DET --> LOAO
+    DET ==>|loop · evasions| OPT
+
+    GATE -.-> COMM
+    SIM -.-> FID
+    ABCD -.-> TRANS
+    LOAO -.-> PROV
+
+    classDef red stroke:#c0392b,stroke-width:2px,fill:none
+    classDef blue stroke:#2471a3,stroke-width:2px,fill:none
+    classDef inst stroke:#7f8c8d,stroke-width:1px,stroke-dasharray:4 3,fill:none
+    classDef plain stroke:#566573,stroke-width:1px,fill:none
+    class ENV,SIM,OPT red
+    class FEAT,DET,ACT blue
+    class COMM,TRANS,FID,PROV inst
+    class ANCHOR,LOADER,SCHEMA,SPLIT,LOAO,ABCD,CURVE,GATE plain
+    style DATA fill:none,stroke:#95a5a6
+    style RED fill:none,stroke:#c0392b
+    style BLUE fill:none,stroke:#2471a3
+    style EVAL fill:none,stroke:#95a5a6
+    style INST fill:none,stroke:#7f8c8d
+```
+
+The contract schema is the seam: both sides code against one internal type, so nothing downstream
+knows or cares which anchor the rows came from, and `afl/attack/**` and `afl/defend/**` never import
+each other. The bold edge is the loop — the detector's evasions steer the optimiser's next search,
+the detector retrains on what the gate admitted, and the round repeats. The dashed instruments are what
+make the whole thing answerable: they gate a batch before it is ever trained on, and verify a fold
+before a number from it is allowed to be quoted, which is why several numbers in this README are
+reported as withheld rather than reported as wins.
+
 ## Where this is right now
 
 The pipeline runs end to end on **real data** — PaySim and the IBM AMLSim dump both load through
