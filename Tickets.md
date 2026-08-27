@@ -33,7 +33,7 @@ blocks the frontier for both lanes.
 | 11 | ~~Leave-one-attack-out harness with leakage guards~~ **done** | ■ B | 08, 03 |
 | 12 | ~~Multi-vector adaptive optimiser~~ **done** | ▲ A | 01, 02, 08 |
 | 13 | M1 — the optimiser's boundary walk as a vector | ▲ A | 12 |
-| 14 | Realism leash, reported every round | ▲ A | 12 |
+| 14 | ~~Realism leash, reported every round~~ **done — it was not holding anything, and that is the finding** | ▲ A | 12 |
 | 15 | ~~Fidelity scorecard on real anchor data~~ **done** | ■ B | 06, 08 |
 | 16 | ~~The three-system table~~ **done** | ■ B | 11, 12 |
 | 17 | ~~Sequence model — earn it or report it~~ **done — reported, not promoted** | ■ B | 11 |
@@ -1116,15 +1116,37 @@ and clamping to the declared envelope. The expensive verdict is ticket 15's job.
 
 **Blocked by:** 12.
 
-**Status:** ready-for-agent
+**Status:** done — and the answer to "is the optimiser cheating?" turned out to be "the mechanism
+that was supposed to tell us was not working." Full derivation in `docs/realism-leash.md`.
 
-- [ ] Each round logs a realism penalty and any violations by name, next to the evasion rate
-- [ ] Cross-row rules enforced: no self-transfers, no duplicate ids, no unlabelled fraud rows,
-      no provenance on legit rows
-- [ ] Empirical bounds derived from the real anchor, not hard-coded guesses
-- [ ] A deliberately absurd param set is caught by the leash in a test
-- [ ] λ is config, and its effect on the search is demonstrated with a run at two values
-- [ ] Realism penalty over rounds is plottable next to evasion rate — the "is it cheating?" chart
+- [x] Each round logs a realism penalty and violations by name, beside the evasion rate — and the
+      report now also carries `terms` (each soft term's own contribution) and `binding`, which
+      answers "is this number responding to anything?" rather than leaving it to be inferred.
+- [x] Cross-row rules enforced and named: self-transfer, duplicate id, unlabelled fraud row,
+      provenance on a legit row, non-positive amount, empty attack. One test per rule.
+- [x] Empirical bounds derived from the real anchor — `RealismBounds.from_anchor`. **The shipped
+      defaults are deliberately left unchanged**, so the committed A/B/C/D artefact still traces to
+      the code that produced it; enabling measured bounds is a re-run, which is a decision.
+- [x] A deliberately absurd param set is caught by the leash in a test — every fraud edge on one
+      beneficiary, every amount round, all at one instant.
+- [x] λ is config, and demonstrated at two values: against a constant penalty the winner does not
+      change for any λ, against a moving one it does. Run on a controlled stand-in rather than a
+      repeat of the anchor.
+- [x] Realism penalty is plottable next to evasion rate — `artifacts/abcd/*_realism.png`, ticket 19.
+
+- [x] **The finding, which is why this ticket became the keystone.** The penalty was 0.065 ± 0.001
+      in 41 of 42 committed rounds. Two of its three terms are structurally dead (ceilings 70× and
+      700× above anything the real anchors do) and the third is pointed the wrong way: every anchor
+      measures ~0.99 amount precision against a target guessed at 0.6, so `|0.99 − 0.6| × 0.5 / 3 =
+      0.065` — the constant, derived. **A constant penalty cannot change an argmax, so λ was a no-op
+      on the search for the whole experiment.**
+
+- [x] **The reconciliation with B's two audit rules.** `lift` refuses at generation and rejected
+      100% of candidates on amlsim/paysim; `envelope` admits them and the provenance probe then
+      refuses at evaluation (PR-AUC 0.998 / 0.970), withholding the column. Two independent guards,
+      opposite ends of the pipeline, one verdict: separable, no quotable number. Loosening the gate
+      moved where the refusal happened, it did not rescue the table — so `lift` was right on those
+      anchors, and its rejection rate was the first signal of what B's probe later measured.
 
 ---
 
