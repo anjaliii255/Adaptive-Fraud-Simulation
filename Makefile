@@ -56,7 +56,7 @@ compare:  ## the same three systems through the hydra loop on the default config
           ## check, not the reportable table. `make table` is the one that carries numbers.
 	uv run python scripts/run_experiment.py -m experiment=baseline,smote,adaptive
 
-figures:  ## convergence curve + 3-system table from logged runs
+figures:  ## convergence curve, realism leash and the numbers behind them, from logged runs
 	uv run python scripts/make_figures.py
 
 demo:     ## api + streamlit + mlflow
