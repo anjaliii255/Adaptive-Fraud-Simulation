@@ -1,0 +1,43 @@
+{
+  "anchor": "amlworld",
+  "seed": 1337,
+  "split_digest": "f5e33a878d68b792",
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100
+  },
+  "gate_1_hosts_behaviour": {
+    "rows": 1670437,
+    "accounts": 118053,
+    "history_coverage": 0.9293,
+    "median_txns_per_account": 2,
+    "mean_txns_per_account": 14.1499,
+    "max_txns_per_account": 168672,
+    "share_of_rows_on_a_repeat_account": 0.9822,
+    "thresholds": {
+      "history_coverage_gt": 0.5,
+      "median_txns_per_account_gte": 10
+    },
+    "passes_coverage": true,
+    "passes_median": false,
+    "verdict": "SPLIT"
+  },
+  "gate_2_fraud_non_trivial": {
+    "amount_floor_pr_auc": 0.004169,
+    "trained_ceiling_pr_auc": 0.178768,
+    "ratio": 0.0233,
+    "threshold_ratio_lte": 0.6,
+    "verdict": "PASS",
+    "n_positives_in_test": 623,
+    "recall_at_fixed_fpr": 0.35313,
+    "top_features": [
+      "amount",
+      "hour_of_day",
+      "dst_account_age_s",
+      "src_account_age_s",
+      "src_amount_z",
+      "src_amount_ratio_to_mean"
+    ]
+  },
+  "gate_3_transfer": "artifacts/transfer/amlworld.json"
+}

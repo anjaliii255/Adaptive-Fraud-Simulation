@@ -107,3 +107,7 @@ skills-lock.json
 # laptop is not a result anyone can check, and ticket 19's figure regenerates from these files.
 !artifacts/abcd/
 !artifacts/abcd/**
+# the anchor gates: the two numbers that decided which dataset hosts the loop. Gate 2's ratio is
+# the reason AMLworld was used at all, and a reason that traces to nothing is not a reason.
+!artifacts/spike/
+!artifacts/spike/**
