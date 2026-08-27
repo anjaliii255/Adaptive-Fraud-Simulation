@@ -14,6 +14,45 @@ from dataclasses import dataclass, field
 from afl.contract.schema import AttackBatch, Transaction
 
 
+@dataclass(frozen=True)
+class RealismBounds:
+    """What the leash compares a batch against.
+
+    `DEFAULT` is what ticket 12 shipped and what the committed A/B/C/D run was scored under. Its
+    three numbers are guesses, and ticket 14 measured what they cost: see `docs/realism-leash.md`.
+    `from_anchor` replaces them with the anchor's own statistics, which is what the ticket asked
+    for — bounds derived from real data rather than chosen at a keyboard.
+    """
+
+    max_degree_concentration: float = 0.6
+    max_round_share: float = 0.5
+    target_precision_share: float = 0.6
+    source: str = "default"
+
+    @classmethod
+    def from_anchor(
+        cls, txns: list[Transaction], name: str = "anchor", *, headroom: float = 0.1
+    ) -> RealismBounds:
+        """Measure the anchor, so 'unrealistic' means 'unlike this data' rather than 'unlike 0.6'.
+
+        Concentration and round-share are ceilings, so they take the anchor's value plus headroom:
+        exceeding what the real data does is the tell. Precision is a target to sit near, not a
+        ceiling, so it is taken as measured.
+        """
+        if not txns:
+            return cls()
+        fraud = [t for t in txns if t.is_fraud] or txns
+        return cls(
+            max_degree_concentration=min(1.0, _degree_concentration(fraud) + headroom),
+            max_round_share=min(1.0, _round_number_share(txns) + headroom),
+            target_precision_share=_amount_precision_share(txns),
+            source=name,
+        )
+
+
+DEFAULT_BOUNDS = RealismBounds()
+
+
 @dataclass
 class RealismReport:
     """Cheap per-batch verdict on whether generated traffic still looks like traffic."""
@@ -21,10 +60,25 @@ class RealismReport:
     penalty: float  # 0 = indistinguishable-shaped, 1 = obviously fake
     violations: list[str] = field(default_factory=list)
     detail: dict[str, float] = field(default_factory=dict)
+    #: Each soft term's own contribution, so a penalty that never moves can be seen to be one
+    #: term saturating rather than three terms agreeing. This is how ticket 14 found the leash
+    #: was not binding: `precision` sat at its ceiling while the other two never fired at all.
+    terms: dict[str, float] = field(default_factory=dict)
+    bounds: str = "default"
 
     @property
     def ok(self) -> bool:
         return not self.violations
+
+    @property
+    def binding(self) -> bool:
+        """Is any term actually responding to this batch, or is the number a constant?
+
+        A leash whose penalty is the same for every candidate cannot change which candidate wins:
+        fitness is `evasion - λ·penalty`, and subtracting an equal constant from every trial leaves
+        the argmax alone. That is a λ that does nothing, and it is invisible unless asked directly.
+        """
+        return any(v > 0 for k, v in self.terms.items() if k != "precision")
 
 
 def _schema_violations(txns: list[Transaction]) -> list[str]:
@@ -68,11 +122,25 @@ def _degree_concentration(txns: list[Transaction]) -> float:
 def check(
     batch: AttackBatch,
     *,
-    max_degree_concentration: float = 0.6,
-    max_round_share: float = 0.5,
+    max_degree_concentration: float | None = None,
+    max_round_share: float | None = None,
     min_fraud_rows: int = 1,
+    bounds: RealismBounds | None = None,
 ) -> RealismReport:
-    """Cheap per-batch verdict. Hard violations pin the penalty at 1.0."""
+    """Cheap per-batch verdict. Hard violations pin the penalty at 1.0.
+
+    Defaults are unchanged from what the committed A/B/C/D run was scored under; pass `bounds` to
+    compare against a measured anchor instead. The explicit float arguments still win over
+    `bounds`, so existing callers keep their behaviour exactly.
+    """
+    bounds = bounds or DEFAULT_BOUNDS
+    max_degree = (
+        max_degree_concentration
+        if max_degree_concentration is not None
+        else bounds.max_degree_concentration
+    )
+    max_round = max_round_share if max_round_share is not None else bounds.max_round_share
+
     fraud = batch.fraud_transactions
     violations = _schema_violations(batch.transactions)
     if len(fraud) < min_fraud_rows:
@@ -93,11 +161,13 @@ def check(
     round_share = _round_number_share(fraud)
     precision_share = _amount_precision_share(fraud)
 
-    soft = 0.0
-    soft += max(0.0, degree - max_degree_concentration) / max(1e-9, 1 - max_degree_concentration)
-    soft += max(0.0, round_share - max_round_share) / max(1e-9, 1 - max_round_share)
-    soft += abs(precision_share - 0.6) * 0.5  # real rails give a mix, not all-or-nothing
-    penalty = 1.0 if violations else min(1.0, soft / 3.0)
+    terms = {
+        "degree": max(0.0, degree - max_degree) / max(1e-9, 1 - max_degree),
+        "round": max(0.0, round_share - max_round) / max(1e-9, 1 - max_round),
+        # a target to sit near, not a ceiling: real rails give a mix, not all-or-nothing
+        "precision": abs(precision_share - bounds.target_precision_share) * 0.5,
+    }
+    penalty = 1.0 if violations else min(1.0, sum(terms.values()) / 3.0)
 
     return RealismReport(
         penalty=round(penalty, 6),
@@ -108,4 +178,6 @@ def check(
             "amount_precision_share": round(precision_share, 4),
             "n_fraud": float(len(fraud)),
         },
+        terms={k: round(v, 6) for k, v in terms.items()},
+        bounds=bounds.source,
     )
