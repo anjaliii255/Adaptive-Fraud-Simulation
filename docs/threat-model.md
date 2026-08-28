@@ -1,8 +1,8 @@
-# Threat model — nine vectors, three engines
+# Threat model — the vector taxonomy
 
-_Eight built, one template (M1)._
+_9 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode._
 
-Nine vectors, three engines. The ids match the architecture doc and are frozen; see
+9 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. Three engines. The ids match the architecture doc and are frozen; see
 `docs/adr/0001-vector-taxonomy-and-holdout.md` for why each one is where it is, and
 `afl/attack/templates/vectors.yaml` for the definitions. Adding a vector is a YAML edit.
 
@@ -33,8 +33,8 @@ declares:
 - **planned** — cannot be generated. `Simulator.generate` raises and names the ticket, because a
   family that silently emits nothing looks exactly like a family the detector caught.
 
-So eight of the nine are done. Only M1 still owes work, and it arrives free as the optimiser's
-own boundary walk. **M3 is the leave-one-attack-out holdout** because `user == fraudster` breaks
+So **8 of the 9 are fully simulated.** Only M1 still owes work — it is an adversarial
+boundary-probing extension, in template mode, and it arrives as the optimiser's own boundary walk. **M3 is the leave-one-attack-out holdout** because `user == fraudster` breaks
 the legit-vs-attacker assumption every supervised feature rests on: the abuse runs on the owner's
 own device, to beneficiaries the account already pays, elevated only against that account's own
 history. A one-line amount rule at 1% FPR catches 3% of it, which is the point.

@@ -279,7 +279,7 @@
       <h1>Make the <span class="red">attacker</span> and the <span class="blue">defender</span> co-adapt.</h1>
       <p class="sub">One closed loop that generates adaptive payment attacks, learns where the detector is blind, and proves it caught an attack family it was never trained on — reproducibly.</p>
       <div class="tags">
-        <span class="tag">9 vectors · 3 engines</span>
+        <span class="tag">9 vectors identified · 8 simulated · 3 engines</span>
         <span class="tag">Leave-one-attack-out</span>
         <span class="tag">Card · UPI · A2A</span>
         <span class="tag">One-command reproduce</span>
@@ -333,7 +333,7 @@
 
   <div class="wrap">
     <div class="stats reveal">
-      <div class="stat"><div class="n g">3</div><div class="k">simulation engines power all nine vectors</div></div>
+      <div class="stat"><div class="n g">3</div><div class="k">simulation engines; 8 of the 9 vectors are fully simulated</div></div>
       <div class="stat"><div class="n a">3</div><div class="k">strong vectors run the full adaptive loop</div></div>
       <div class="stat"><div class="n d">1</div><div class="k">falsifiable hypothesis the whole system tests</div></div>
       <div class="stat"><div class="n">5</div><div class="k">attack surfaces covered + first-party fraud</div></div>
@@ -374,7 +374,7 @@
           </g>
           <g>
             <rect x="200" y="30" width="140" height="46" rx="3" fill="#121A21" stroke="#FF5A47"/>
-            <text x="270" y="50" fill="#FF5A47">Attack simulator</text><text x="270" y="65" fill="#8B98A4" font-size="10">3 engines · 9 vectors</text>
+            <text x="270" y="50" fill="#FF5A47">Attack simulator</text><text x="270" y="65" fill="#8B98A4" font-size="10">3 engines · 8 of 9 built</text>
           </g>
           <g>
             <rect x="400" y="30" width="140" height="46" rx="3" fill="#121A21" stroke="#4CC2FF"/>
@@ -420,7 +420,7 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="sec-num">01 / IDENTIFY</div>
-      <h2 class="sec-title">Nine vectors, and why each is here</h2>
+      <h2 class="sec-title">Nine vectors identified, eight simulated, and why each is here</h2>
     </div>
     <p class="lead">Breadth is a judged criterion, so we carry nine. But nine configurations collapse onto three engines — graph, velocity, drift — so the build cost stays near three. Only the strong three carry the adaptive machinery; the rest are templates or held-out tests.</p>
 
@@ -527,7 +527,7 @@
       <div class="panel reveal">
         <h3>Actors &amp; two-tier generation</h3>
         <div class="rowline"><div class="lbl n">Actors</div><div class="txt">Normal user · fraudster · mule · merchant — each a parameter bundle, not an autonomous agent.<small>Params: amount dist, frequency, inter-arrival, counterparty diversity, account age, shared devices, fan-in/out, cash-out speed.</small></div></div>
-        <div class="rowline"><div class="lbl n">Tier 1</div><div class="txt">Deterministic / probabilistic templates for all nine vectors — cheap, reproducible, form the baseline training and fixed benchmarks.</div></div>
+        <div class="rowline"><div class="lbl n">Tier 1</div><div class="txt">Deterministic / probabilistic templates across the vector set (8 of 9 fully simulated; M1 is a boundary-probing extension in template mode) — cheap, reproducible, form the baseline training and fixed benchmarks.</div></div>
         <div class="rowline"><div class="lbl">Tier 2</div><div class="txt">Adaptive optimiser wraps only S1–S3. This is the novel part.</div></div>
       </div>
 

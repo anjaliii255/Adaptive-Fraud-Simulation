@@ -17,9 +17,9 @@ Three anchors had already failed to validate the loop's held-out claim:
 
 - **PaySim** — no repeated entities. Behaviour cannot be anomalous against a history that does not
   exist.
-- **AMLSim** — its own fraud is amount-trivial. Floor 0.456 against a ceiling of 0.594, ratio 0.77:
-  no room left to measure anything a model contributes.
-- **BankSim** — transfer fails. Synthetic-trained 0.238 against a 0.702 amount floor, and that is
+- **AMLSim** — its own fraud is amount-trivial. Floor 0.455644 against a ceiling of 0.593653,
+  ratio 0.7675: no room left to measure anything a model contributes.
+- **BankSim** — transfer fails. Synthetic-trained 0.2377 against a 0.7023 amount floor, and that is
   the *second* number, measured after fixing a payee-namespace leak the audit itself initially
   missed.
 
@@ -45,8 +45,8 @@ Both gates below are recomputed by `scripts/spike_gates.py` and committed to
   The verdict is SPLIT under either figure, and the corrected one makes the point more strongly
   than the number it replaces.
 - **Gate 2 (own fraud non-trivial): PASS, decisively.** Amount-only floor 0.004169 against a trained
-  ceiling of 0.178768, ratio **0.0233** — against a threshold of ≤ 0.6, where AMLSim scored 0.77 and
-  BankSim 0.736. Measured on the anchor's own fraud in the test window, 623 positives. Finding:
+  ceiling of 0.178768, ratio **0.0233** — against a threshold of ≤ 0.6, where AMLSim scored 0.7675 and
+  BankSim 0.7359 (both derived, see Provenance). Measured on the anchor's own fraud in the test window, 623 positives. Finding:
   **the IBM generator family is not uniformly amount-legible** — the small sibling was, the
   typology-rich large set is not.
 
@@ -63,8 +63,9 @@ Both gates below are recomputed by `scripts/spike_gates.py` and committed to
 
 **Decision on the gate rule.** Gates 1 and 3 fail their literal thresholds, so the mechanical rule
 returns NO-GO. We record that, and also that the thresholds tested a stricter question ("synthetic
-replaces real labels") than the project's actual claim ("adaptive augmentation improves a
-detector"). AMLworld was taken forward as the loop anchor because Gate 2 — the gate that killed the
+replaces real labels") than the claim the project was pursuing *at the time this spike ran*
+("adaptive augmentation improves a detector"). That claim has since been withdrawn — the 7-seed
+result below is what withdrew it, and `docs/claim.md` states what replaced it. AMLworld was taken forward as the loop anchor because Gate 2 — the gate that killed the
 whole IBM family's small sibling and every prior anchor — passed cleanly, and for the right
 relational reason.
 
@@ -147,6 +148,10 @@ mean, max and repeat-share all matched, and its headline coverage figure did not
 against 54.6% written down. The discrepancy was invisible for as long as the number lived only in a
 terminal, and that is the argument for the artefact, not an argument against the gate.
 
-The comparison ratios quoted for AMLSim (0.77) and BankSim (0.736) are from ADR 0002 and ADR 0004
-and have not been recomputed under `spike_gates.py`. They are cited as context for AMLworld's 0.0233,
-not as measurements this ADR stands behind.
+The comparison ratios quoted for AMLSim (0.7675) and BankSim (0.7359) were first written in ADR 0002
+and ADR 0004, before `spike_gates.py` existed. They have since been checked and **do trace to
+committed artefacts**: both are `amount_floor.real_fraud.pr_auc ÷ real.real_fraud.pr_auc` in
+`artifacts/transfer/<anchor>.json` — AMLSim 0.455644 / 0.593653, BankSim 0.702308 / 0.954362. They
+are cited as context for AMLworld's 0.0233 rather than as measurements under the same gate
+definition, and should not be compared to it at the fourth decimal; `spike_gates.py` has not been
+run on those two anchors.
