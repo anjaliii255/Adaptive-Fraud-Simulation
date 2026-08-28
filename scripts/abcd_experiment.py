@@ -45,6 +45,7 @@ from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol
 from afl.evaluation.three_system import smote_transactions
 from afl.loop.closed_loop import find_evasions
+from afl.utils.provenance import git_provenance
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("abcd")
@@ -328,6 +329,27 @@ def report(runs: list[dict], args) -> None:
             print(f"  sign test on {metric:19} {k}/{n} seeds   p = {pval:.3f}{tail}")
 
 
+def artifact_header(cfg: dict, args) -> dict:
+    """Everything a reader needs to regenerate this run, including the code that produced it.
+
+    `git_commit` is here because a split digest and a seed are not enough: they pin the data and
+    the draw, not the program. See `afl/utils/provenance.py` for what this cost to learn.
+    """
+    return {
+        "anchor": args.data,
+        "typology": args.typology,
+        "split_digest": committed_split_for(cfg).digest,
+        **git_provenance(),
+        "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
+        "allocation": args.allocation,
+        "leash": args.leash,
+        "lambda_realism": args.lambda_realism,
+        "audit_rule": "both" if args.leash == "binding" else "lift",
+        "rounds": args.rounds,
+        "episodes_per_round": args.episodes,
+    }
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     p = argparse.ArgumentParser()
@@ -381,16 +403,7 @@ def main() -> int:
     out.write_text(
         json.dumps(
             {
-                "anchor": args.data,
-                "typology": args.typology,
-                "split_digest": committed_split_for(cfg).digest,
-                "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
-                "allocation": args.allocation,
-                "leash": args.leash,
-                "lambda_realism": args.lambda_realism,
-                "audit_rule": "both" if args.leash == "binding" else "lift",
-                "rounds": args.rounds,
-                "episodes_per_round": args.episodes,
+                **artifact_header(cfg, args),
                 "runs": runs,
             },
             indent=2,
