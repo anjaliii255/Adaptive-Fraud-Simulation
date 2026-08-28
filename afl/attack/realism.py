@@ -64,6 +64,10 @@ class RealismReport:
     #: term saturating rather than three terms agreeing. This is how ticket 14 found the leash
     #: was not binding: `precision` sat at its ceiling while the other two never fired at all.
     terms: dict[str, float] = field(default_factory=dict)
+    #: The soft score alone, *not* overridden by the hard-violation cliff. `penalty` pins to 1.0
+    #: when a violation is present, which is right for a gate and wrong for a gradient — an
+    #: optimiser needs the graded signal separately from the veto.
+    soft_penalty: float = 0.0
     bounds: str = "default"
 
     @property
@@ -167,10 +171,12 @@ def check(
         # a target to sit near, not a ceiling: real rails give a mix, not all-or-nothing
         "precision": abs(precision_share - bounds.target_precision_share) * 0.5,
     }
-    penalty = 1.0 if violations else min(1.0, sum(terms.values()) / 3.0)
+    soft = min(1.0, sum(terms.values()) / 3.0)
+    penalty = 1.0 if violations else soft
 
     return RealismReport(
         penalty=round(penalty, 6),
+        soft_penalty=round(soft, 6),
         violations=violations,
         detail={
             "degree_concentration": round(degree, 4),
