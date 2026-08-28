@@ -17,7 +17,7 @@ other, neither supersedes the other, and their system labels collide. Read this 
 | arms | A_real, B_smote, **C_template**, **D_adaptive**, amount_floor | A_baseline, B_smote, **C_adaptive** |
 
 **The collision to watch: `C` is template-static in the first and adaptive in the second.** So
-"C beats B by +0.76 recall" (three-system) and "D vs C is a coin flip" (A/B/C/D) are statements
+"C beats B by +0.76 recall" (three-system) and "C beats D on 6/7 seeds" (A/B/C/D) are statements
 about different arms, and neither contradicts the other. The A/B/C/D experiment has a
 template-static control that the three-system table does not; that control is the whole point of
 ticket 12, because it separates *any synthetic augmentation* from *adaptive* synthetic augmentation.
@@ -38,8 +38,8 @@ fold, base rate 0.053%, 6 rounds, 7 seeds.
 | --- | --- | --- | --- |
 | A_real | the anchor's real rows and labels | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
 | B_smote | the same plus row-level oversampling | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | the same plus **static** template attacks | 0.0449 ± 0.0309 | 0.639 ± 0.098 |
-| D_adaptive | the same plus the **adaptive** loop's attacks | 0.0622 ± 0.0582 | 0.613 ± 0.268 |
+| C_template | the same plus **static** template attacks | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
+| D_adaptive | the same plus the **adaptive** loop's attacks | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
 | amount_floor | nothing — rank by amount | 0.0013 | 0.012 |
 
 **C_template is what makes D falsifiable.** C and D share an episode budget, so the only difference
@@ -50,20 +50,28 @@ Per-seed direction, exact one-sided sign test:
 
 | comparison | PR-AUC | recall@1%FPR |
 |---|---|---|
-| D > C_template | 4/7, p = 0.500 | 4/7, p = 0.500 |
-| D > B_smote | 4/7, p = 0.500 | 6/7, p = 0.062 |
-| D > A_real | 3/7, p = 0.773 | 6/7, p = 0.062 |
+| D > C_template | 1/7, p = 0.992 | 2/7, p = 0.938 |
+| D > B_smote | 4/7, p = 0.500 | 2/7, p = 0.938 |
+| D > A_real | 1/7, p = 0.992 | 2/7, p = 0.938 |
 | D > amount_floor | 7/7, p = 0.008 | 6/7, p = 0.062 |
+| **C > D**, the same test read the other way | **6/7, p = 0.062** | 5/7, p = 0.227 |
 
-**The fold cannot resolve D against C** — 4/7 on both metrics. Every standard deviation above is
-comparable to or larger than its own mean, so seed variance exceeds the effect. The two 6/7 results
-are p = 0.062, neither significant, and D-vs-A does not hold direction across metrics. The one
-comparison that clears significance is that every system beats the amount floor on PR-AUC, which
-says the fold is not measuring amount-legibility and nothing about adaptive.
+**Adaptive loses to static template augmentation** — D wins 1 of 7 seeds on PR-AUC, and C wins 6 of
+7 (p = 0.062). Directional, not significant: 6/7 does not clear 0.05, and every standard deviation
+above is comparable to or larger than its own mean, so the fold is underpowered for an effect this
+size. The one comparison that clears significance is that every system beats the amount floor on
+PR-AUC, which says the fold is not measuring amount-legibility and nothing about adaptive.
 
-The loop itself converged: evasion falls 0.915 → 0.201 over six rounds on all 7 seeds, and the audit
-gate rejected 0 of 42 rounds, so the null is not an artefact of leaky synthesis. The comparison was
-also **unconstrained** — the per-round realism leash was not binding (`docs/realism-leash.md`).
+The loop itself converged: evasion falls 0.836 → 0.054 over six rounds, and the audit gate rejected
+0 of 42 rounds, so the result is not an artefact of leaky synthesis. The comparison is also
+**unconstrained** — the realism leash is inert, vetoing 0 of 42 rounds, and correcting its bounds
+changes the outcome not at all (`docs/realism-leash.md`).
+
+**Provenance.** These numbers come from `artifacts/abcd/amlworld_gather-scatter.json`, regenerated
+on commit `4050fc46` with a clean tree — the header carries `git_commit` and `git_dirty: false`
+beside the split digest. An earlier artefact reported here could not be reproduced from any commit
+in the repository; it is retired in `artifacts/abcd/retired/` and the defect is written up in
+`artifacts/abcd/README.md`.
 
 Full reasoning, including the retraction of an earlier 2-seed reading, is in
 `docs/adr/0005-amlworld-anchor-and-the-abcd-null.md`.

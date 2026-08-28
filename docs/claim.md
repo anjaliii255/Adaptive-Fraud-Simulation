@@ -22,8 +22,9 @@ An earlier version of this README claimed:
 > with real-only training and ordinary synthetic augmentation, reproducibly, with the mechanism
 > shown.
 
-**We do not claim that, because our own instruments do not support it.** A 7-seed A/B/C/D on
-AMLworld put adaptive against non-adaptive at 4/7 seeds, p = 0.500 — a coin flip. On the two anchors
+**We do not claim that, because our own instruments contradict it.** A 7-seed A/B/C/D on AMLworld
+put adaptive against non-adaptive at 1/7 seeds, p = 0.992 — and static template augmentation beat
+the adaptive loop on 6 of 7 seeds. On the two anchors
 where an apparent +0.76 recall gain did show up, the provenance probe sorted the injected rows from
 real traffic at PR-AUC 0.998, so the gain is explained by which generator wrote the row rather than
 by anything about fraud. The claim above is what survives.
@@ -116,7 +117,7 @@ none of them does training on synthetic alone beat sorting the test window by am
 
 ### 4. When they do pass, does adaptive beat non-adaptive?
 
-**Unresolved, and unconstrained.** AMLworld is the one anchor where question 3's gate passed, so it
+**No — and unconstrained.** AMLworld is the one anchor where question 3's gate passed, so it
 is the one place question 4 can honestly be asked. This is the **A/B/C/D experiment** (ticket 12), whose
 `C_template` arm is the static-synthetic control that makes "adaptive" falsifiable. Held out
 GATHER-SCATTER, 7 seeds:
@@ -125,39 +126,43 @@ GATHER-SCATTER, 7 seeds:
 |---|---|---|
 | A_real | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
 | B_smote | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | 0.0449 ± 0.0309 | 0.639 ± 0.098 |
-| D_adaptive | 0.0622 ± 0.0582 | 0.613 ± 0.268 |
+| C_template | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
+| D_adaptive | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
 | amount_floor | 0.0013 | 0.012 |
 
 Per-seed direction, D against each alternative, exact one-sided sign test:
 
 | comparison | PR-AUC | recall@1%FPR |
 |---|---|---|
-| D > C_template | 4/7, p = 0.500 | 4/7, p = 0.500 |
-| D > B_smote | 4/7, p = 0.500 | 6/7, p = 0.062 |
-| D > A_real | 3/7, p = 0.773 | 6/7, p = 0.062 |
+| D > C_template | 1/7, p = 0.992 | 2/7, p = 0.938 |
+| D > B_smote | 4/7, p = 0.500 | 2/7, p = 0.938 |
+| D > A_real | 1/7, p = 0.992 | 2/7, p = 0.938 |
 | D > amount_floor | 7/7, p = 0.008 | 6/7, p = 0.062 |
+| **C > D** (the same test, read the other way) | **6/7, p = 0.062** | 5/7, p = 0.227 |
 
-**The fold cannot resolve D against C.** 4/7 on both metrics, p = 0.500 — a coin. Every standard
-deviation in the table above is comparable to or larger than its own mean, so **seed variance
-exceeds the effect being looked for**. We report that rather than quote a favourable seed or a
-favourable metric.
+**Adaptive does not beat non-adaptive; it loses to it.** D wins on 1 of 7 seeds by PR-AUC and 2 of 7
+by recall. Read the other way, static template augmentation beats the adaptive loop on **6 of 7
+seeds, p = 0.062**.
 
-Two results do reach 6/7, and neither is a win for adaptive. **D beats the amount floor on recall
-at 6/7, p = 0.062**, and **D beats real-only on recall at 6/7, p = 0.062** — both above the 0.05
-line, so neither is significant, and the second does not even hold direction across metrics: on
-PR-AUC the same comparison is 3/7, p = 0.773. **The one comparison that clears significance is that
-every system beats the no-model amount floor on PR-AUC, 7/7, p = 0.008** — which establishes that
-the fold is not measuring amount-legibility, and nothing about adaptive.
+That is **directional, not significant.** 6/7 does not clear the 0.05 line, and every standard
+deviation in the table above is comparable to or larger than its own mean, so this fold is
+underpowered for an effect of this size — the same limitation that applied when the result read as
+a null. What we can say is that the direction is consistent and it is not the direction the project
+hoped for. **The one comparison that clears significance is that every system beats the no-model
+amount floor on PR-AUC, 7/7, p = 0.008** — which establishes that the fold is not measuring
+amount-legibility, and nothing about adaptive.
 
 An earlier 2-seed reading showed adaptive ahead 2/2 and was reported as established. It evaporated
 at 7 seeds. That retraction is recorded in `docs/adr/0005-amlworld-anchor-and-the-abcd-null.md`, and
 it is the reason the sign test exists in this project at all.
 
-**Unresolved in a second sense: the comparison was also unconstrained.** The per-round realism leash
-that was supposed to stop the optimiser buying evasion with unrealistic traffic **was not binding** —
-it reported a constant 0.065 in 41 of 42 rounds, so λ had no effect on the search for the entire
-experiment. The attacker was therefore never actually penalised for unrealism while these numbers
+**Unconstrained, in a second sense that survives the result.** The per-round realism leash that was
+supposed to stop the optimiser buying evasion with unrealistic traffic **is inert**. It vetoed 0 of
+42 rounds. Correcting its inverted bounds — measured off the anchor rather than guessed — made the
+penalty vary properly (41 distinct values across 42 rounds instead of a pinned 0.065) and changed
+the outcome **not at all**: a control run with the old leash and a run with the corrected one are
+bit-identical on the same code. So the leash was never the binding constraint, and this number is a
+measurement of an *unconstrained* attacker. The attacker was therefore never actually penalised for unrealism while these numbers
 were produced. Nothing suggests it exploited that (the audit gate rejected 0 of 42 rounds, and the
 fidelity scorecard was run independently), but the constraint was not enforced, so **D is not a
 measurement of "the best attack subject to staying realistic" — it is a measurement of an
@@ -165,10 +170,15 @@ unconstrained search.** Making the leash bind is the stated next step, and it wo
 optimiser's search and invalidate this artefact, which is why it is a re-run rather than a patch.
 Derivation in `docs/realism-leash.md`.
 
-So question 4 is **unresolved and unconstrained**, and both halves have to be fixed before it can be
-answered: a fold with the power to resolve the effect, and a leash that actually holds. This is a
-**null on an underpowered fold**, not a disproof — at 173 positives and a 0.053% base rate the fold
-cannot resolve differences of this size, and more seeds do not fix a power problem.
+So question 4 answers **no, directionally, and unconstrained**. Two caveats bound it in both
+directions: the fold is underpowered, so 6/7 at p = 0.062 is a direction rather than a proof; and
+the attacker was never actually constrained, so this is not evidence about what a realism-bounded
+adaptive attacker could do.
+
+**Provenance.** Every number in this section traces to `artifacts/abcd/amlworld_gather-scatter.json`,
+regenerated on commit `4050fc46` with a clean tree (`git_dirty: false`). The previous artefact
+reported here could not be reproduced from any commit; it is retired in `artifacts/abcd/retired/`
+with the evidence, and the stamp that now catches this is described in `afl/utils/provenance.py`.
 
 ## What we claim
 

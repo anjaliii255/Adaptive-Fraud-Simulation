@@ -8,8 +8,15 @@ Relates to ADR 0002 (dataset anchors) and ADR 0004 (BankSim spike). 0004 said no
 hunting; this records the one anchor we had already agreed was worth finishing, and the result it
 produced.
 
-**NO-GO on the adaptive claim.** Recorded as a definitive negative on an underpowered fold, not a
-disproof.
+**NO-GO on the adaptive claim.** Adaptive augmentation does not beat static template augmentation
+on this fold; it loses to it on 6 of 7 seeds. Directional rather than significant, on an
+underpowered fold, and measured on an attacker that was never actually constrained.
+
+**Superseded numbers.** The figures in this ADR were regenerated on 2026-08-28 from commit
+`4050fc46` with a clean tree. The artefact originally reported here could not be reproduced from
+any commit in this repository and is retired in `artifacts/abcd/retired/`; see
+`artifacts/abcd/README.md` for how it was caught and what fixed it. `A_real`, `B_smote` and the
+amount floor are unchanged — they never touch the simulator, which is how the defect was localised.
 
 ## Context
 
@@ -73,26 +80,26 @@ relational reason.
 
 Multi-vector adaptive optimiser (search over S1/S2/S3 knobs plus budget allocation) run as an
 A/B/C/D comparison. GATHER-SCATTER held out entirely, out-of-time split digest `f5e33a878d68b792`,
-173 positives, base rate 0.0532%, 6 rounds, 7 seeds (7, 11, 23, 42, 101, 1337, 2024). Every number
-below traces to `artifacts/abcd/amlworld_gather-scatter.json`.
+173 positives, base rate 0.0532%, 6 rounds, 7 seeds (7, 11, 23, 42, 101, 1337, 2024). Every number below traces to `artifacts/abcd/amlworld_gather-scatter.json`, whose header carries
+`git_commit: 4050fc46…` and `git_dirty: false` beside the split digest.
 
 | system | PR-AUC (mean ± sd) | recall@1%FPR (mean ± sd) |
 |---|---|---|
 | A_real | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
 | B_smote | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | 0.0449 ± 0.0309 | 0.639 ± 0.098 |
-| D_adaptive | 0.0622 ± 0.0582 | 0.613 ± 0.268 |
+| C_template | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
+| D_adaptive | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
 | amount_floor | 0.0013 | 0.012 |
 
 Sign tests on per-seed direction:
 
-- **D > C: PR-AUC 4/7 (p = 0.500), recall 4/7 (p = 0.500)** — a coin flip. This is the comparison
-  the ticket exists to answer.
-- D > A: PR-AUC 3/7 (p = 0.773), recall 6/7 (p = 0.062).
-- C > A: PR-AUC 2/7 (p = 0.938), recall 6/7 (p = 0.062).
+- **D > C: PR-AUC 1/7 (p = 0.992), recall 2/7 (p = 0.938)** — the comparison the ticket exists to
+  answer, and adaptive loses it. Read the other way, **C > D on 6/7 (p = 0.062)** by PR-AUC.
+- D > A: PR-AUC 1/7 (p = 0.992), recall 2/7 (p = 0.938).
+- C > A: PR-AUC 3/7 (p = 0.773), recall 4/7 (p = 0.500).
 - Every system beats the amount floor on PR-AUC: 7/7 (p = 0.008), all four. On recall it is 7/7 for
-  A, B and C, and **6/7 (p = 0.062) for D** — stated separately because rounding it up to a blanket
-  7/7 would be the same species of error this ADR retracts below.
+  A and B, and **6/7 (p = 0.062) for C and D** — stated separately because rounding it up to a
+  blanket 7/7 would be the same species of error this ADR retracts below.
 
 ## Decision
 
@@ -110,6 +117,12 @@ test was added at all.
 
 The only comparison that clears significance is that every system beats the no-model amount floor,
 which establishes that the fold is not measuring amount-legibility.
+
+**And the attacker was unconstrained.** The per-round realism leash vetoed 0 of 42 rounds. Its
+bounds were inverted — guessed at 0.6 where every anchor measures ~0.99 — and correcting them made
+the penalty vary properly while changing the outcome not at all: a control run under the old leash
+and a run under the corrected one are bit-identical on the same code. Nothing here is evidence about
+a realism-bounded adaptive attacker. `docs/realism-leash.md`.
 
 ## Consequences, and what holds
 
