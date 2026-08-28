@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
+from dataclasses import field as dataclass_field
 from typing import Any
 
 from afl.attack import realism as realism_lib
@@ -53,7 +54,22 @@ AUDIT_LIFT_LIMIT = 3.0
 #: Ticket 14 owns the leash and is where the two rules should be reconciled; until then both
 #: verdicts are recorded on every trial, so no run has to be repeated to find out what the other
 #: rule would have done.
-AUDIT_RULES = ("lift", "envelope")
+#:   `both`     — reject if EITHER rule fires. The strictest available, and what the binding-leash
+#:                configuration uses: a candidate has to satisfy both readings of "not separable
+#:                from the anchor" before the optimiser is allowed to score it at all.
+AUDIT_RULES = ("lift", "envelope", "both")
+
+#: The objective, stated once so it cannot drift from the code that implements it:
+#:
+#:     maximise   evasion_rate - lambda_realism * soft_fidelity_penalty
+#:     subject to (hard, veto):  no schema or provenance leak in the batch
+#:                               not separable from the anchor by the audit rule in force
+#:
+#: Hard gates veto: a candidate that trips one scores -1.0, is never trained on and can never
+#: become `best`. Soft objectives are graded: statistical and structural fidelity enter as a
+#: continuous penalty, so the search is pushed toward realism rather than fenced away from a
+#: cliff. Making every fidelity metric a hard gate would likely leave no feasible region at all
+#: on public synthetic anchors, which is why only separability and leaks are vetoes.
 
 
 @dataclass
@@ -64,6 +80,11 @@ class MultiTrial:
     params: dict[str, dict[str, Any]]
     evasion_rate: float = 0.0
     realism_penalty: float = 0.0
+    #: the graded score fitness actually reads; `realism_penalty` still carries the 1.0 cliff
+    realism_soft_penalty: float = 0.0
+    realism_terms: dict[str, float] = dataclass_field(default_factory=dict)
+    realism_violations: list[str] = dataclass_field(default_factory=list)
+    rejected_by_leak: bool = False
     audit_score: float = 0.0
     audit_base_rate: float = 0.0
     audit_worst: str | None = None
@@ -95,6 +116,7 @@ class MultiVectorOptimiser:
         episodes_per_round: int = 12,
         anchor: list[Transaction] | None = None,
         audit_rule: str = "lift",
+        bounds: realism_lib.RealismBounds | None = None,
     ) -> None:
         if allocation not in ALLOCATIONS:
             raise ValueError(f"unknown allocation {allocation!r}; expected one of {ALLOCATIONS}")
@@ -107,6 +129,14 @@ class MultiVectorOptimiser:
         self.audit_rule = audit_rule
         self.episodes_per_round = episodes_per_round
         self.anchor = anchor or []
+        #: Measured off the anchor when given, so "unrealistic" means "unlike this data" rather
+        #: than "unlike a number someone guessed". Falls back to the shipped defaults, which is
+        #: what the v1.0 artefact was scored under.
+        self.bounds = bounds or (
+            realism_lib.RealismBounds.from_anchor(self.anchor, "anchor")
+            if self.anchor
+            else realism_lib.DEFAULT_BOUNDS
+        )
         self.rng = make_rng(seed)
         self.trials: list[MultiTrial] = []
         self.rejected = 0
@@ -206,18 +236,31 @@ class MultiVectorOptimiser:
 
         Returns False when the batch is rejected, which is the signal not to train on it.
         """
-        report = realism_lib.check(batch)
+        report = realism_lib.check(batch, bounds=self.bounds)
         fraud = batch.fraud_transactions
         audit = envelope_audit(self.anchor, fraud) if self.anchor else {}
         score = float(audit.get("score", 0.0))
         base = float(audit.get("base_rate", 0.0))
         by_lift = bool(self.anchor) and score >= AUDIT_LIFT_LIMIT * max(base, 1e-9)
         by_envelope = bool(self.anchor) and bool(audit.get("trivially_separable"))
-        rejected = by_envelope if self.audit_rule == "envelope" else by_lift
+        by_rule = {
+            "lift": by_lift,
+            "envelope": by_envelope,
+            "both": by_lift or by_envelope,
+        }[self.audit_rule]
+        # a batch carrying a schema or provenance leak is not a weaker attack, it is not an
+        # attack — vetoed on the same footing as separability
+        by_leak = not report.ok
+        rejected = by_rule or by_leak
 
         self._batch_stats = {
             "n_fraud": len(fraud),
             "realism_penalty": report.penalty,
+            "realism_soft_penalty": report.soft_penalty,
+            "realism_terms": dict(report.terms),
+            "realism_violations": list(report.violations),
+            "realism_bounds": report.bounds,
+            "rejected_by_leak": by_leak,
             "audit_score": score,
             "audit_base_rate": base,
             "audit_worst": audit.get("worst"),
@@ -246,6 +289,10 @@ class MultiVectorOptimiser:
         trial.n_evasions = len(evasions)
         trial.evasion_rate = (len(evasions) / n_fraud) if n_fraud else 0.0
         trial.realism_penalty = float(stats.get("realism_penalty", 0.0))
+        trial.realism_soft_penalty = float(stats.get("realism_soft_penalty", 0.0))
+        trial.realism_terms = dict(stats.get("realism_terms") or {})
+        trial.realism_violations = list(stats.get("realism_violations") or [])
+        trial.rejected_by_leak = bool(stats.get("rejected_by_leak", False))
         trial.audit_score = float(stats.get("audit_score", 0.0))
         trial.audit_base_rate = float(stats.get("audit_base_rate", 0.0))
         trial.audit_worst = stats.get("audit_worst")
@@ -262,11 +309,12 @@ class MultiVectorOptimiser:
             by_vector[v][1] = max(by_vector[v][1], 1)
         trial.per_vector_evasion = {v: c[0] / max(n_fraud, 1) for v, c in by_vector.items()}
 
-        # a rejected candidate scores worse than any honest one, so the search leaves that region
+        # hard gate vetoes outright; otherwise evasion is traded against the GRADED fidelity
+        # penalty, so the search is steered toward realism rather than only fenced off a cliff
         trial.fitness = (
             -1.0
             if trial.rejected
-            else trial.evasion_rate - self.lambda_realism * trial.realism_penalty
+            else trial.evasion_rate - self.lambda_realism * trial.realism_soft_penalty
         )
 
         if self._study is not None and self._optuna_trial is not None:

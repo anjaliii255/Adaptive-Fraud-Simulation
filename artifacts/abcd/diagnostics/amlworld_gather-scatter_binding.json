@@ -1,0 +1,1466 @@
+{
+  "anchor": "amlworld",
+  "typology": "GATHER-SCATTER",
+  "split_digest": "f5e33a878d68b792",
+  "operating_point": {
+    "fixed_fpr": 0.01,
+    "k": 100
+  },
+  "allocation": "search",
+  "leash": "binding",
+  "lambda_realism": 0.5,
+  "audit_rule": "both",
+  "rounds": 6,
+  "episodes_per_round": 12,
+  "runs": [
+    {
+      "seed": 7,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.035517,
+          "recall_at_fixed_fpr": 0.34104,
+          "precision_at_k": 0.18,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.058222,
+          "recall_at_fixed_fpr": 0.716763,
+          "precision_at_k": 0.07,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.072082,
+          "recall_at_fixed_fpr": 0.66474,
+          "precision_at_k": 0.14,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.004269,
+          "recall_at_fixed_fpr": 0.040462,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1171847,
+          "n_train_fraud": 3560
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.08876909607575174,
+            "S2": 0.5731721681588007,
+            "S3": 0.33805873576544754
+          },
+          "n_fraud": 336,
+          "n_evasions": 285,
+          "evasion_rate": 0.8482142857142857,
+          "realism_penalty": 0.000787,
+          "fitness": 0.8478207857142857,
+          "seconds": 147.2,
+          "pr_auc": 0.005457,
+          "recall_at_fixed_fpr": 0.283237,
+          "precision_at_k": 0.03,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.32229603671327334,
+            "S2": 0.6281990650947744,
+            "S3": 0.04950489819195231
+          },
+          "n_fraud": 344,
+          "n_evasions": 92,
+          "evasion_rate": 0.26744186046511625,
+          "realism_penalty": 0.001117,
+          "fitness": 0.26688336046511624,
+          "seconds": 148.9,
+          "pr_auc": 0.071278,
+          "recall_at_fixed_fpr": 0.797688,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.1964568461739396,
+            "S2": 0.4180295785366135,
+            "S3": 0.3855135752894469
+          },
+          "n_fraud": 516,
+          "n_evasions": 53,
+          "evasion_rate": 0.10271317829457365,
+          "realism_penalty": 0.000983,
+          "fitness": 0.10222167829457364,
+          "seconds": 150.1,
+          "pr_auc": 0.379396,
+          "recall_at_fixed_fpr": 0.809249,
+          "precision_at_k": 0.62,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0009,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.2750779138014806,
+            "S2": 0.3944636462108802,
+            "S3": 0.330458439987639
+          },
+          "n_fraud": 599,
+          "n_evasions": 19,
+          "evasion_rate": 0.03171953255425709,
+          "realism_penalty": 0.000883,
+          "fitness": 0.031278032554257096,
+          "seconds": 149.6,
+          "pr_auc": 0.063193,
+          "recall_at_fixed_fpr": 0.635838,
+          "precision_at_k": 0.06,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.0004,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.38835993513477385,
+            "S2": 0.22626456009790782,
+            "S3": 0.3853755047673183
+          },
+          "n_fraud": 250,
+          "n_evasions": 9,
+          "evasion_rate": 0.036,
+          "realism_penalty": 0.001608,
+          "fitness": 0.035196,
+          "seconds": 150.3,
+          "pr_auc": 0.065918,
+          "recall_at_fixed_fpr": 0.722543,
+          "precision_at_k": 0.08,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.2996264337076925,
+            "S2": 0.26744525178624373,
+            "S3": 0.43292831450606384
+          },
+          "n_fraud": 513,
+          "n_evasions": 24,
+          "evasion_rate": 0.04678362573099415,
+          "realism_penalty": 0.0013,
+          "fitness": 0.04613362573099415,
+          "seconds": 148.7,
+          "pr_auc": 0.037148,
+          "recall_at_fixed_fpr": 0.757225,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0022,
+            "hour_of_day": 0.0016,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0022,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0036,
+            "hour_of_day": 0.0024,
+            "rail": 0.0022,
+            "sender_in_anchor": 0.0022,
+            "payee_in_anchor": 0.0022,
+            "payee_popularity": 0.0022,
+            "has_device": 0.0022
+          },
+          "worst": "log_amount",
+          "score": 0.0036,
+          "base_rate": 0.0022,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2558
+    },
+    {
+      "seed": 11,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.015542,
+          "recall_at_fixed_fpr": 0.190751,
+          "precision_at_k": 0.11,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.018591,
+          "recall_at_fixed_fpr": 0.520231,
+          "precision_at_k": 0.09,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.042715,
+          "recall_at_fixed_fpr": 0.739884,
+          "precision_at_k": 0.02,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.024988,
+          "recall_at_fixed_fpr": 0.653179,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1171452,
+          "n_train_fraud": 3165
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0003,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.2837289919382617,
+            "S2": 0.08784321212601612,
+            "S3": 0.6284277959357223
+          },
+          "n_fraud": 213,
+          "n_evasions": 194,
+          "evasion_rate": 0.9107981220657277,
+          "realism_penalty": 0.00071,
+          "fitness": 0.9104431220657278,
+          "seconds": 151.3,
+          "pr_auc": 0.020866,
+          "recall_at_fixed_fpr": 0.514451,
+          "precision_at_k": 0.02,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.22615331678685385,
+            "S2": 0.49271353091516534,
+            "S3": 0.2811331522979808
+          },
+          "n_fraud": 261,
+          "n_evasions": 88,
+          "evasion_rate": 0.3371647509578544,
+          "realism_penalty": 0.000359,
+          "fitness": 0.3369852509578544,
+          "seconds": 147.9,
+          "pr_auc": 0.102712,
+          "recall_at_fixed_fpr": 0.780347,
+          "precision_at_k": 0.1,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0004,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.22864814359645935,
+            "S2": 0.3785765023124023,
+            "S3": 0.39277535409113834
+          },
+          "n_fraud": 227,
+          "n_evasions": 24,
+          "evasion_rate": 0.10572687224669604,
+          "realism_penalty": 0.000662,
+          "fitness": 0.10539587224669604,
+          "seconds": 149.2,
+          "pr_auc": 0.02659,
+          "recall_at_fixed_fpr": 0.693642,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0006,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.36828679697824795,
+            "S2": 0.1969420908234293,
+            "S3": 0.4347711121983227
+          },
+          "n_fraud": 395,
+          "n_evasions": 45,
+          "evasion_rate": 0.11392405063291139,
+          "realism_penalty": 0.000165,
+          "fitness": 0.11384155063291139,
+          "seconds": 149.2,
+          "pr_auc": 0.008998,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.33223539824387427,
+            "S2": 0.4829597758247729,
+            "S3": 0.18480482593135275
+          },
+          "n_fraud": 516,
+          "n_evasions": 49,
+          "evasion_rate": 0.09496124031007752,
+          "realism_penalty": 0.000337,
+          "fitness": 0.09479274031007752,
+          "seconds": 149.0,
+          "pr_auc": 0.075585,
+          "recall_at_fixed_fpr": 0.797688,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.11344897357942729,
+            "S2": 0.433252907726557,
+            "S3": 0.45329811869401565
+          },
+          "n_fraud": 551,
+          "n_evasions": 21,
+          "evasion_rate": 0.038112522686025406,
+          "realism_penalty": 0.001065,
+          "fitness": 0.03758002268602541,
+          "seconds": 148.6,
+          "pr_auc": 0.039245,
+          "recall_at_fixed_fpr": 0.815029,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0025,
+            "hour_of_day": 0.0018,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0025,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0031,
+            "hour_of_day": 0.0023,
+            "rail": 0.0018,
+            "sender_in_anchor": 0.0018,
+            "payee_in_anchor": 0.0018,
+            "payee_popularity": 0.0019,
+            "has_device": 0.0018
+          },
+          "worst": "log_amount",
+          "score": 0.0031,
+          "base_rate": 0.0018,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2163
+    },
+    {
+      "seed": 23,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.113571,
+          "recall_at_fixed_fpr": 0.595376,
+          "precision_at_k": 0.26,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.028122,
+          "recall_at_fixed_fpr": 0.595376,
+          "precision_at_k": 0.08,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.173546,
+          "recall_at_fixed_fpr": 0.734104,
+          "precision_at_k": 0.36,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.036821,
+          "recall_at_fixed_fpr": 0.589595,
+          "precision_at_k": 0.02,
+          "n_positives": 173,
+          "n_train": 1171625,
+          "n_train_fraud": 3338
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0009,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.23870241501957706,
+            "S2": 0.4186580288289372,
+            "S3": 0.34263955615148584
+          },
+          "n_fraud": 533,
+          "n_evasions": 319,
+          "evasion_rate": 0.5984990619136961,
+          "realism_penalty": 0.001024,
+          "fitness": 0.5979870619136961,
+          "seconds": 150.9,
+          "pr_auc": 0.009621,
+          "recall_at_fixed_fpr": 0.190751,
+          "precision_at_k": 0.06,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0004,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.14610209419360254,
+            "S2": 0.43117537350354906,
+            "S3": 0.42272253230284834
+          },
+          "n_fraud": 286,
+          "n_evasions": 63,
+          "evasion_rate": 0.2202797202797203,
+          "realism_penalty": 0.001692,
+          "fitness": 0.21943372027972027,
+          "seconds": 157.7,
+          "pr_auc": 0.109708,
+          "recall_at_fixed_fpr": 0.693642,
+          "precision_at_k": 0.02,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.15244846448280983,
+            "S2": 0.10879866023393571,
+            "S3": 0.7387528752832544
+          },
+          "n_fraud": 364,
+          "n_evasions": 55,
+          "evasion_rate": 0.1510989010989011,
+          "realism_penalty": 0.001359,
+          "fitness": 0.1504194010989011,
+          "seconds": 156.5,
+          "pr_auc": 0.01164,
+          "recall_at_fixed_fpr": 0.052023,
+          "precision_at_k": 0.02,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.24151109001444176,
+            "S2": 0.37772753801964337,
+            "S3": 0.3807613719659148
+          },
+          "n_fraud": 280,
+          "n_evasions": 14,
+          "evasion_rate": 0.05,
+          "realism_penalty": 0.001084,
+          "fitness": 0.049458,
+          "seconds": 151.3,
+          "pr_auc": 0.06825,
+          "recall_at_fixed_fpr": 0.67052,
+          "precision_at_k": 0.17,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.653600480882606,
+            "S2": 0.18617094482112925,
+            "S3": 0.1602285742962646
+          },
+          "n_fraud": 312,
+          "n_evasions": 32,
+          "evasion_rate": 0.10256410256410256,
+          "realism_penalty": 0.000396,
+          "fitness": 0.10236610256410256,
+          "seconds": 165.8,
+          "pr_auc": 0.137925,
+          "recall_at_fixed_fpr": 0.739884,
+          "precision_at_k": 0.05,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.4322691857856627,
+            "S2": 0.4293591992253576,
+            "S3": 0.1383716149889798
+          },
+          "n_fraud": 561,
+          "n_evasions": 13,
+          "evasion_rate": 0.023172905525846704,
+          "realism_penalty": 0.000492,
+          "fitness": 0.022926905525846704,
+          "seconds": 156.8,
+          "pr_auc": 0.010731,
+          "recall_at_fixed_fpr": 0.028902,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0021,
+            "hour_of_day": 0.0013,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0021,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0037,
+            "hour_of_day": 0.0025,
+            "rail": 0.002,
+            "sender_in_anchor": 0.002,
+            "payee_in_anchor": 0.002,
+            "payee_popularity": 0.002,
+            "has_device": 0.002
+          },
+          "worst": "log_amount",
+          "score": 0.0037,
+          "base_rate": 0.002,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2336
+    },
+    {
+      "seed": 42,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.239882,
+          "recall_at_fixed_fpr": 0.653179,
+          "precision_at_k": 0.45,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.017366,
+          "recall_at_fixed_fpr": 0.572254,
+          "precision_at_k": 0.05,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.042731,
+          "recall_at_fixed_fpr": 0.508671,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.01964,
+          "recall_at_fixed_fpr": 0.387283,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1172103,
+          "n_train_fraud": 3816
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0006,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.19284158077217142,
+            "S2": 0.45294856282011686,
+            "S3": 0.3542098564077118
+          },
+          "n_fraud": 462,
+          "n_evasions": 380,
+          "evasion_rate": 0.8225108225108225,
+          "realism_penalty": 0.00011,
+          "fitness": 0.8224558225108225,
+          "seconds": 157.5,
+          "pr_auc": 0.157099,
+          "recall_at_fixed_fpr": 0.786127,
+          "precision_at_k": 0.1,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.41071106015892495,
+            "S2": 0.3446918960516624,
+            "S3": 0.24459704378941266
+          },
+          "n_fraud": 570,
+          "n_evasions": 70,
+          "evasion_rate": 0.12280701754385964,
+          "realism_penalty": 0.00052,
+          "fitness": 0.12254701754385965,
+          "seconds": 149.8,
+          "pr_auc": 0.077792,
+          "recall_at_fixed_fpr": 0.739884,
+          "precision_at_k": 0.1,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0003,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.4552856528148378,
+            "S2": 0.3849829381335815,
+            "S3": 0.15973140905158079
+          },
+          "n_fraud": 200,
+          "n_evasions": 23,
+          "evasion_rate": 0.115,
+          "realism_penalty": 0.000608,
+          "fitness": 0.114696,
+          "seconds": 151.3,
+          "pr_auc": 0.097999,
+          "recall_at_fixed_fpr": 0.843931,
+          "precision_at_k": 0.05,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0009,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.2991176577046345,
+            "S2": 0.35851234554793276,
+            "S3": 0.3423699967474327
+          },
+          "n_fraud": 444,
+          "n_evasions": 103,
+          "evasion_rate": 0.23198198198198197,
+          "realism_penalty": 0.001899,
+          "fitness": 0.23103248198198198,
+          "seconds": 155.0,
+          "pr_auc": 0.026988,
+          "recall_at_fixed_fpr": 0.606936,
+          "precision_at_k": 0.04,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.001,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.06386005517658314,
+            "S2": 0.5219574590592367,
+            "S3": 0.4141824857641801
+          },
+          "n_fraud": 634,
+          "n_evasions": 37,
+          "evasion_rate": 0.0583596214511041,
+          "realism_penalty": 0.000697,
+          "fitness": 0.0580111214511041,
+          "seconds": 154.8,
+          "pr_auc": 0.112036,
+          "recall_at_fixed_fpr": 0.82659,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.2041975917123418,
+            "S2": 0.4227759830867339,
+            "S3": 0.37302642520092427
+          },
+          "n_fraud": 504,
+          "n_evasions": 15,
+          "evasion_rate": 0.02976190476190476,
+          "realism_penalty": 0.000952,
+          "fitness": 0.02928590476190476,
+          "seconds": 167.2,
+          "pr_auc": 0.01523,
+          "recall_at_fixed_fpr": 0.514451,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0022,
+            "hour_of_day": 0.0021,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0022,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.004,
+            "hour_of_day": 0.0029,
+            "rail": 0.0024,
+            "sender_in_anchor": 0.0024,
+            "payee_in_anchor": 0.0024,
+            "payee_popularity": 0.0024,
+            "has_device": 0.0024
+          },
+          "worst": "log_amount",
+          "score": 0.004,
+          "base_rate": 0.0024,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2814
+    },
+    {
+      "seed": 101,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.063818,
+          "recall_at_fixed_fpr": 0.630058,
+          "precision_at_k": 0.12,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.012651,
+          "recall_at_fixed_fpr": 0.231214,
+          "precision_at_k": 0.01,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.034573,
+          "recall_at_fixed_fpr": 0.606936,
+          "precision_at_k": 0.01,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.002574,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.04,
+          "n_positives": 173,
+          "n_train": 1172297,
+          "n_train_fraud": 4010
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.44684662127232017,
+            "S2": 0.48946281415587173,
+            "S3": 0.06369056457180826
+          },
+          "n_fraud": 625,
+          "n_evasions": 441,
+          "evasion_rate": 0.7056,
+          "realism_penalty": 0.000675,
+          "fitness": 0.7052625,
+          "seconds": 150.0,
+          "pr_auc": 0.066841,
+          "recall_at_fixed_fpr": 0.803468,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0011,
+          "audit_base_rate": 0.0007,
+          "allocation": {
+            "S1": 0.3714209438528921,
+            "S2": 0.4424268465280941,
+            "S3": 0.18615220961901371
+          },
+          "n_fraud": 762,
+          "n_evasions": 201,
+          "evasion_rate": 0.2637795275590551,
+          "realism_penalty": 0.000525,
+          "fitness": 0.2635170275590551,
+          "seconds": 156.7,
+          "pr_auc": 0.071558,
+          "recall_at_fixed_fpr": 0.734104,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.4335016426018242,
+            "S2": 0.17083969418861808,
+            "S3": 0.39565866320955784
+          },
+          "n_fraud": 434,
+          "n_evasions": 14,
+          "evasion_rate": 0.03225806451612903,
+          "realism_penalty": 0.000739,
+          "fitness": 0.03188856451612903,
+          "seconds": 149.6,
+          "pr_auc": 0.034325,
+          "recall_at_fixed_fpr": 0.751445,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0002,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.6064577403147451,
+            "S2": 0.10142657856459011,
+            "S3": 0.29211568112066494
+          },
+          "n_fraud": 179,
+          "n_evasions": 19,
+          "evasion_rate": 0.10614525139664804,
+          "realism_penalty": 0.00145,
+          "fitness": 0.10542025139664804,
+          "seconds": 152.6,
+          "pr_auc": 0.07273,
+          "recall_at_fixed_fpr": 0.849711,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.001,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.06253017491755812,
+            "S2": 0.41610813954415665,
+            "S3": 0.5213616855382852
+          },
+          "n_fraud": 621,
+          "n_evasions": 6,
+          "evasion_rate": 0.00966183574879227,
+          "realism_penalty": 0.000396,
+          "fitness": 0.00946383574879227,
+          "seconds": 165.7,
+          "pr_auc": 0.074694,
+          "recall_at_fixed_fpr": 0.855491,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.288435520869309,
+            "S2": 0.395960499077305,
+            "S3": 0.315603980053386
+          },
+          "n_fraud": 387,
+          "n_evasions": 79,
+          "evasion_rate": 0.2041343669250646,
+          "realism_penalty": 0.000309,
+          "fitness": 0.2039798669250646,
+          "seconds": 157.0,
+          "pr_auc": 0.013014,
+          "recall_at_fixed_fpr": 0.092486,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0023,
+            "hour_of_day": 0.0017,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0023,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0043,
+            "hour_of_day": 0.0027,
+            "rail": 0.0026,
+            "sender_in_anchor": 0.0026,
+            "payee_in_anchor": 0.0026,
+            "payee_popularity": 0.0025,
+            "has_device": 0.0026
+          },
+          "worst": "log_amount",
+          "score": 0.0043,
+          "base_rate": 0.0026,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 3008
+    },
+    {
+      "seed": 1337,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.05052,
+          "recall_at_fixed_fpr": 0.393064,
+          "precision_at_k": 0.12,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.022212,
+          "recall_at_fixed_fpr": 0.526012,
+          "precision_at_k": 0.01,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.017888,
+          "recall_at_fixed_fpr": 0.554913,
+          "precision_at_k": 0.01,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.024067,
+          "recall_at_fixed_fpr": 0.722543,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1171664,
+          "n_train_fraud": 3377
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.36727590886590117,
+            "S2": 0.2466536422236927,
+            "S3": 0.3860704489104062
+          },
+          "n_fraud": 466,
+          "n_evasions": 457,
+          "evasion_rate": 0.98068669527897,
+          "realism_penalty": 0.000587,
+          "fitness": 0.9803931952789701,
+          "seconds": 160.5,
+          "pr_auc": 0.006189,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.2723844328872564,
+            "S2": 0.3084763735875576,
+            "S3": 0.4191391935251861
+          },
+          "n_fraud": 273,
+          "n_evasions": 67,
+          "evasion_rate": 0.2454212454212454,
+          "realism_penalty": 0.002275,
+          "fitness": 0.2442837454212454,
+          "seconds": 155.4,
+          "pr_auc": 0.040524,
+          "recall_at_fixed_fpr": 0.757225,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0006,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.3977141911674606,
+            "S2": 0.048326564433943335,
+            "S3": 0.5539592443985961
+          },
+          "n_fraud": 332,
+          "n_evasions": 24,
+          "evasion_rate": 0.07228915662650602,
+          "realism_penalty": 0.001271,
+          "fitness": 0.07165365662650602,
+          "seconds": 150.6,
+          "pr_auc": 0.009161,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.03,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.2844881875766644,
+            "S2": 0.26486691543667773,
+            "S3": 0.4506448969866578
+          },
+          "n_fraud": 368,
+          "n_evasions": 34,
+          "evasion_rate": 0.09239130434782608,
+          "realism_penalty": 0.000463,
+          "fitness": 0.09215980434782609,
+          "seconds": 154.5,
+          "pr_auc": 0.063417,
+          "recall_at_fixed_fpr": 0.693642,
+          "precision_at_k": 0.04,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.0008,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.13810683821952932,
+            "S2": 0.6194481476946581,
+            "S3": 0.24244501408581262
+          },
+          "n_fraud": 525,
+          "n_evasions": 24,
+          "evasion_rate": 0.045714285714285714,
+          "realism_penalty": 0.00037,
+          "fitness": 0.04552928571428572,
+          "seconds": 152.8,
+          "pr_auc": 0.060478,
+          "recall_at_fixed_fpr": 0.867052,
+          "precision_at_k": 0.05,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0006,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.4889059876759598,
+            "S2": 0.24337227280049578,
+            "S3": 0.26772173952354444
+          },
+          "n_fraud": 411,
+          "n_evasions": 13,
+          "evasion_rate": 0.031630170316301706,
+          "realism_penalty": 0.000158,
+          "fitness": 0.031551170316301703,
+          "seconds": 151.5,
+          "pr_auc": 0.054378,
+          "recall_at_fixed_fpr": 0.768786,
+          "precision_at_k": 0.04,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0021,
+            "hour_of_day": 0.0013,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0021,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0035,
+            "hour_of_day": 0.0023,
+            "rail": 0.002,
+            "sender_in_anchor": 0.002,
+            "payee_in_anchor": 0.002,
+            "payee_popularity": 0.0021,
+            "has_device": 0.002
+          },
+          "worst": "log_amount",
+          "score": 0.0035,
+          "base_rate": 0.002,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2375
+    },
+    {
+      "seed": 2024,
+      "positives": 173,
+      "base_rate": 0.0005324715297014466,
+      "results": {
+        "A_real": {
+          "pr_auc": 0.045387,
+          "recall_at_fixed_fpr": 0.277457,
+          "precision_at_k": 0.17,
+          "n_positives": 173,
+          "n_train": 1169289,
+          "n_train_fraud": 1002
+        },
+        "B_smote": {
+          "pr_auc": 0.034553,
+          "recall_at_fixed_fpr": 0.479769,
+          "precision_at_k": 0.06,
+          "n_positives": 173,
+          "n_train": 1170291,
+          "n_train_fraud": 2004
+        },
+        "C_template": {
+          "pr_auc": 0.006251,
+          "recall_at_fixed_fpr": 0.0,
+          "precision_at_k": 0.05,
+          "n_positives": 173,
+          "n_train": 1170777,
+          "n_train_fraud": 2490
+        },
+        "D_adaptive": {
+          "pr_auc": 0.005185,
+          "recall_at_fixed_fpr": 0.254335,
+          "precision_at_k": 0.0,
+          "n_positives": 173,
+          "n_train": 1171724,
+          "n_train_fraud": 3437
+        },
+        "amount_floor": {
+          "pr_auc": 0.001329,
+          "recall_at_fixed_fpr": 0.011561,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        }
+      },
+      "convergence": [
+        {
+          "round": 0,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.39227154073202003,
+            "S2": 0.4602952193888247,
+            "S3": 0.14743323987915533
+          },
+          "n_fraud": 462,
+          "n_evasions": 456,
+          "evasion_rate": 0.987012987012987,
+          "realism_penalty": 0.001192,
+          "fitness": 0.986416987012987,
+          "seconds": 148.6,
+          "pr_auc": 0.133686,
+          "recall_at_fixed_fpr": 0.820809,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        },
+        {
+          "round": 1,
+          "rejected_by_audit": false,
+          "audit_score": 0.0011,
+          "audit_base_rate": 0.0005,
+          "allocation": {
+            "S1": 0.1553696224906832,
+            "S2": 0.40398502167328665,
+            "S3": 0.4406453558360301
+          },
+          "n_fraud": 570,
+          "n_evasions": 45,
+          "evasion_rate": 0.07894736842105263,
+          "realism_penalty": 0.000228,
+          "fitness": 0.07883336842105262,
+          "seconds": 160.8,
+          "pr_auc": 0.049171,
+          "recall_at_fixed_fpr": 0.739884,
+          "precision_at_k": 0.0,
+          "n_positives": 173
+        },
+        {
+          "round": 2,
+          "rejected_by_audit": false,
+          "audit_score": 0.0004,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.4425873647699651,
+            "S2": 0.16164393632410484,
+            "S3": 0.39576869890593014
+          },
+          "n_fraud": 312,
+          "n_evasions": 51,
+          "evasion_rate": 0.16346153846153846,
+          "realism_penalty": 0.00174,
+          "fitness": 0.16259153846153845,
+          "seconds": 159.6,
+          "pr_auc": 0.364787,
+          "recall_at_fixed_fpr": 0.618497,
+          "precision_at_k": 0.58,
+          "n_positives": 173
+        },
+        {
+          "round": 3,
+          "rejected_by_audit": false,
+          "audit_score": 0.0007,
+          "audit_base_rate": 0.0004,
+          "allocation": {
+            "S1": 0.2799385853784659,
+            "S2": 0.268562277128304,
+            "S3": 0.4514991374932301
+          },
+          "n_fraud": 500,
+          "n_evasions": 31,
+          "evasion_rate": 0.062,
+          "realism_penalty": 0.001059,
+          "fitness": 0.0614705,
+          "seconds": 158.2,
+          "pr_auc": 0.252307,
+          "recall_at_fixed_fpr": 0.710983,
+          "precision_at_k": 0.48,
+          "n_positives": 173
+        },
+        {
+          "round": 4,
+          "rejected_by_audit": false,
+          "audit_score": 0.0004,
+          "audit_base_rate": 0.0003,
+          "allocation": {
+            "S1": 0.48746533844985435,
+            "S2": 0.20239610117932377,
+            "S3": 0.31013856037082194
+          },
+          "n_fraud": 300,
+          "n_evasions": 18,
+          "evasion_rate": 0.06,
+          "realism_penalty": 0.011628,
+          "fitness": 0.054186,
+          "seconds": 157.2,
+          "pr_auc": 0.031715,
+          "recall_at_fixed_fpr": 0.67052,
+          "precision_at_k": 0.03,
+          "n_positives": 173
+        },
+        {
+          "round": 5,
+          "rejected_by_audit": false,
+          "audit_score": 0.0005,
+          "audit_base_rate": 0.0002,
+          "allocation": {
+            "S1": 0.5144683622262464,
+            "S2": 0.12179199697063675,
+            "S3": 0.36373964080311677
+          },
+          "n_fraud": 291,
+          "n_evasions": 2,
+          "evasion_rate": 0.006872852233676976,
+          "realism_penalty": 0.000556,
+          "fitness": 0.006594852233676976,
+          "seconds": 156.2,
+          "pr_auc": 0.077278,
+          "recall_at_fixed_fpr": 0.606936,
+          "precision_at_k": 0.01,
+          "n_positives": 173
+        }
+      ],
+      "audit": {
+        "template": {
+          "signals": {
+            "log_amount": 0.0022,
+            "hour_of_day": 0.0015,
+            "rail": 0.0013,
+            "sender_in_anchor": 0.0013,
+            "payee_in_anchor": 0.0013,
+            "payee_popularity": 0.0013,
+            "has_device": 0.0013
+          },
+          "worst": "log_amount",
+          "score": 0.0022,
+          "base_rate": 0.0013,
+          "trivially_separable": false
+        },
+        "adaptive": {
+          "signals": {
+            "log_amount": 0.0033,
+            "hour_of_day": 0.0031,
+            "rail": 0.0021,
+            "sender_in_anchor": 0.0021,
+            "payee_in_anchor": 0.0021,
+            "payee_popularity": 0.0021,
+            "has_device": 0.0021
+          },
+          "worst": "log_amount",
+          "score": 0.0033,
+          "base_rate": 0.0021,
+          "trivially_separable": false
+        }
+      },
+      "n_template_rows": 1488,
+      "n_adaptive_rows": 2435
+    }
+  ]
+}

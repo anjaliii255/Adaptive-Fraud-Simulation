@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 import yaml
 
+from afl.attack import realism as realism_lib
 from afl.attack.envelope import AnchorEnvelope
 from afl.attack.envelope import audit as envelope_audit
 from afl.attack.multi import MultiVectorOptimiser
@@ -109,6 +110,9 @@ def adaptive_attacks(
     The detector inside the loop is what the search is evading; it is retrained each round so the
     attacker is always probing the current model rather than the one it started against.
     """
+    # "default" reproduces the v1.0 artefact: guessed bounds, separability reported not vetoed.
+    # "binding" measures the bounds off the anchor and vetoes on either audit rule.
+    binding = args.leash == "binding"
     optimiser = MultiVectorOptimiser(
         vectors=STRONG,
         seed=seed,
@@ -116,6 +120,8 @@ def adaptive_attacks(
         allocation=args.allocation,
         episodes_per_round=episodes,
         anchor=anchor,
+        audit_rule="both" if binding else "lift",
+        bounds=None if binding else realism_lib.DEFAULT_BOUNDS,
     )
     bound = optimiser.bind(sim)
     detector = fit(real_train, seed, args.params)
@@ -341,12 +347,27 @@ def main() -> int:
         help="keep runs already in the artefact whose seeds are not being re-run, so adding "
         "seeds does not mean paying again for the ones already measured",
     )
+    p.add_argument(
+        "--leash",
+        default="default",
+        choices=("default", "binding"),
+        help="'default' reproduces the v1.0 artefact. 'binding' measures the realism bounds off "
+        "the anchor and makes separability a veto rather than a note.",
+    )
+    p.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="artefact path; defaults to <anchor>_<typology>.json. Set this when a run is not "
+        "meant to replace the committed one.",
+    )
     args = p.parse_args()
 
     cfg = yaml.safe_load(Path(f"config/data/{args.data}.yaml").read_text())
     args.params = yaml.safe_load(Path("config/defend/lgbm.yaml").read_text()).get("params") or {}
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    out = ARTIFACT_DIR / f"{args.data}_{args.typology.lower()}.json"
+    out = args.out or (ARTIFACT_DIR / f"{args.data}_{args.typology.lower()}.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     runs = [run_seed(cfg, args, seed) for seed in args.seeds]
     if args.append and out.exists():
@@ -365,6 +386,9 @@ def main() -> int:
                 "split_digest": committed_split_for(cfg).digest,
                 "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
                 "allocation": args.allocation,
+                "leash": args.leash,
+                "lambda_realism": args.lambda_realism,
+                "audit_rule": "both" if args.leash == "binding" else "lift",
                 "rounds": args.rounds,
                 "episodes_per_round": args.episodes,
                 "runs": runs,

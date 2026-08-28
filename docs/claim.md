@@ -28,6 +28,41 @@ where an apparent +0.76 recall gain did show up, the provenance probe sorted the
 real traffic at PR-AUC 0.998, so the gain is explained by which generator wrote the row rather than
 by anything about fraud. The claim above is what survives.
 
+## The optimiser's objective, stated exactly
+
+The attacker's search is a constrained optimisation, and the constraint structure matters as much
+as the objective. Hard gates **veto**; soft objectives are **graded**.
+
+```
+maximise    evasion_rate  -  λ · soft_fidelity_penalty          (λ = 0.5, config)
+
+subject to  [hard, veto]  no schema or provenance leak in the batch
+                          — self-transfer, duplicate id, unlabelled fraud row,
+                            provenance on a legit row, non-positive amount, empty attack
+            [hard, veto]  not separable from the real anchor, under BOTH audit rules
+                          — `lift`: commensurability score < 3 × base rate
+                          — `envelope`: the audit's own `trivially_separable` verdict
+
+where       soft_fidelity_penalty = mean of three graded terms, each measured against the
+            anchor's own statistics rather than a guessed constant:
+                statistical   amount-precision distance from the anchor's share
+                structural    beneficiary-degree concentration above the anchor's
+                structural    round-amount share above the anchor's
+```
+
+A vetoed candidate scores −1.0, is never trained on, and can never become `best`. **Only
+separability and leaks are vetoes.** Making every fidelity metric a hard gate would very likely
+leave no feasible region at all on public synthetic anchors — the `lift` rule alone already rejects
+100% of candidates on AMLSim and PaySim — so statistical and structural fidelity enter as a
+gradient that steers the search rather than a cliff that empties it.
+
+**Which configuration produced which number.** The committed v1.0 result below was produced under
+an earlier version of this objective in which the soft penalty was **not binding**: its bounds were
+guessed rather than measured, so it reported a near-constant 0.065 and λ had no effect on the search
+(`docs/realism-leash.md`). Separability was audited and reported, but not vetoed. The objective as
+stated above is the corrected one; any result produced under it is reported separately and is not
+the v1.0 artefact.
+
 ## The four questions
 
 The project is a success or a failure on four questions, asked in order. Each one gates the next:
