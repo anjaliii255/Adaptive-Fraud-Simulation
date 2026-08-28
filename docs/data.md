@@ -51,7 +51,17 @@ summarised away:
 
 - **PaySim** — no repeated senders, so behaviour cannot be anomalous against a history that does not
   exist.
-- **AMLSim** — its own fraud is amount-trivial: floor 0.456 against a ceiling of 0.594.
-- **BankSim** — transfer fails, 0.238 against a 0.702 amount floor. `docs/adr/0004-*.md`.
-- **AMLworld** — passes the non-triviality gate decisively (ratio 0.0233) and still produces a null
-  on the adaptive claim. `docs/adr/0005-*.md`, with the gate numbers in `artifacts/spike/`.
+- **AMLSim** — its own fraud is amount-trivial: amount floor 0.455644 against a trained ceiling of
+  0.593653, **ratio 0.7675**.
+- **BankSim** — transfer fails: synthetic-trained 0.2377 against a 0.7023 amount floor, and its own
+  fraud is amount-shortcuttable at **ratio 0.7359** (0.702308 / 0.954362). `docs/adr/0004-*.md`.
+- **AMLworld** — passes the non-triviality gate decisively, **ratio 0.0233** (0.004169 / 0.178768),
+  and still produces a null on the adaptive claim. `docs/adr/0005-*.md`.
+
+**Traceability of those three ratios.** AMLworld's is a direct measurement, recomputed by
+`scripts/spike_gates.py` into `artifacts/spike/amlworld.json`. AMLSim's and BankSim's are **derived
+from committed values** — `amount_floor.real_fraud.pr_auc ÷ real.real_fraud.pr_auc` in
+`artifacts/transfer/<anchor>.json` — and were first quoted in ADRs 0002 and 0004 before
+`spike_gates.py` existed. They therefore trace to an artefact, but not to the same gate definition
+AMLworld's ratio was measured under, and the two should not be compared to the fourth decimal.
+Re-running `python scripts/spike_gates.py --data amlsim` would close that gap; it has not been run.

@@ -48,7 +48,7 @@ flowchart LR
     subgraph RED["RED · attack"]
         direction TB
         ENV[Anchor envelope<br/>scale · rails · pools]
-        SIM[Simulator<br/>3 engines · 9 vectors]
+        SIM[Simulator<br/>3 engines · 8 of 9 built]
         OPT[Adaptive optimiser<br/>search over knobs]
         ENV --> SIM --> OPT
     end
@@ -120,8 +120,8 @@ reported as withheld rather than reported as wins.
 The pipeline runs end to end on real data. Four public anchors have been tried; the loop converges
 on all of them and **no anchor validates the adaptive claim**. What is built and committed:
 
-- **Attack side** — 8 of 9 vectors generate (M1 is template); the multi-vector adaptive optimiser
-  runs closed-loop with an audit gate in front of the detector.
+- **Attack side** — 9 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
+  gate in front of the detector.
 - **Defence side** — 56 causal features, a tuned LightGBM detector, graded cost-based actions with
   SHAP reason codes, and an anomaly layer that did not earn its place.
 - **Instruments** — commensurability audit, provenance probe, transfer test, 3-level fidelity
@@ -177,7 +177,8 @@ Every target is listed with a one-line comment in the `Makefile`. Results regene
 
 ## Main result
 
-Four systems on the same held-out real laundering typology. AMLworld, 7 seeds, 173 positives, base
+The **A/B/C/D experiment** (ticket 12) — four systems plus a no-model floor on the same held-out
+real laundering typology. AMLworld, 7 seeds, 173 positives, base
 rate 0.053%, split digest `f5e33a878d68b792`. From `artifacts/abcd/amlworld_gather-scatter.json`.
 
 ```
@@ -200,8 +201,13 @@ not fix a power problem.
 
 What *did* work: **evasion falls 0.915 → 0.201 over six rounds on all 7 seeds**, and the audit gate
 rejected 0 of 42 rounds — so the loop demonstrably closes and the null is not an artefact of leaky
-synthesis. The full narrative, the three-system table, and the results that are withheld and why are
-in `docs/results.md`.
+synthesis.
+
+**There is a second, separate comparison in this repo** — the three-system table (ticket 16) on
+PaySim and AMLSim, at 3 seeds, holding out an injected synthetic family. Its labels collide with
+these: **`C` is template-static here and adaptive there.** Neither experiment supersedes the other,
+and `docs/results.md` opens by setting them side by side. The withheld results and why are there
+too.
 
 ## How it's laid out
 
@@ -230,9 +236,9 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 | `docs/claim.md` | what we claim and what we do not, with the four success questions |
 | `docs/architecture.md` | the red/blue seam, the contract, features, detector, decision layer |
 | `docs/evaluation.md` | leave-one-attack-out, transfer test, commensurability, fidelity, seeds |
-| `docs/results.md` | the three-system table, current numbers, and the withheld columns |
+| `docs/results.md` | both comparison experiments side by side, and the withheld columns |
 | `docs/negative-results.md` | anomaly layer, sequence model, temporal GNN — built, measured, benched |
-| `docs/threat-model.md` | the nine vectors, 8 built / M1 template |
+| `docs/threat-model.md` | the 9 vectors identified, 8 fully simulated, M1 in template mode |
 | `docs/data.md` | data cards, the anchors, and the four-anchor limitation |
 | `docs/realism-leash.md` | why the per-round leash was not binding, and how the two audit rules reconcile |
 | `docs/adr/` | the decisions, in the order they were taken |

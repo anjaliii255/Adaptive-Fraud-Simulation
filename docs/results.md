@@ -1,7 +1,72 @@
 # Results — what was measured, and what was withheld
 
-_The three-system table, the A/B/C/D experiment, and the reason most of the apparent gains are in
-brackets. `docs/claim.md` states what all of this adds up to._
+_The two comparison experiments, and the reason most of the apparent gains are in brackets.
+`docs/claim.md` states what all of this adds up to._
+
+## Two experiments, and the labels do not mean the same thing
+
+This repository contains **two separate comparison experiments**. They are not versions of each
+other, neither supersedes the other, and their system labels collide. Read this before either table.
+
+| | **A/B/C/D** (ticket 12) | **three-system table** (ticket 16) |
+| --- | --- | --- |
+| artefact | `artifacts/abcd/` | `artifacts/three_system/` |
+| anchor | AMLworld | PaySim and AMLSim |
+| held out | GATHER-SCATTER, a **real** laundering typology | M3, an **injected synthetic** family |
+| seeds | 7 | 3 |
+| arms | A_real, B_smote, **C_template**, **D_adaptive**, amount_floor | A_baseline, B_smote, **C_adaptive** |
+
+**The collision to watch: `C` is template-static in the first and adaptive in the second.** So
+"C beats B by +0.76 recall" (three-system) and "D vs C is a coin flip" (A/B/C/D) are statements
+about different arms, and neither contradicts the other. The A/B/C/D experiment has a
+template-static control that the three-system table does not; that control is the whole point of
+ticket 12, because it separates *any synthetic augmentation* from *adaptive* synthetic augmentation.
+
+**Which one carries the claim.** The A/B/C/D experiment is the one `docs/claim.md` answers question
+4 with: it is on a real held-out attack shape, at 7 seeds, with the template-static control that
+makes "adaptive" falsifiable. The three-system table is on injected synthetic holdouts at 3 seeds,
+and its headline column is withheld on both anchors.
+
+## The A/B/C/D experiment
+
+`scripts/abcd_experiment.py` runs four systems plus a no-model floor on AMLworld, holding out the
+GATHER-SCATTER laundering typology entirely — a real attack shape no system trained on, rather than
+a synthetic family injected for the purpose. Split digest `f5e33a878d68b792`, 173 positives in the
+fold, base rate 0.053%, 6 rounds, 7 seeds.
+
+| system | trained on | PR-AUC (mean ± sd) | recall@1%FPR |
+| --- | --- | --- | --- |
+| A_real | the anchor's real rows and labels | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
+| B_smote | the same plus row-level oversampling | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
+| C_template | the same plus **static** template attacks | 0.0449 ± 0.0309 | 0.639 ± 0.098 |
+| D_adaptive | the same plus the **adaptive** loop's attacks | 0.0622 ± 0.0582 | 0.613 ± 0.268 |
+| amount_floor | nothing — rank by amount | 0.0013 | 0.012 |
+
+**C_template is what makes D falsifiable.** C and D share an episode budget, so the only difference
+between them is whether the attacks were searched adaptively or generated statically. If D does not
+beat C, the adaptive search bought nothing that plain synthetic augmentation would not have.
+
+Per-seed direction, exact one-sided sign test:
+
+| comparison | PR-AUC | recall@1%FPR |
+|---|---|---|
+| D > C_template | 4/7, p = 0.500 | 4/7, p = 0.500 |
+| D > B_smote | 4/7, p = 0.500 | 6/7, p = 0.062 |
+| D > A_real | 3/7, p = 0.773 | 6/7, p = 0.062 |
+| D > amount_floor | 7/7, p = 0.008 | 6/7, p = 0.062 |
+
+**The fold cannot resolve D against C** — 4/7 on both metrics. Every standard deviation above is
+comparable to or larger than its own mean, so seed variance exceeds the effect. The two 6/7 results
+are p = 0.062, neither significant, and D-vs-A does not hold direction across metrics. The one
+comparison that clears significance is that every system beats the amount floor on PR-AUC, which
+says the fold is not measuring amount-legibility and nothing about adaptive.
+
+The loop itself converged: evasion falls 0.915 → 0.201 over six rounds on all 7 seeds, and the audit
+gate rejected 0 of 42 rounds, so the null is not an artefact of leaky synthesis. The comparison was
+also **unconstrained** — the per-round realism leash was not binding (`docs/realism-leash.md`).
+
+Full reasoning, including the retraction of an earlier 2-seed reading, is in
+`docs/adr/0005-amlworld-anchor-and-the-abcd-null.md`.
 
 ## The three-system table
 

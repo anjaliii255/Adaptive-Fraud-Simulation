@@ -72,7 +72,9 @@ admitted attacks, and nothing more exotic than that.
 | transfer test | amlworld | **fail** — synthetic-trained scores 0.000532 against a 0.001329 amount floor |
 
 Downstream, this is why so little is quotable: **4 of 18 leave-one-attack-out folds** carry a number,
-and **2 of 6 three-system columns**. The rest are withheld, in brackets, with the reason attached.
+and **2 of 6 columns in the three-system table** (ticket 16, a separate experiment from the
+A/B/C/D one below — `docs/results.md` sets the two side by side, and warns that their `C` labels
+mean different things). The rest are withheld, in brackets, with the reason attached.
 
 On one anchor of four the attacks are commensurable with the traffic they are injected into. On
 none of them does training on synthetic alone beat sorting the test window by amount.
@@ -80,7 +82,9 @@ none of them does training on synthetic alone beat sorting the test window by am
 ### 4. When they do pass, does adaptive beat non-adaptive?
 
 **Unresolved, and unconstrained.** AMLworld is the one anchor where question 3's gate passed, so it
-is the one place question 4 can honestly be asked. Held out GATHER-SCATTER, 7 seeds:
+is the one place question 4 can honestly be asked. This is the **A/B/C/D experiment** (ticket 12), whose
+`C_template` arm is the static-synthetic control that makes "adaptive" falsifiable. Held out
+GATHER-SCATTER, 7 seeds:
 
 | system | PR-AUC (mean ± sd) | recall@1%FPR |
 |---|---|---|
