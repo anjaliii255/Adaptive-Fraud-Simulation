@@ -21,7 +21,7 @@ Four questions decide whether this worked, each gating the next:
 | 1 | Can the attacker find evasions? | **Demonstrated** — 91.5% of generated fraud past the detector in round 0, never driven below ~0.20 |
 | 2 | Can the detector close known gaps? | **Partially** — evasion falls 0.915 → 0.201 on all 7 seeds, but plateaus, and every extra layer built to close a gap was benched |
 | 3 | Do the attacks pass the fidelity and provenance gates? | **On one anchor of four** — 4 of 18 leave-one-attack-out folds carry a quotable number |
-| 4 | When they do, does adaptive beat non-adaptive? | **Unresolved and unconstrained** — 4/7 seeds, p = 0.500, and the realism leash did not bind |
+| 4 | When they do, does adaptive beat non-adaptive? | **No — it underperforms.** D > C on 1/7 seeds (p = 0.992); C > D on 6/7 (p = 0.062, directional). And unconstrained: the leash vetoed 0/42 |
 
 **We do not claim that adaptive augmentation improves recall on a held-out family.** An earlier
 version of this README did; our own 7-seed test does not support it, and the one place a large gain
@@ -184,24 +184,30 @@ rate 0.053%, split digest `f5e33a878d68b792`. From `artifacts/abcd/amlworld_gath
 ```
 system         PR-AUC (mean ± sd)   recall@1%FPR     D beats it, per seed
                                                      PR-AUC          recall
-A_real         0.0806 ± 0.0709      0.440 ± 0.172    3/7 p = 0.773   6/7 p = 0.062
-B_smote        0.0274 ± 0.0143      0.520 ± 0.137    4/7 p = 0.500   6/7 p = 0.062
-C_template     0.0449 ± 0.0309      0.639 ± 0.098    4/7 p = 0.500   4/7 p = 0.500
-D_adaptive     0.0622 ± 0.0582      0.613 ± 0.268    --              --
+A_real         0.0806 ± 0.0709      0.440 ± 0.172    1/7 p = 0.992   2/7 p = 0.938
+B_smote        0.0274 ± 0.0143      0.520 ± 0.137    4/7 p = 0.500   2/7 p = 0.938
+C_template     0.0557 ± 0.0518      0.544 ± 0.236    1/7 p = 0.992   2/7 p = 0.938
+D_adaptive     0.0168 ± 0.0121      0.378 ± 0.270    --              --
 amount_floor   0.0013               0.012            7/7 p = 0.008   6/7 p = 0.062
 ```
 
-**Adaptive against non-adaptive is 4/7 seeds on both metrics, p = 0.500 — a coin flip.** Every
-standard deviation is comparable to or larger than its own mean, so seed variance exceeds the effect
-being looked for. The two 6/7 results are both p = 0.062, neither significant, and D-vs-A does not
-hold direction across metrics. The one comparison that clears significance is that every system
-beats the no-model amount floor on PR-AUC — which says the fold is not measuring amount-legibility,
-and nothing about adaptive. This is a null on an underpowered fold, not a disproof; more seeds do
-not fix a power problem.
+**Adaptive does not beat non-adaptive — it loses to it.** D > C on 1/7 seeds by PR-AUC
+(p = 0.992) and 2/7 by recall; read the other way, **C beats D on 6/7 by PR-AUC (p = 0.062)**. That
+is directional rather than significant: 6/7 does not clear 0.05, and every standard deviation here
+is comparable to or larger than its own mean, so the fold is underpowered for an effect this size.
+What is significant is that every system beats the no-model amount floor on PR-AUC, 7/7, p = 0.008 —
+which says the fold is not measuring amount-legibility, and nothing about adaptive.
 
-What *did* work: **evasion falls 0.915 → 0.201 over six rounds on all 7 seeds**, and the audit gate
-rejected 0 of 42 rounds — so the loop demonstrably closes and the null is not an artefact of leaky
-synthesis.
+**This is unconstrained adaptive.** The per-round realism leash is inert: it vetoed 0 of 42 rounds,
+and correcting its bounds provably changes nothing (`docs/realism-leash.md`). Nothing here is
+evidence about a *constrained* attacker.
+
+What *did* work: **evasion falls 0.836 → 0.054 over six rounds**, and the audit gate rejected 0 of
+42 rounds — so the loop demonstrably closes and the result is not an artefact of leaky synthesis.
+
+Every number above traces to `artifacts/abcd/amlworld_gather-scatter.json`, regenerated on commit
+`4050fc46` with `git_dirty: false`. The original 7-seed artefact could not be reproduced from any
+commit and is retired in `artifacts/abcd/retired/` with the evidence.
 
 **There is a second, separate comparison in this repo** — the three-system table (ticket 16) on
 PaySim and AMLSim, at 3 seeds, holding out an injected synthetic family. Its labels collide with
