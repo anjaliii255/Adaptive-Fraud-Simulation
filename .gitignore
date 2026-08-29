@@ -107,6 +107,12 @@ skills-lock.json
 # laptop is not a result anyone can check, and ticket 19's figure regenerates from these files.
 !artifacts/abcd/
 !artifacts/abcd/**
+# the expectation `make reproduce` checks a fresh run against: the headline of the loop on the
+# zero-download default, recorded with the environment that produced it. Committed because a
+# reproducibility check whose target is not in the repository checks nothing. The report the
+# command writes beside it is a run artefact and stays ignored.
+!artifacts/reproduce/
+!artifacts/reproduce/synthetic_headline.json
 # the anchor gates: the two numbers that decided which dataset hosts the loop. Gate 2's ratio is
 # the reason AMLworld was used at all, and a reason that traces to nothing is not a reason.
 !artifacts/spike/

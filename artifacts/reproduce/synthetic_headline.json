@@ -1,0 +1,65 @@
+{
+  "what": "The headline of `python scripts/run_experiment.py experiment=adaptive` on the zero-download synthetic default. A PIPELINE CHECK, not a result: data=synthetic has no real anchor, so these numbers say the pipeline runs and is deterministic, and nothing about fraud. `scripts/reproduce.py` compares a fresh run against this.",
+  "command": "python scripts/run_experiment.py experiment=adaptive seed=1337",
+  "seconds_when_recorded": 40.6,
+  "recorded_on": {
+    "git_commit": "a23ca1147ee39ba7ce7f8d9d868ecb63ea3151b8",
+    "git_dirty": true,
+    "seed": 1337,
+    "environment": {
+      "python": "3.11.16",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "cpu_count": 14,
+      "packages": {
+        "lightgbm": "4.5.0",
+        "numpy": "2.0.2",
+        "scipy": "1.14.1",
+        "scikit-learn": "1.5.2",
+        "pandas": "2.2.3",
+        "shap": "0.46.0",
+        "optuna": "4.0.0",
+        "torch": "2.5.1"
+      }
+    }
+  },
+  "headline": {
+    "seed": 1337,
+    "data": "synthetic",
+    "pipeline_check": true,
+    "operating_point": {
+      "fixed_fpr": 0.01,
+      "k": 100
+    },
+    "backend": [
+      "lightgbm 4.5.0"
+    ],
+    "systems": {
+      "A_baseline": {
+        "pr_auc": 0.567018,
+        "recall@1%fpr": 0.28866,
+        "precision@100": 0.66,
+        "evasion_rate": 0.07560137457044673,
+        "train_rows": 13684
+      },
+      "B_smote": {
+        "pr_auc": 0.56701,
+        "recall@1%fpr": 0.28866,
+        "precision@100": 0.66,
+        "evasion_rate": 0.7628865979381443,
+        "train_rows": 13832
+      },
+      "C_adaptive": {
+        "pr_auc": 0.140351,
+        "recall@1%fpr": 0.041237,
+        "precision@100": 0.19,
+        "evasion_rate": 0.24054982817869416,
+        "train_rows": 13684
+      }
+    },
+    "fidelity": {
+      "verdict": "fail",
+      "score": 0.5755
+    }
+  }
+}

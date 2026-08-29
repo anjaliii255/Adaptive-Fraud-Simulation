@@ -17,7 +17,7 @@ penalty is a λ that does nothing, however large λ is.**
 Across the committed run — 7 seeds × 6 rounds — the penalty was:
 
 ```
-seed 7     0.0652  0.0633  0.0654  0.0653  0.0660  1.0000
+seed 7     0.0652  0.0633  0.0654  0.0653  0.0660  0.0657
 seed 11    0.0651  0.0648  0.0637  0.0646  0.0647  0.0655
 seed 23    0.0654  0.0661  0.0658  0.0655  0.0640  0.0649
 seed 42    0.0645  0.0649  0.0650  0.0663  0.0651  0.0653
@@ -26,9 +26,14 @@ seed 1337  0.0638  0.0667  0.0657  0.0649  0.0648  0.0642
 seed 2024  0.0656  0.0646  0.0661  0.0633  0.0644  0.0649
 ```
 
-**41 of 42 rounds at 0.065 ± 0.001.** One value, not a distribution. The single 1.0 is the hard
-violation cliff firing once — the only time in the whole experiment that the leash affected
-anything, and it fires as a binary trip rather than a gradient.
+**All 42 rounds between 0.0629 and 0.0667** — a mean of 0.065 and a total spread of 0.0037. One
+value, not a distribution, and the hard violation cliff never fires at all: no round in the
+committed run is vetoed by the leash.
+
+_This table was regenerated under ticket 20. It previously carried a `1.0000` in seed 7's last
+round and read "41 of 42 rounds", because it had been copied from the **retired** v1.0 artefact —
+the one `artifacts/abcd/README.md` says no document may quote. The canonical run has 0.0657 there.
+The argument below is unaffected and slightly stronger: not even the cliff fired._
 
 ### Why: three bounds, none of which can bind
 

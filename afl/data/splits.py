@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from afl.contract.schema import Transaction
+from afl.utils.runcard import with_provenance
 
 
 def out_of_time_split(
@@ -202,7 +203,7 @@ class CommittedSplit:
     def save(self, directory: str | Path = DEFAULT_SPLIT_DIR) -> Path:
         path = Path(directory) / f"{self.dataset}_oot.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
+        path.write_text(json.dumps(with_provenance(self.to_dict()), indent=2) + "\n")
         return path
 
     @classmethod

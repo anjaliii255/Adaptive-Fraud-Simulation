@@ -41,6 +41,7 @@ from afl.data import loaders
 from afl.data.splits import committed_split_for
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol
+from afl.utils.runcard import stamp
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("transfer")
@@ -248,6 +249,7 @@ def main() -> int:
                 "anchor": args.data,
                 "holdout": args.holdout,
                 "seed": args.seed,
+                "provenance": stamp(args.seed),
                 "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
                 "split_digest": split.digest,
                 "commensurability": audit,

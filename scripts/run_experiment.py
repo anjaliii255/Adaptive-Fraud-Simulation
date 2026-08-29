@@ -42,6 +42,7 @@ from afl.evaluation import leave_one_attack_out as loao
 from afl.evaluation import three_system
 from afl.fidelity import provenance, scorecard
 from afl.tracking import get_tracker
+from afl.utils.runcard import stamp, write_run_card
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger(__name__)
@@ -421,6 +422,10 @@ def main(cfg: DictConfig) -> None:
         json.dumps(
             {
                 "pipeline_check": pipeline_check,
+                # which code, which seed, which libraries — the artefact answers it itself, so a
+                # number that will not reproduce can be diffed against the run that made it
+                # rather than argued about. No clock here: see afl/utils/runcard.py.
+                "provenance": stamp(int(cfg.seed)),
                 "data": str(cfg.data.name),
                 "n_real_rows": len(real),
                 "real_base_rate": loaders.base_rate(real),
@@ -440,6 +445,18 @@ def main(cfg: DictConfig) -> None:
     (artifact_dir / "history.json").write_text(json.dumps(tracker.history, indent=2, default=str))
     (artifact_dir / "attack_trials.json").write_text(json.dumps(optimiser.history(), indent=2))
     (artifact_dir / "config.yaml").write_text(OmegaConf.to_yaml(cfg))
+    # config, seed, attack params and metrics in one file, plus the wall-clock facts that are
+    # kept out of the artefacts so that two runs of one seed still diff to nothing.
+    write_run_card(
+        artifact_dir,
+        seed=int(cfg.seed),
+        config=OmegaConf.to_container(cfg, resolve=True),
+        attack_params=optimiser.history(),
+        metrics=[r.row() for r in results],
+        detector_backend=backends,
+        pipeline_check=pipeline_check,
+        split_digest=split.digest if split else None,
+    )
 
     if cfg.eval.sweep_all_vectors:
         # Every requested fold gets a row, including the ones that could not be run — a fold

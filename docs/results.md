@@ -36,11 +36,17 @@ fold, base rate 0.053%, 6 rounds, 7 seeds.
 
 | system | trained on | PR-AUC (mean ± sd) | recall@1%FPR |
 | --- | --- | --- | --- |
-| A_real | the anchor's real rows and labels | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
-| B_smote | the same plus row-level oversampling | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | the same plus **static** template attacks | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
-| D_adaptive | the same plus the **adaptive** loop's attacks | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
+| A_real | the anchor's real rows and labels | 0.0806 ± 0.0765 | 0.440 ± 0.185 |
+| B_smote | the same plus row-level oversampling | 0.0274 ± 0.0154 | 0.520 ± 0.148 |
+| C_template | the same plus **static** template attacks | 0.0557 ± 0.0560 | 0.544 ± 0.255 |
+| D_adaptive | the same plus the **adaptive** loop's attacks | 0.0168 ± 0.0131 | 0.378 ± 0.292 |
 | amount_floor | nothing — rank by amount | 0.0013 | 0.012 |
+
+Every cell is the mean over the 7 seeds; `± sd` is the **sample** standard deviation (ddof = 1),
+which is what `scripts/abcd_experiment.py` prints and what `afl/evaluation/three_system.py` uses
+for the other table. Until ticket 20 these four rows quoted population sd, which no script in the
+repository produces — the spread column moved, no mean moved, and no comparison changed.
+`make claims` now recomputes all four rows from the artefact on every run.
 
 **C_template is what makes D falsifiable.** C and D share an episode budget, so the only difference
 between them is whether the attacks were searched adaptively or generated statically. If D does not
@@ -190,6 +196,6 @@ so in a banner and in its own artefact.
 Each numeric regime supersedes the last rather than sitting beside it — the vectors, the holdout,
 the backend and the decision layer have each moved the table, and a run from before any of them is
 not comparable. Ticket 12's A/B/C/D experiment on AMLworld (`artifacts/abcd/`) reported adaptive
-failing to beat non-adaptive at 4 of 7 seeds, p = 0.500; this table is a different fold on
-different anchors and does not overturn it.
+beating the static-template control on 1 of 7 seeds by PR-AUC, p = 0.992; this table is a different
+fold on different anchors and does not overturn it.
 

@@ -1,0 +1,521 @@
+# Every quoted number, and the artefact it is recomputed from.
+#
+# `make claims` reads this file, recomputes each `expr` over the named artefact, formats it, and
+# fails unless the result is exactly the `quoted` string AND that string still appears in every
+# document listed. Then it does the harder half: inside every `region`, any number that is not a
+# claim or an allowed constant is a failure, so the registry cannot fall behind the prose.
+#
+# Adding a number to a covered section means adding it here. That is the intended cost: this
+# repository has already shipped an evasion curve that three documents kept quoting after the
+# artefact behind it had been regenerated.
+#
+# Grammar of `expr` is in `afl/repro/claims.py` — a small set of named reductions, evaluated with
+# no builtins, that can only read the artefact named on the same line.
+
+version: 1
+
+artifacts:
+  abcd: artifacts/abcd/amlworld_gather-scatter.json
+  abcd_binding: artifacts/abcd/diagnostics/amlworld_gather-scatter_binding.json
+  ts_paysim: artifacts/three_system/paysim.json
+  ts_amlsim: artifacts/three_system/amlsim.json
+
+# Sections whose every number must trace to a claim below. These are the four places the
+# headline result is stated; `docs/reproducibility.md` records what is not yet covered and why.
+regions:
+  - file: README.md
+    section: "# Adaptive Fraud Simulation Lab"
+    until: "## How it fits together"
+  - file: README.md
+    section: "## Main result"
+  - file: docs/results.md
+    section: "## The A/B/C/D experiment"
+  - file: docs/claim.md
+    section: "### 4. When they do pass, does adaptive beat non-adaptive?"
+
+# Numbers in a covered section that are not measurements. Each needs a reason, because "it is
+# obviously not a result" is exactly what was said about several numbers that were.
+allow:
+  "0.05": "the significance convention the result is judged against, not a measurement"
+  "0": "the loop's first round is round 0"
+  "1": "row numbers in the four-question table"
+  "2026": "the year of the challenge this was built for"
+  "12": "ticket number (12 = A/B/C/D), and the episodes-per-round budget stated in the artefact header"
+  "16": "ticket number (16 = the three-system table)"
+  "20": "ticket number (20 = reproducibility)"
+  "11": "ticket number (11 = the leave-one-attack-out harness)"
+  "0005": "ADR number in a filename"
+  "1.0": "the retired artefact's version label, not a metric"
+  "2": "the '2-seed reading' that was retracted, and the two experiments being set side by side"
+  "4": "the four public anchors tried, and the 4.5x factor spelled out below it"
+  "18": "leave-one-attack-out folds, quoted from docs/loao.md rather than from this artefact"
+  "5": "the '4.5x reduction' decimal half, and 'five acts' of the prototype"
+
+claims:
+  # ── the fold itself ─────────────────────────────────────────────────────────
+  - id: abcd.seeds
+    what: seeds in the A/B/C/D run
+    artifact: abcd
+    expr: n_seeds()
+    quoted: "7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.rounds
+    what: loop rounds per seed
+    artifact: abcd
+    expr: at('rounds')
+    quoted: "6"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.positives
+    what: positives in the held-out GATHER-SCATTER fold
+    artifact: abcd
+    expr: at('runs.0.positives')
+    quoted: "173"
+    docs: [README.md, docs/results.md]
+  - id: abcd.base_rate
+    what: base rate of the held-out fold
+    artifact: abcd
+    expr: at('runs.0.base_rate')
+    fmt: "{:.3%}"
+    quoted: "0.053%"
+    docs: [README.md, docs/results.md]
+  - id: abcd.fixed_fpr
+    what: the operating point the recall column is read at
+    artifact: abcd
+    expr: at('operating_point.fixed_fpr')
+    fmt: "{:.0%}"
+    quoted: "1%"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.split_digest
+    what: committed out-of-time split the fold was cut on
+    artifact: abcd
+    expr: at('split_digest')
+    quoted: "f5e33a878d68b792"
+    docs: [README.md, docs/results.md]
+  - id: abcd.git_commit
+    what: the commit the canonical artefact was produced on
+    artifact: abcd
+    expr: at('git_commit')[:8]
+    quoted: "4050fc46"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.git_dirty
+    what: whether that tree was dirty
+    artifact: abcd
+    expr: "'true' if at('git_dirty') else 'false'"
+    quoted: "false"
+    docs: [README.md, docs/claim.md]
+
+  # ── the systems table: mean and sample sd over the 7 seeds ──────────────────
+  # sd is ddof=1, the spread `scripts/abcd_experiment.py` prints and the one
+  # `afl/evaluation/three_system.py` uses for its own table. An earlier version of these
+  # documents quoted population sd, which no script in the repository produces.
+  - id: abcd.A_real.pr_auc.mean
+    what: System A mean PR-AUC
+    artifact: abcd
+    expr: mean(metric('A_real', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0806"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.A_real.pr_auc.sd
+    what: System A PR-AUC sample sd
+    artifact: abcd
+    expr: sd(metric('A_real', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0765"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.A_real.recall.mean
+    what: System A mean recall at 1% FPR
+    artifact: abcd
+    expr: mean(metric('A_real', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.440"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.A_real.recall.sd
+    what: System A recall sample sd
+    artifact: abcd
+    expr: sd(metric('A_real', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.185"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.B_smote.pr_auc.mean
+    what: System B mean PR-AUC
+    artifact: abcd
+    expr: mean(metric('B_smote', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0274"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.B_smote.pr_auc.sd
+    what: System B PR-AUC sample sd
+    artifact: abcd
+    expr: sd(metric('B_smote', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0154"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.B_smote.recall.mean
+    what: System B mean recall at 1% FPR
+    artifact: abcd
+    expr: mean(metric('B_smote', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.520"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.B_smote.recall.sd
+    what: System B recall sample sd
+    artifact: abcd
+    expr: sd(metric('B_smote', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.148"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.C_template.pr_auc.mean
+    what: System C (static template) mean PR-AUC
+    artifact: abcd
+    expr: mean(metric('C_template', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0557"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.C_template.pr_auc.sd
+    what: System C PR-AUC sample sd
+    artifact: abcd
+    expr: sd(metric('C_template', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0560"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.C_template.recall.mean
+    what: System C mean recall at 1% FPR
+    artifact: abcd
+    expr: mean(metric('C_template', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.544"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.C_template.recall.sd
+    what: System C recall sample sd
+    artifact: abcd
+    expr: sd(metric('C_template', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.255"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.D_adaptive.pr_auc.mean
+    what: System D (adaptive) mean PR-AUC
+    artifact: abcd
+    expr: mean(metric('D_adaptive', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0168"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.D_adaptive.pr_auc.sd
+    what: System D PR-AUC sample sd
+    artifact: abcd
+    expr: sd(metric('D_adaptive', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0131"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.D_adaptive.recall.mean
+    what: System D mean recall at 1% FPR
+    artifact: abcd
+    expr: mean(metric('D_adaptive', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.378"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.D_adaptive.recall.sd
+    what: System D recall sample sd
+    artifact: abcd
+    expr: sd(metric('D_adaptive', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.292"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.amount_floor.pr_auc
+    what: the no-model amount floor, PR-AUC
+    artifact: abcd
+    expr: mean(metric('amount_floor', 'pr_auc'))
+    fmt: "{:.4f}"
+    quoted: "0.0013"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.amount_floor.recall
+    what: the no-model amount floor, recall at 1% FPR
+    artifact: abcd
+    expr: mean(metric('amount_floor', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.012"
+    docs: [README.md, docs/results.md, docs/claim.md]
+
+  # ── the sign tests: which way each seed fell, and how surprising that is ────
+  - id: abcd.sign.D_over_A.pr_auc
+    what: seeds where adaptive beat real-only on PR-AUC
+    artifact: abcd
+    expr: wins('D_adaptive', 'A_real', 'pr_auc')
+    fmt: "{}/7"
+    quoted: "1/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_A.pr_auc.p
+    what: one-sided p for that count
+    artifact: abcd
+    expr: sign_test(wins('D_adaptive', 'A_real', 'pr_auc'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.992"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_A.recall
+    what: seeds where adaptive beat real-only on recall
+    artifact: abcd
+    expr: wins('D_adaptive', 'A_real', 'recall_at_fixed_fpr')
+    fmt: "{}/7"
+    quoted: "2/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_A.recall.p
+    what: one-sided p for that count
+    artifact: abcd
+    expr: sign_test(wins('D_adaptive', 'A_real', 'recall_at_fixed_fpr'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.938"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_B.pr_auc
+    what: seeds where adaptive beat SMOTE on PR-AUC
+    artifact: abcd
+    expr: wins('D_adaptive', 'B_smote', 'pr_auc')
+    fmt: "{}/7"
+    quoted: "4/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_B.pr_auc.p
+    what: one-sided p for that count
+    artifact: abcd
+    expr: sign_test(wins('D_adaptive', 'B_smote', 'pr_auc'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.500"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_C.pr_auc
+    what: seeds where adaptive beat static template augmentation on PR-AUC — the ticket-12 question
+    artifact: abcd
+    expr: wins('D_adaptive', 'C_template', 'pr_auc')
+    fmt: "{}/7"
+    quoted: "1/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.C_over_D.pr_auc
+    what: the same test read the other way — seeds where static beat adaptive
+    artifact: abcd
+    expr: wins('C_template', 'D_adaptive', 'pr_auc')
+    fmt: "{}/7"
+    quoted: "6/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.C_over_D.pr_auc.p
+    what: one-sided p for that count
+    artifact: abcd
+    expr: sign_test(wins('C_template', 'D_adaptive', 'pr_auc'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.062"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.C_over_D.recall
+    what: seeds where static beat adaptive on recall
+    artifact: abcd
+    expr: wins('C_template', 'D_adaptive', 'recall_at_fixed_fpr')
+    fmt: "{}/7"
+    quoted: "5/7"
+    docs: [docs/results.md, docs/claim.md]
+  - id: abcd.sign.C_over_D.recall.p
+    what: one-sided p for that count
+    artifact: abcd
+    expr: sign_test(wins('C_template', 'D_adaptive', 'recall_at_fixed_fpr'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.227"
+    docs: [docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_floor.pr_auc
+    what: seeds where adaptive beat the no-model amount floor on PR-AUC
+    artifact: abcd
+    expr: wins('D_adaptive', 'amount_floor', 'pr_auc')
+    fmt: "{}/7"
+    quoted: "7/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_floor.pr_auc.p
+    what: the one comparison in this fold that clears 0.05
+    artifact: abcd
+    expr: sign_test(wins('D_adaptive', 'amount_floor', 'pr_auc'), n_seeds())
+    fmt: "{:.3f}"
+    quoted: "0.008"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_floor.recall
+    what: seeds where adaptive beat the amount floor on recall
+    artifact: abcd
+    expr: wins('D_adaptive', 'amount_floor', 'recall_at_fixed_fpr')
+    fmt: "{}/7"
+    quoted: "6/7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+
+  # ── the loop itself: what closed, and what was never rejected ───────────────
+  - id: abcd.evasion.round0
+    what: mean evasion rate in round 0, before the detector has retrained
+    artifact: abcd
+    expr: round_mean('evasion_rate', 0)
+    fmt: "{:.3f}"
+    quoted: "0.836"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.evasion.round0.pct
+    what: the same number as a percentage
+    artifact: abcd
+    expr: round_mean('evasion_rate', 0)
+    fmt: "{:.1%}"
+    quoted: "83.6%"
+    docs: [README.md, docs/claim.md]
+  - id: abcd.evasion.final
+    what: mean evasion rate in the last round
+    artifact: abcd
+    expr: round_mean('evasion_rate', -1)
+    fmt: "{:.3f}"
+    quoted: "0.054"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.audit.rejected
+    what: rounds the commensurability gate rejected, over every seed
+    artifact: abcd
+    expr: (rounds_where('rejected_by_audit'), total_rounds())
+    fmt: "{} of {}"
+    quoted: "0 of 42"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.leash.vetoed
+    what: rounds the realism leash vetoed under the binding bounds and both audit rules
+    artifact: abcd_binding
+    expr: (rounds_where('rejected_by_audit'), total_rounds())
+    fmt: "{} of {}"
+    quoted: "0 of 42"
+    docs: [README.md, docs/results.md, docs/claim.md]
+
+  # ── the second experiment: the three-system table, ticket 16 ────────────────
+  # Registered but its sections are not covered regions yet — `docs/three_system.md` is
+  # generated from these artefacts, and `docs/results.md` copies the table by hand, which is
+  # exactly the copy that can drift.
+  - id: ts.seeds
+    what: seeds in the three-system table
+    artifact: ts_paysim
+    expr: n_seeds()
+    quoted: "3"
+    docs: [README.md, docs/results.md]
+  - id: ts.paysim.A.known.pr_auc
+    what: PaySim, real-only, known column
+    artifact: ts_paysim
+    expr: mean(cell('A_baseline', 'known', 'pr_auc'))
+    fmt: "{:.3f}"
+    quoted: "0.162"
+    docs: [docs/results.md]
+  - id: ts.paysim.B.known.pr_auc
+    what: PaySim, SMOTE, known column
+    artifact: ts_paysim
+    expr: mean(cell('B_smote', 'known', 'pr_auc'))
+    fmt: "{:.3f}"
+    quoted: "0.166"
+    docs: [docs/results.md]
+  - id: ts.paysim.C.known.pr_auc
+    what: PaySim, adaptive, known column
+    artifact: ts_paysim
+    expr: mean(cell('C_adaptive', 'known', 'pr_auc'))
+    fmt: "{:.3f}"
+    quoted: "0.163"
+    docs: [docs/results.md]
+  - id: ts.paysim.C.unseen.recall
+    what: PaySim, adaptive, held-out column — withheld, and quoted in brackets
+    artifact: ts_paysim
+    expr: mean(cell('C_adaptive', 'unseen', 'recall_at_fixed_fpr'))
+    fmt: "{:.3f}"
+    quoted: "0.997"
+    docs: [docs/results.md]
+  - id: ts.paysim.train.rows
+    what: PaySim training rows behind the table
+    artifact: ts_paysim
+    expr: counts('train.historical_rows')
+    fmt: "{:,}"
+    quoted: "446,214"
+    docs: [docs/results.md]
+  - id: ts.paysim.train.fraud
+    what: PaySim training fraud rows
+    artifact: ts_paysim
+    expr: counts('train.historical_fraud')
+    quoted: "369"
+    docs: [docs/results.md]
+  - id: ts.amlsim.C.unseen.pr_auc
+    what: AMLSim, adaptive, held-out column — withheld
+    artifact: ts_amlsim
+    expr: mean(cell('C_adaptive', 'unseen', 'pr_auc'))
+    fmt: "{:.3f}"
+    quoted: "0.998"
+    docs: [docs/results.md]
+  - id: ts.amlsim.train.rows
+    what: AMLSim training rows behind the table
+    artifact: ts_amlsim
+    expr: counts('train.historical_rows')
+    fmt: "{:,}"
+    quoted: "930,465"
+    docs: [docs/results.md]
+  - id: ts.amlsim.train.fraud
+    what: AMLSim training fraud rows
+    artifact: ts_amlsim
+    expr: counts('train.historical_fraud')
+    fmt: "{:,}"
+    quoted: "1,170"
+    docs: [docs/results.md]
+
+  # ── the same counts as a document phrases them in prose ────────────────────
+  # Registered separately from the `N/7` forms above: the checker masks a phrase before it
+  # tokenises, so `D wins 1 of 7 seeds` is verified as a claim rather than passing as two
+  # unrelated digits.
+  - id: abcd.sign.D_over_C.pr_auc.prose
+    what: the ticket-12 question in prose — adaptive over static template, PR-AUC
+    artifact: abcd
+    expr: wins('D_adaptive', 'C_template', 'pr_auc')
+    fmt: "{} of 7"
+    quoted: "1 of 7"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_C.recall.prose
+    what: the same, on recall
+    artifact: abcd
+    expr: wins('D_adaptive', 'C_template', 'recall_at_fixed_fpr')
+    fmt: "{} of 7"
+    quoted: "2 of 7"
+    docs: [README.md, docs/claim.md]
+  - id: abcd.sign.C_over_D.pr_auc.prose
+    what: read the other way, in prose
+    artifact: abcd
+    expr: wins('C_template', 'D_adaptive', 'pr_auc')
+    fmt: "{} of 7"
+    quoted: "6 of 7"
+    docs: [docs/results.md, docs/claim.md]
+  - id: abcd.sign.D_over_C.pr_auc.slash
+    what: the same count as the four-question table writes it
+    artifact: abcd
+    expr: (wins('D_adaptive', 'C_template', 'pr_auc'), n_seeds())
+    fmt: "{}/{} seeds"
+    quoted: "1/7 seeds"
+    docs: [README.md]
+  - id: abcd.leash.vetoed.slash
+    what: the leash's veto count as the four-question table writes it
+    artifact: abcd_binding
+    expr: (rounds_where('rejected_by_audit'), total_rounds())
+    fmt: "{}/{}"
+    quoted: "0/42"
+    docs: [README.md]
+
+  # ── the leash: is the penalty responding to anything? ──────────────────────
+  - id: abcd.total_rounds
+    what: rounds across every seed — the denominator of every "of 42" in these documents
+    artifact: abcd
+    expr: total_rounds()
+    quoted: "42"
+    docs: [README.md, docs/results.md, docs/claim.md]
+  - id: abcd.leash.default.mean
+    what: mean realism penalty under the shipped leash — the constant that made lambda a no-op
+    artifact: abcd
+    expr: mean(flat('realism_penalty'))
+    fmt: "{:.3f}"
+    quoted: "0.065"
+    docs: [docs/claim.md, docs/realism-leash.md]
+  - id: abcd.leash.binding.distinct
+    what: distinct penalty values once the bounds are measured off the anchor instead of guessed
+    artifact: abcd_binding
+    expr: distinct('realism_penalty')
+    quoted: "41"
+    docs: [docs/claim.md]
+  - id: abcd.leash.default.min
+    what: smallest penalty the shipped leash produced across all 42 rounds
+    artifact: abcd
+    expr: min(flat('realism_penalty'))
+    fmt: "{:.4f}"
+    quoted: "0.0629"
+    docs: [docs/claim.md, docs/realism-leash.md]
+  - id: abcd.leash.default.max
+    what: largest penalty the shipped leash produced across all 42 rounds
+    artifact: abcd
+    expr: max(flat('realism_penalty'))
+    fmt: "{:.4f}"
+    quoted: "0.0667"
+    docs: [docs/claim.md, docs/realism-leash.md]

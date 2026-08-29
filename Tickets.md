@@ -39,7 +39,7 @@ blocks the frontier for both lanes.
 | 17 | ~~Sequence model — earn it or report it~~ **done — reported, not promoted** | ■ B | 11 |
 | 18 | ~~Temporal GNN — earn it or fall back~~ **done — fell back, and said so** | ■ B | 11 |
 | 19 | ~~The convergence artefact~~ **done — the loop closes, the transfer does not** | ▲ A | 11, 12 |
-| 20 | One command reproduces a headline number | ▲ A | 16, 19 |
+| 20 | ~~One command reproduces a headline number~~ **done — one command, and the anchor re-run reproduces exactly** | ▲ A | 16, 19 |
 | 21 | The live demo | ▲ A | 19 |
 | 22 | Submission pack and claims audit | ◆ A+B | 15, 16, 20, 21 |
 
@@ -1582,17 +1582,66 @@ seed. A number that cannot be reproduced from (config, seed) is a bug, not a rou
 
 **Blocked by:** 16, 19.
 
-**Status:** ready-for-agent
+**Status:** done — `make reproduce` is the one command: it checks the documents against the
+artefacts they cite, then runs the whole loop twice on the zero-download default and compares both
+runs against a committed expectation and against each other. 82 seconds, nothing to download.
+Written up in `docs/reproducibility.md`, which also carries the one box that is **not** ticked.
 
-- [ ] `docker compose up` or a single `run_experiment.py` invocation reproduces a stated headline
-      number from a clean clone
-- [ ] Global seed set; the same seed twice gives the same number, and this is verified on a
-      machine that was not used to develop it
-- [ ] Every run writes config, seed, attack params and metrics into the artefact directory
-- [ ] Dependencies pinned; the README's commands are exact and were run verbatim to check
-- [ ] Every number in the README traces to a committed artefact
-- [ ] Where determinism is not achievable, the residual variance is stated rather than glossed
-- [ ] The whole thing still runs on the synthetic default with nothing to download
+- [x] A single `run_experiment.py` invocation reproduces a stated headline number from a clean
+      clone — checked in a copy holding only tracked files, with no `data/` and no `.git`, in 87
+      seconds. `make reproduce` wraps it: the loop on `data=synthetic` lands on every number in
+      `artifacts/reproduce/synthetic_headline.json`, which records the environment it was taken
+      on. **That number is a pipeline check, not a result** — no clone can run the real headline
+      without the anchor, so the real one is *re-derived* from `artifacts/abcd/` instead, and
+      `--anchor` re-runs it where the data exists.
+- [x] Global seed set; the same seed twice gives the same number. Two consecutive runs of seed
+      1337 are byte-identical in `metrics.json`, `history.json` and `attack_trials.json`; the only
+      difference anywhere was one clock field in the fidelity scorecard, which is why nothing this
+      ticket added carries a timestamp.
+- [x] **A real anchor reproduces exactly.** One seed of the PaySim three-system table
+      (`--anchor paysim --anchor-seed 1337`, 412 seconds) was re-run against the committed
+      artefact: **0 differences** across every cell, measured and withheld. That is the strongest
+      evidence in this ticket, and it is on real data rather than the synthetic default.
+- [ ] **Verified on a machine that was not used to develop it — NOT DONE.** No second machine was
+      available and the Docker daemon was not running. Stated in `docs/reproducibility.md` rather
+      than glossed. The command is built for whoever does it first: when the numbers differ and
+      the environment differs it reports UNCONFIRMED and exits 2, naming every environment field
+      that moved, because calling that a pass would be worse than either verdict.
+- [x] Every run writes config, seed, attack params and metrics into the artefact directory.
+      `run_card.json` carries all four plus the command line; every artefact carries a
+      `provenance` block with commit, dirty flag, seed and library versions — and deliberately no
+      clock, so `run it twice and diff` keeps working. A test fails if a new artefact type is
+      written without one.
+- [x] Dependencies pinned. `requirements.txt` was a set of ranges wide enough to admit LightGBM
+      4.3 and 4.5 under one file; it now pins exact versions, and `uv.lock` pins the rest. Every
+      command quoted in the README was run verbatim.
+- [x] Every number in the README traces to a committed artefact — 65 of them, by command rather
+      than by reading. `docs/claims.yaml` names the artefact and the expression for each, and four
+      sections are *covered regions*: any number in them that is not a registered claim or an
+      allowed constant with a stated reason fails the check.
+- [x] Where determinism is not achievable, the residual variance is stated. On one machine it is
+      zero, measured. Across machines it is unmeasured and said to be unmeasured, with the three
+      things known to move it named: LightGBM's build and thread count, the libomp fallback on
+      macOS, and the dependency ranges that are now closed.
+- [x] The whole thing still runs on the synthetic default with nothing to download.
+
+**Three defects the new check found on its first run**, all of them numbers that were true when
+written and had stopped being true:
+
+1. `docs/realism-leash.md`'s per-round penalty table was copied from the **retired** v1.0
+   artefact — the file `artifacts/abcd/README.md` says no document may quote. It carried a
+   `1.0000` where the canonical run has `0.0657`. Regenerated; the argument it supports got
+   slightly stronger, because not even the hard cliff fired.
+2. The A/B/C/D `± sd` column was population sd in four documents, while both
+   `scripts/abcd_experiment.py` and `afl/evaluation/three_system.py` compute sample sd. Restated
+   as sample sd, which is what a reader running the command sees. No mean and no sign test moved.
+3. Three sentences cited `p = 0.500` — the D-versus-SMOTE comparison — for a claim about
+   *non-adaptive*, where the artefact says 1/7 and p = 0.992 against the static-template control.
+   Corrected in `README.md`, `docs/claim.md` and `docs/results.md`.
+
+**Not covered, deliberately:** `Tickets.md` itself. It is a log of what was believed when each
+ticket closed, not a claim surface — which is why ticket 19 above still reads `0.915 → 0.201`,
+the figure that was current before the artefact was regenerated on `4050fc46`.
 
 ---
 

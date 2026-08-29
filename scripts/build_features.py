@@ -37,6 +37,7 @@ import yaml
 from afl.contract.schema import Transaction
 from afl.data import loaders
 from afl.defend.features import FEATURE_GROUPS, FeatureBuilder, feature_specs
+from afl.utils.runcard import with_provenance
 
 log = logging.getLogger("build_features")
 
@@ -299,7 +300,7 @@ def main() -> int:
 
     for name, report in reports.items():
         path = ARTIFACT_DIR / f"{name}.json"
-        path.write_text(json.dumps(report, indent=2) + "\n")
+        path.write_text(json.dumps(with_provenance(report, args.seed), indent=2) + "\n")
         state = report["state"]
         print(f"\n── {name} " + "─" * (70 - len(name)))
         print(

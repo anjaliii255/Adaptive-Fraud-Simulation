@@ -46,6 +46,7 @@ from afl.evaluation import protocol
 from afl.evaluation.three_system import smote_transactions
 from afl.loop.closed_loop import find_evasions
 from afl.utils.provenance import git_provenance
+from afl.utils.runcard import environment, write_run_card
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("abcd")
@@ -340,6 +341,9 @@ def artifact_header(cfg: dict, args) -> dict:
         "typology": args.typology,
         "split_digest": committed_split_for(cfg).digest,
         **git_provenance(),
+        # the commit pins the program; the environment pins the arithmetic. LightGBM's version
+        # is the first thing to compare when two machines disagree on a number.
+        "environment": environment(),
         "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
         "allocation": args.allocation,
         "leash": args.leash,
@@ -409,6 +413,15 @@ def main() -> int:
             indent=2,
             default=str,
         )
+    )
+    write_run_card(
+        out.parent,
+        seed=args.seeds[0] if len(args.seeds) == 1 else None,
+        config={"data": cfg, "args": {k: str(v) for k, v in vars(args).items()}},
+        attack_params={"vectors": list(STRONG), "detector_params": args.params},
+        metrics={r["seed"]: r["results"] for r in runs},
+        name=f"{out.stem}_run_card.json",
+        seeds=args.seeds,
     )
     print(f"\nwritten to {out}")
     return 0

@@ -131,6 +131,10 @@ on all of them and **no anchor validates the adaptive claim**. What is built and
   `enabled: false`, and a test refuses to let either be switched on while the committed evidence
   says no. `artifacts/gnn/`, `artifacts/sequence/`, written up in `docs/gnn.md`,
   `docs/sequence.md` and `docs/negative-results.md`.
+- **Reproducibility** — one command from a clean clone, with nothing to download: the documents
+  are checked against the artefacts they cite, and the loop is run twice and compared against a
+  committed expectation. Every artefact records the commit, the seed and the library versions that
+  produced it. `make reproduce`, written up in `docs/reproducibility.md`.
 - **Working prototype** — five acts over the committed artefacts, with the generate-and-audit step
   and the detector running live in-process. Every screen renders from a committed artefact even
   with the live path dead, and replayed data is badged rather than shown as live.
@@ -152,25 +156,45 @@ source .venv/bin/activate
 pip install -e '.[dev]'        # or: uv sync --extra dev
 
 make smoke                     # runs the whole loop on dummy data; has to pass
+make reproduce                 # the one command: documents vs artefacts, then the loop twice
 make loop                      # the adaptive loop on the synthetic default, no download
 
 streamlit run prototype/app.py # the working prototype, five acts, no download
 ```
+
+`make reproduce` is the one to run first on a fresh clone. It needs nothing downloaded, takes
+about eighty seconds, and either everything checks out or it tells you which number moved:
+every figure quoted in these documents is recomputed from the artefact it names, then the whole
+loop is run twice on the synthetic default and both runs are compared against a committed
+expectation and against each other. `docs/reproducibility.md` says what that does and does not
+prove.
 
 `make sequence` and `make gnn` are the only targets needing more (torch, via `make setup-deep`).
 Nothing else imports them and the default suite stays green without either.
 
 ## Reproducing the main experiment
 
-The headline experiment is the A/B/C/D comparison on AMLworld, holding out the GATHER-SCATTER
-laundering typology entirely. It needs the anchor in `data/raw/` (see `docs/data.md`).
+**Without the anchor**, which is every fresh clone: `make reproduce` re-derives every number in
+this README from `artifacts/abcd/` and checks the documents still quote it, then runs the loop
+end to end twice on the synthetic default. It is the reproducibility claim that a reader can
+check in eighty seconds without downloading anything.
+
+**With the anchor.** The headline experiment is the A/B/C/D comparison on AMLworld, holding out
+the GATHER-SCATTER laundering typology entirely. It needs the anchor in `data/raw/` (see
+`docs/data.md`).
 
 ```bash
 make splits                                        # commit the out-of-time boundary + digest
 python scripts/abcd_experiment.py --data amlworld \
     --typology GATHER-SCATTER --seeds 7 11 23 42 101 1337 2024
 make figures                                       # convergence curve, from logs only
+
+python scripts/reproduce.py --anchor amlworld --anchor-seed 7   # re-run one seed and diff it
 ```
+
+The last line is the strong form: it re-runs a seed of the committed experiment and reports every
+system whose number moved. Without the anchor on disk it says which file is missing and skips,
+rather than passing quietly.
 
 Everything is config-driven with Hydra, so runs compose with overrides:
 
@@ -190,10 +214,10 @@ rate 0.053%, split digest `f5e33a878d68b792`. From `artifacts/abcd/amlworld_gath
 ```
 system         PR-AUC (mean ± sd)   recall@1%FPR     D beats it, per seed
                                                      PR-AUC          recall
-A_real         0.0806 ± 0.0709      0.440 ± 0.172    1/7 p = 0.992   2/7 p = 0.938
-B_smote        0.0274 ± 0.0143      0.520 ± 0.137    4/7 p = 0.500   2/7 p = 0.938
-C_template     0.0557 ± 0.0518      0.544 ± 0.236    1/7 p = 0.992   2/7 p = 0.938
-D_adaptive     0.0168 ± 0.0121      0.378 ± 0.270    --              --
+A_real         0.0806 ± 0.0765      0.440 ± 0.185    1/7 p = 0.992   2/7 p = 0.938
+B_smote        0.0274 ± 0.0154      0.520 ± 0.148    4/7 p = 0.500   2/7 p = 0.938
+C_template     0.0557 ± 0.0560      0.544 ± 0.255    1/7 p = 0.992   2/7 p = 0.938
+D_adaptive     0.0168 ± 0.0131      0.378 ± 0.292    --              --
 amount_floor   0.0013               0.012            7/7 p = 0.008   6/7 p = 0.062
 ```
 
@@ -254,6 +278,8 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 | `docs/threat-model.md` | the 9 vectors identified, 8 fully simulated, M1 in template mode |
 | `docs/data.md` | data cards, the anchors, and the four-anchor limitation |
 | `docs/realism-leash.md` | why the per-round leash was not binding, and how the two audit rules reconcile |
+| `docs/reproducibility.md` | what reproduces, what is not verified, and the residual variance |
+| `docs/claims.yaml` | the registry: every quoted number, the artefact it comes from, and how it is recomputed |
 | `docs/adr/` | the decisions, in the order they were taken |
 | `prototype/README.md` | the working prototype: what is live, what is replayed, how to deploy it |
 
@@ -263,9 +289,11 @@ Generated from artefacts, never edited by hand: `docs/features.md`, `docs/detect
 
 ## What we're not claiming
 
-**We do not claim that adaptive augmentation improves recall on a held-out family.** Our own 7-seed
-test says p = 0.500 on the one anchor where the question was fair to ask, and where a large gain did
-appear the provenance probe explained it. `docs/claim.md` is the full statement.
+**We do not claim that adaptive augmentation improves recall on a held-out family.** On the one
+anchor where the question was fair to ask, our own 7-seed test puts adaptive ahead of the
+static-template control on 2 of 7 seeds by recall (p = 0.938) and 1 of 7 by PR-AUC (p = 0.992) —
+and where a large gain did appear, the provenance probe explained it. `docs/claim.md` is the full
+statement.
 
 Fidelity metrics are diagnostics, not proofs. A C2ST score near chance does not mean "realistic,"
 and DCR/MIA do not mean "private." They mean we tested for memorisation and membership leakage.

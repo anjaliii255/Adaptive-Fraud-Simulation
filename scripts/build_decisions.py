@@ -77,6 +77,7 @@ from afl.defend.decision import (
 from afl.defend.features import FeatureBuilder
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol
+from afl.utils.runcard import with_provenance
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("build_decisions")
@@ -704,7 +705,9 @@ def main() -> int:
         Path(args.out).mkdir(parents=True, exist_ok=True)
         for name, card in cards.items():
             path = Path(args.out) / f"{name}.json"
-            path.write_text(json.dumps(card, indent=2, default=str) + "\n")
+            path.write_text(
+                json.dumps(with_provenance(card, args.seed), indent=2, default=str) + "\n"
+            )
             print(f"→ {path}")
 
     DOC_PATH.write_text(decisions_doc(cards, missing))

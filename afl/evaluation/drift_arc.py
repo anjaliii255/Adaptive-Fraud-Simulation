@@ -52,6 +52,7 @@ from afl.evaluation.leave_one_attack_out import (
     WITHHELD,
     is_provenance_bound,
 )
+from afl.utils.runcard import with_provenance
 
 # ── the axis ────────────────────────────────────────────────────────────────────
 SUDDEN = "sudden"
@@ -635,7 +636,7 @@ class SequenceReport:
     def save(self, directory: str | Path = DEFAULT_SEQUENCE_DIR) -> Path:
         path = Path(directory) / f"{self.dataset}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, default=str) + "\n")
+        path.write_text(json.dumps(with_provenance(self.to_dict()), indent=2, default=str) + "\n")
         return path
 
     @classmethod

@@ -69,6 +69,7 @@ from afl.evaluation.leave_one_attack_out import (
     is_provenance_bound,
 )
 from afl.evaluation.three_system import Comparison, Spread
+from afl.utils.runcard import with_provenance
 
 # ── the families ────────────────────────────────────────────────────────────────
 #: The two families the graph engine puts on the table. S1 is fan-in to a collector then layering
@@ -869,7 +870,7 @@ class GNNReport:
     def save(self, directory: str | Path = DEFAULT_GNN_DIR) -> Path:
         path = Path(directory) / f"{self.dataset}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, default=str) + "\n")
+        path.write_text(json.dumps(with_provenance(self.to_dict()), indent=2, default=str) + "\n")
         return path
 
     @classmethod

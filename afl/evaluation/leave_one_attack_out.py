@@ -48,6 +48,7 @@ from afl.contract.metrics import MetricResult
 from afl.contract.schema import Transaction
 from afl.data.splits import CommittedSplit, assert_no_leakage, out_of_time_split
 from afl.evaluation import protocol
+from afl.utils.runcard import with_provenance
 
 log = logging.getLogger(__name__)
 
@@ -767,7 +768,7 @@ class LeaveOneAttackOutReport:
     def save(self, directory: str | Path = DEFAULT_LOAO_DIR) -> Path:
         path = Path(directory) / f"{self.dataset}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, default=str) + "\n")
+        path.write_text(json.dumps(with_provenance(self.to_dict()), indent=2, default=str) + "\n")
         return path
 
     @classmethod

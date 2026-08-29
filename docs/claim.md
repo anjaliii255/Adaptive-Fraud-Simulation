@@ -124,10 +124,10 @@ GATHER-SCATTER, 7 seeds:
 
 | system | PR-AUC (mean ± sd) | recall@1%FPR |
 |---|---|---|
-| A_real | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
-| B_smote | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
-| D_adaptive | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
+| A_real | 0.0806 ± 0.0765 | 0.440 ± 0.185 |
+| B_smote | 0.0274 ± 0.0154 | 0.520 ± 0.148 |
+| C_template | 0.0557 ± 0.0560 | 0.544 ± 0.255 |
+| D_adaptive | 0.0168 ± 0.0131 | 0.378 ± 0.292 |
 | amount_floor | 0.0013 | 0.012 |
 
 Per-seed direction, D against each alternative, exact one-sided sign test:
@@ -197,16 +197,17 @@ with the evidence, and the stamp that now catches this is described in `afl/util
 
 ## What we do not claim
 
-- **That adaptive augmentation improves recall on a held-out family.** Our own 7-seed test says
-  p = 0.500 on the one anchor where the question was fair to ask.
+- **That adaptive augmentation improves recall on a held-out family.** On the one anchor where
+  the question was fair to ask, our own 7-seed test puts adaptive ahead of the static-template
+  control on 2 of 7 seeds by recall (p = 0.938) and 1 of 7 by PR-AUC (p = 0.992).
 - **That the synthetic attacks are realistic enough to train on.** The transfer test says they are
   not, on every anchor tried.
 - **That the +0.76 recall gain on amlsim/paysim is real.** The provenance probe explains it, and the
   column is withheld in `docs/three_system.md` rather than quoted.
-- **That the loop was verifiably not cheating while it ran.** The per-round realism leash was pinned
-  at a constant 0.065 in 41 of 42 rounds and could not have detected cheating; the evidence that the
-  attacker stayed honest comes from the audit gate and the fidelity scorecard instead, not from the
-  leash. Derivation in `docs/realism-leash.md`.
+- **That the loop was verifiably not cheating while it ran.** The per-round realism leash sat
+  between 0.0629 and 0.0667 in all 42 rounds and could not have detected cheating; the evidence
+  that the attacker stayed honest comes from the audit gate and the fidelity scorecard instead,
+  not from the leash. Derivation in `docs/realism-leash.md`.
 - **That any of this generalises to production payment traffic.** All four anchors are generated
   datasets. A better generator is not observed fraud.
 

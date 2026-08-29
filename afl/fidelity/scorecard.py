@@ -25,6 +25,7 @@ from typing import Any
 from afl.contract.schema import Transaction
 from afl.evaluation import protocol
 from afl.fidelity import level1_statistical, level2_structural, level3_utility, privacy
+from afl.utils.runcard import with_provenance
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
 
@@ -246,7 +247,8 @@ class Scorecard:
         directory.mkdir(parents=True, exist_ok=True)
         js = directory / f"{stem}.json"
         md = directory / f"{stem}.md"
-        js.write_text(json.dumps(self.to_dict(), indent=2, default=str))
+        card = with_provenance(self.to_dict(), self.meta.get("seed"))
+        js.write_text(json.dumps(card, indent=2, default=str))
         md.write_text(self.to_markdown())
         return {"json": js, "markdown": md}
 
@@ -278,6 +280,8 @@ def build(
     """
     card = Scorecard(thresholds=thresholds or Thresholds(), meta=meta or {}, provenance=provenance)
     card.meta.setdefault("operating_point", {"fixed_fpr": fixed_fpr, "k": k})
+    # the seed belongs on the card, not only in the caller: every level below draws from it
+    card.meta.setdefault("seed", seed)
     card.levels["level1"] = level1_statistical.report(real, synth)
     card.levels["level2"] = level2_structural.report(real, synth)
 

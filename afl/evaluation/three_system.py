@@ -33,6 +33,7 @@ from afl.evaluation import protocol
 from afl.evaluation.leave_one_attack_out import DEFAULT_HOLDOUT, LeaveOneAttackOut
 from afl.loop.closed_loop import find_evasions, run_closed_loop
 from afl.tracking import InMemoryTracker
+from afl.utils.runcard import with_provenance
 from afl.utils.seed import rng as make_rng
 
 log = logging.getLogger(__name__)
@@ -855,7 +856,7 @@ class ThreeSystemReport:
     def save(self, directory: str | Path = DEFAULT_TABLE_DIR) -> Path:
         path = Path(directory) / f"{self.dataset}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, default=str) + "\n")
+        path.write_text(json.dumps(with_provenance(self.to_dict()), indent=2, default=str) + "\n")
         return path
 
     @classmethod

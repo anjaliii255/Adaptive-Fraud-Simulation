@@ -83,6 +83,7 @@ from afl.defend.models.anomaly import AnomalyDetector, EnsembleDetector, contami
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import leave_one_attack_out as loao
 from afl.evaluation import protocol
+from afl.utils.runcard import with_provenance
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("build_anomaly")
@@ -941,7 +942,9 @@ def main() -> int:
                 missing.append(name)
                 continue
             baseline.assert_no_forbidden_metrics(card["systems"])
-            (ARTIFACT_DIR / f"{name}.json").write_text(json.dumps(card, indent=2, default=str))
+            (ARTIFACT_DIR / f"{name}.json").write_text(
+                json.dumps(with_provenance(card, args.seed), indent=2, default=str)
+            )
             cards[name] = card
         # anchors this run did not touch, but whose artefact is committed, still belong in the doc
         for path in sorted(ARTIFACT_DIR.glob("*.json")):

@@ -85,11 +85,16 @@ A/B/C/D comparison. GATHER-SCATTER held out entirely, out-of-time split digest `
 
 | system | PR-AUC (mean ± sd) | recall@1%FPR (mean ± sd) |
 |---|---|---|
-| A_real | 0.0806 ± 0.0709 | 0.440 ± 0.172 |
-| B_smote | 0.0274 ± 0.0143 | 0.520 ± 0.137 |
-| C_template | 0.0557 ± 0.0518 | 0.544 ± 0.236 |
-| D_adaptive | 0.0168 ± 0.0121 | 0.378 ± 0.270 |
+| A_real | 0.0806 ± 0.0765 | 0.440 ± 0.185 |
+| B_smote | 0.0274 ± 0.0154 | 0.520 ± 0.148 |
+| C_template | 0.0557 ± 0.0560 | 0.544 ± 0.255 |
+| D_adaptive | 0.0168 ± 0.0131 | 0.378 ± 0.292 |
 | amount_floor | 0.0013 | 0.012 |
+
+_Restated under ticket 20: the spread column was population sd, and every script in the repository
+that computes a spread over seeds uses the sample sd (ddof = 1). Same artefact, same means, same
+sign tests, same decision — only the `± sd` column moved. `docs/claims.yaml` now recomputes these
+rows from the artefact on every `make claims`._
 
 Sign tests on per-seed direction:
 

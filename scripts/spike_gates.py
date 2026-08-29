@@ -35,6 +35,7 @@ from afl.data import loaders
 from afl.data.splits import committed_split_for
 from afl.defend.models.lgbm import LGBMDetector
 from afl.evaluation import protocol
+from afl.utils.runcard import stamp
 from afl.utils.seed import set_all_seeds
 
 log = logging.getLogger("spike")
@@ -187,6 +188,7 @@ def main() -> int:
             {
                 "anchor": args.data,
                 "seed": args.seed,
+                "provenance": stamp(args.seed),
                 "split_digest": split.digest,
                 "operating_point": {"fixed_fpr": args.fixed_fpr, "k": args.k},
                 "gate_1_hosts_behaviour": gate1,
