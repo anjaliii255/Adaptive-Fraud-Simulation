@@ -1,0 +1,173 @@
+# The seven honesty guardrails, written as rules a command can fail on.
+#
+# `make guardrails` reads this file, walks every document in `documents`, and checks three things:
+#
+#   * the guardrail's own `statement` appears in the write-up named by `stated_in` — a guardrail
+#     nobody wrote down is a guardrail the reader has to take on faith;
+#   * no sentence matches a `forbid` pattern, unless that same sentence carries the `unless` that
+#     marks it as a *refusal* of the claim rather than the claim;
+#   * no sentence trips a `require` — a term that may not be written naked, because the honest
+#     omission is the failure mode a banned-phrase list cannot see.
+#
+# Fenced code blocks are skipped: the write-up quotes the sentences it refuses to write, and a
+# fence is how it does that. Everything else in a document is prose and is audited as prose.
+#
+# Patterns are case-insensitive and matched one sentence at a time (`scope: paragraph` widens the
+# unit to the whole paragraph). Grammar and mechanics are in `afl/repro/guardrails.py`.
+
+version: 1
+
+# Everything a reviewer reads. The generated documents are in scope too: a generator that writes
+# an overstatement is a bug in the generator, and finding it here is cheaper than finding it in
+# a review. `Tickets.md` is deliberately out of scope for the same reason `docs/claims.yaml`
+# leaves it alone — it is a log of what was believed when each ticket closed, not a claim surface.
+documents:
+  - README.md
+  - SPEC.md
+  - docs/*.md
+  - docs/adr/*.md
+  - docs/data-cards/*.md
+  - docs/architecture.html
+  - prototype/README.md
+  - artifacts/*/README.md
+
+guardrails:
+  # ── 1 ───────────────────────────────────────────────────────────────────────
+  - id: fidelity-is-a-diagnostic
+    statement: "C2ST near chance is a diagnostic under our protocol, not proof of realism."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\b(proves?|proof of|confirms?|establishes|verifies)\b[^.]{0,70}\b(realistic|realism)\b'
+        unless: '\bnot\b|\bno\b|never|rather than|instead of|cannot|whether|refus'
+        why: "no instrument here proves realism; the fidelity levels are diagnostics and level 3 is a gate that fails"
+      - pattern: '\b(realism|fidelity)\b[^.]{0,40}\b(is |was |been )?(proven|verified|established|confirmed)\b'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot'
+        why: "fidelity was measured, and on three anchors of four it failed; nothing about it is established"
+      - pattern: '\b(c2st|classifier two-sample|provenance probe)\b[^.]{0,80}\b(proves?|means|shows)\b[^.]{0,50}\b(realis|indistinguishable)'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot|does not'
+        why: "a two-sample test near chance is a failure to distinguish, which is not the same as a demonstration of realism"
+      - pattern: '\b(statistically )?indistinguishable from real (data|traffic|transactions|rows)\b'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot|would'
+        why: "on every anchor tried, the injected rows were separable from real traffic — the opposite of this sentence"
+    require:
+      - when: '\b(c2st|classifier two-sample test)\b'
+        must: 'diagnostic|not proof|rather than proof|near chance|do not (run|report|quote)|never (run|report)|withheld|not (a |the )?(measure|evidence)'
+        why: "naming the test obliges the same sentence to say what it is worth"
+
+  # ── 2 ───────────────────────────────────────────────────────────────────────
+  - id: privacy-is-evidence-not-proof
+    statement: "DCR / MIA are evidence against memorisation, not proof of privacy."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\b(proves?|proof of|guarantees?|guaranteed|ensures?|assures?)\b[^.]{0,60}\b(privacy|private|anonymity)\b'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot|does not|refus'
+        why: "DCR and MIA bound memorisation and membership leakage; neither is a privacy proof"
+      - pattern: '\bprivacy[- ](guarantee|preserving|safe|proof)\b'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot|does not'
+        why: "the privacy panel is evidence against memorisation and is reported as such"
+      - pattern: '\b(fully )?anonymised\b|\banonymous by construction\b|\bcarries no personal data\b'
+        unless: '\bnot\b|\bno\b|never|rather than|cannot'
+        why: "synthetic rows are generated from real anchors and reuse real account namespaces by design"
+    require:
+      - when: '\b(DCR|MIA|membership[- ]inference)\b'
+        must: 'evidence|not (a )?(proof|privacy guarantee)|rather than proof|diagnostic|advantage|ratio|attack|leakage|memoris'
+        why: "a privacy number stated without what it bounds will be read as a privacy guarantee"
+        scope: paragraph
+
+  # ── 3 ───────────────────────────────────────────────────────────────────────
+  - id: exposure-not-compliance
+    statement: "Synthetic-only reduces exposure; it does not automatically mean DPDP compliance."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\bDPDP[- ]compliant\b|\bcompliant with (the )?(DPDP|GDPR)\b'
+        unless: '\bnot\b|\bno\b|never|does not|cannot|claim'
+        why: "compliance is a legal determination about a deployment, and nothing in this repository makes it"
+      - pattern: '\b(is|are|means|ensures?|achieves?|delivers?|guarantees?)\b[^.]{0,40}\bDPDP compliance\b'
+        unless: '\bnot\b|\bno\b|never|does not|cannot|automatic'
+        why: "synthetic-only lowers exposure; the compliance question is separate and unanswered here"
+    require:
+      - when: '\bDPDP\b|\bGDPR\b'
+        must: '\bnot\b|\bno\b|never|does not|cannot|exposure|claim|automatic'
+        why: "naming a data-protection regime obliges the sentence to say what is and is not being claimed under it"
+
+  # ── 4 ───────────────────────────────────────────────────────────────────────
+  - id: latency-depends-on-the-decision-point
+    statement: "Latency depends on the decision point — no fixed sub-50ms claim."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\bsub-?\s?\d+\s?ms\b'
+        unless: '\bno\b|\bnot\b|never|depends|would|cannot|refus'
+        why: "a scoring budget is a property of where in the flow the decision sits, not of this model"
+      - pattern: '\b(guarantee[sd]?|SLA|within|under)\b[^.]{0,20}\b\d+\s?(ms|milliseconds)\b'
+        unless: '\bno\b|\bnot\b|never|depends|would|cannot'
+        why: "no latency budget here was measured under load at a named decision point, so none is asserted"
+      - pattern: '\breal-?time (scoring|decisions?|detection)\b[^.]{0,40}\b(guaranteed?|assured|proven)\b'
+        unless: '\bno\b|\bnot\b|never|depends|would'
+        why: "the serving path exists as a demo; nothing about it was load-tested"
+    require:
+      - when: '\b\d+\s?(ms|milliseconds)\b'
+        must: 'decision point|pre-?auth|post-?auth|authorisation|authorization|batch|offline|measured|depends|no fixed|would'
+        why: "a millisecond figure without its decision point reads as a production SLO"
+
+  # ── 5 ───────────────────────────────────────────────────────────────────────
+  - id: ai-risk-depends-on-deployment
+    statement: "AI-risk classification depends on deployment context — no blanket carve-out."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\b(is|are|isn.t|remains?) not (a |an )?high[- ]risk\b'
+        unless: 'depends|deployment context|would|cannot|no blanket|context'
+        why: "risk class follows from how and where a system is deployed, which this repository does not determine"
+      - pattern: '\bexempt from\b[^.]{0,60}\b(AI Act|regulation|obligations)\b'
+        unless: '\bnot\b|\bno\b|never|depends|would|cannot|claim'
+        why: "a carve-out is a determination about a deployment, and no deployment is described here"
+      - pattern: '\b(low|minimal)[- ]risk (system|classification|category|tier)\b'
+        unless: '\bnot\b|depends|would|context|cannot|claim'
+        why: "the same model is a different risk class in a research harness and in a payment authorisation path"
+      - pattern: '\boutside the scope of the (EU )?AI Act\b'
+        unless: '\bnot\b|\bno\b|never|depends|would|cannot|claim'
+        why: "scope is a deployment question; this is a research harness today and says only that"
+    require:
+      - when: '\bAI Act\b|\bhigh[- ]risk\b|\brisk classification\b'
+        must: 'depends|deployment|context|no blanket|research harness|would|not for'
+        why: "any statement about risk class has to carry the deployment context it depends on"
+
+  # ── 6 ───────────────────────────────────────────────────────────────────────
+  - id: projections-are-labelled
+    statement: "Projected losses are labelled projections, never realised figures."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\b(saved|prevented|avoided|recovered|stopped|blocked)\b[^.]{0,40}(₹|\bRs\.?\s?\d|\bINR\b|\$\s?\d)'
+        unless: 'project|illustrat|hypothetic|would|scenario|\bnot\b|\bno\b|never'
+        why: "no rupee of loss was prevented by anything in this repository; nothing here has ever been deployed"
+      - pattern: '(₹|\bRs\.?\s?\d|\bINR\b|\$\s?\d)[^.]{0,40}\b(saved|prevented|avoided|recovered|in losses)\b'
+        unless: 'project|illustrat|hypothetic|would|scenario|\bnot\b|\bno\b|never'
+        why: "a currency figure next to a loss verb reads as realised, whatever the surrounding paragraph says"
+      - pattern: '\b(losses|fraud|leakage) (prevented|avoided|saved|stopped|eliminated)\b'
+        unless: 'project|illustrat|hypothetic|would|scenario|\bnot\b|\bno\b|never'
+        why: "the only fraud this system has caught is fraud it generated itself"
+      - pattern: '\bROI\b[^.]{0,30}\b\d+(\.\d+)?\s?(%|x\b)'
+        unless: 'project|illustrat|hypothetic|would|scenario|\bnot\b'
+        why: "a return figure is a projection built on assumptions, and the assumptions have to travel with it"
+    require:
+      - when: '(₹|\bINR\b|\bRs\.?\s?\d)\s?\d'
+        must: 'project|illustrat|hypothetic|would|scenario|assumption|cost model|unit cost|per[- ]transaction|\bnot\b'
+        why: "a rupee figure without the word that makes it a projection will be read as money"
+
+  # ── 7 ───────────────────────────────────────────────────────────────────────
+  - id: vectors-are-demonstrated-capabilities
+    statement: "Frontier vectors are demonstrated capabilities, not necessarily mass-exploited patterns."
+    stated_in: [docs/submission.md]
+    forbid:
+      - pattern: '\b(M1|M2|M3|C1|C2|C3|S1|S2|S3|frontier vectors?|boundary[- ]prob\w+|synthetic[- ]identity|first[- ]party|bust[- ]out|collect[- ]request)\b[^.]{0,90}\b(widespread|rampant|epidemic|ubiquitous|mass[- ]exploited|routinely (used|exploited)|the most common|sweeping)\b'
+        unless: '\bnot\b|\bno\b|never|necessarily|whether|would|claim'
+        why: "the simulator demonstrates that a vector can be generated; prevalence in the field is a separate, unmeasured question"
+      - pattern: '\b(widespread|rampant|epidemic|mass[- ]exploited|routinely exploited)\b[^.]{0,90}\b(M1|M2|M3|C1|C2|C3|S1|S2|S3|frontier vectors?|attack famil)'
+        unless: '\bnot\b|\bno\b|never|necessarily|whether|would|claim'
+        why: "prevalence is an epidemiological claim about the field, and nothing here measures the field"
+      - pattern: '\bfraudsters (are|now) (using|running|deploying)\b'
+        unless: '\bnot\b|\bno\b|never|necessarily|whether|would|could|claim'
+        why: "what an attacker does in the wild is not observable from four generated anchors"
+    require:
+      - when: '\bfrontier vectors?\b'
+        must: 'demonstrat|capabilit|not necessarily|no claim|generated|simulat'
+        why: "the phrase invites a prevalence reading, so the sentence has to close it off"

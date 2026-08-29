@@ -25,9 +25,10 @@ An earlier version of this README claimed:
 **We do not claim that, because our own instruments contradict it.** A 7-seed A/B/C/D on AMLworld
 put adaptive against non-adaptive at 1/7 seeds, p = 0.992 — and static template augmentation beat
 the adaptive loop on 6 of 7 seeds. On the two anchors
-where an apparent +0.76 recall gain did show up, the provenance probe sorted the injected rows from
-real traffic at PR-AUC 0.998, so the gain is explained by which generator wrote the row rather than
-by anything about fraud. The claim above is what survives.
+where an apparent +0.76 recall gain did show up, a model told only *which rows the generator wrote*
+— never which rows are fraud, never a row of the held-out family — reproduces that column at PR-AUC
+0.995 and 0.863, so the gain is explained by which generator wrote the row rather than by anything
+about fraud. The claim above is what survives.
 
 ## The optimiser's objective, stated exactly
 
@@ -54,8 +55,8 @@ where       soft_fidelity_penalty = mean of three graded terms, each measured ag
 A vetoed candidate scores −1.0, is never trained on, and can never become `best`. **Only
 separability and leaks are vetoes.** Making every fidelity metric a hard gate would very likely
 leave no feasible region at all on public synthetic anchors — the `lift` rule alone already rejects
-100% of candidates on AMLSim and PaySim — so statistical and structural fidelity enter as a
-gradient that steers the search rather than a cliff that empties it.
+the batch the loop kept in 71 of the 72 rounds run on AMLSim and PaySim — so statistical and
+structural fidelity enter as a gradient that steers the search rather than a cliff that empties it.
 
 **Which configuration produced which number.** The committed v1.0 result below was produced under
 an earlier version of this objective in which the soft penalty was **not binding**: its bounds were
@@ -87,8 +88,9 @@ over any alternative. Nothing here says the evasions it finds are the ones a rea
 a 15× reduction, and it falls on **all 7 seeds** — the spread is small next to the drop. The loop
 closes, and this is the one place where the system does what the architecture diagram says it does.
 
-Three qualifications keep it at "partially" rather than "yes". The rate **plateaus near 0.20 rather
-than reaching zero**, so a fifth of the attacker's traffic still gets through after six retrains.
+Three qualifications keep it at "partially" rather than "yes". The rate **plateaus rather than
+reaching zero**, and it plateaus early: 0.106 by round 2 against 0.054 by round 5, so the last four
+retrains together buy about half of what the first one did, and one seed of seven ends at 0.204.
 The gap-closing is measured in aggregate across the vectors in the loop, not per vector, so "which
 gaps" is not answered. And every layer built specifically to close a gap the baseline could not —
 the anomaly layer, the sequence model, the temporal GNN — **lost to what already ships** and was
@@ -97,13 +99,15 @@ admitted attacks, and nothing more exotic than that.
 
 ### 3. Do the generated attacks pass the fidelity and provenance gates?
 
-**Mostly no, and that is the finding.** Four instruments ask this from different angles:
+**Mostly no, and that is the finding.** Five instruments ask this from different angles:
 
 | instrument | anchor | verdict |
 |---|---|---|
 | commensurability audit | amlworld | **pass** — worst field `log_amount` at 0.0002 against a 0.0002 base rate; audit gate rejected 0 of 42 rounds |
-| commensurability audit | amlsim, paysim | **fail** — the `lift` rule rejects 100% of candidate batches |
-| provenance probe | amlsim, paysim | **fail** — injected rows sort from real traffic at PR-AUC 0.998 and 0.970 |
+| commensurability audit | amlsim, paysim | **fail** — the `lift` rule rejects the batch the loop kept in 71 of 72 rounds |
+| provenance probe, injected vs real | paysim | **fail** — injected rows sort from real traffic at PR-AUC 0.970 |
+| provenance probe, injected vs real | amlsim | **pass** — 0.355, so the fold is readable and `A` and `B` carry numbers |
+| provenance counterfactual, System C | amlsim, paysim | **fail** — a model told only which rows the generator wrote reaches 0.995 and 0.863 on the held-out column |
 | fidelity scorecard | amlsim, paysim | **fail** — level-3 utility 0.25 and 0.00 |
 | transfer test | amlworld | **fail** — synthetic-trained scores 0.000532 against a 0.001329 amount floor |
 
@@ -202,7 +206,8 @@ with the evidence, and the stamp that now catches this is described in `afl/util
   control on 2 of 7 seeds by recall (p = 0.938) and 1 of 7 by PR-AUC (p = 0.992).
 - **That the synthetic attacks are realistic enough to train on.** The transfer test says they are
   not, on every anchor tried.
-- **That the +0.76 recall gain on amlsim/paysim is real.** The provenance probe explains it, and the
+- **That the +0.76 recall gain on amlsim/paysim is real.** The provenance counterfactual explains
+  it — trained on who wrote the row rather than on what is fraud, it reproduces the column — and the
   column is withheld in `docs/three_system.md` rather than quoted.
 - **That the loop was verifiably not cheating while it ran.** The per-round realism leash sat
   between 0.0629 and 0.0667 in all 42 rounds and could not have detected cheating; the evidence

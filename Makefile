@@ -1,4 +1,4 @@
-.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence gnn loao fidelity fidelity-selftest loop table compare figures reproduce claims demo lint fmt clean
+.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence gnn loao fidelity fidelity-selftest loop table compare figures reproduce claims guardrails demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -59,13 +59,19 @@ compare:  ## the same three systems through the hydra loop on the default config
 figures:  ## convergence curve, realism leash and the numbers behind them, from logged runs
 	uv run python scripts/make_figures.py
 
-reproduce: ## THE one command: documents vs artefacts, then the whole loop twice on the
-          ## zero-download default, compared against a committed expectation. ~2 minutes,
-          ## nothing to download. Add `--anchor amlworld` to re-run a seed of the real thing.
+reproduce: ## THE one command: documents vs artefacts, the wording against the guardrails, then
+          ## the whole loop twice on the zero-download default, compared against a committed
+          ## expectation. ~2 minutes, nothing to download. Add `--anchor amlworld` to re-run a
+          ## seed of the real thing.
 	uv run python scripts/reproduce.py
 
 claims:   ## every number quoted in the documents, recomputed from the artefact it names
 	uv run python scripts/check_claims.py
+
+guardrails: ## every sentence in the documents, against the seven honesty guardrails — the other
+          ## half of the claims audit: `claims` proves the numbers are the artefacts', this
+          ## proves the sentences around them are too
+	uv run python scripts/check_guardrails.py
 
 demo:     ## api + streamlit + mlflow
 	docker compose up

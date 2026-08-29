@@ -32,6 +32,10 @@ regions:
     section: "## The A/B/C/D experiment"
   - file: docs/claim.md
     section: "### 4. When they do pass, does adaptive beat non-adaptive?"
+  - file: docs/submission.md
+    section: "## Four questions, four answers"
+  - file: docs/submission.md
+    section: "## The result, in one table"
 
 # Numbers in a covered section that are not measurements. Each needs a reason, because "it is
 # obviously not a result" is exactly what was said about several numbers that were.
@@ -449,6 +453,25 @@ claims:
   # Registered separately from the `N/7` forms above: the checker masks a phrase before it
   # tokenises, so `D wins 1 of 7 seeds` is verified as a claim rather than passing as two
   # unrelated digits.
+  # ── the gate, on the anchors it fires on ────────────────────────────────────
+  # Three documents said the strict `lift` rule "rejects 100% of candidate batches" on these two
+  # anchors. What the artefacts record is the batch the loop kept, round by round, and on AMLSim
+  # one round of thirty-six survives the rule. Registered so the sentence cannot drift back.
+  - id: ts.amlsim.lift_rejects
+    what: rounds on AMLSim whose kept batch the strict `lift` rule would have rejected
+    artifact: ts_amlsim
+    expr: (loop_rounds('rejected_by_lift'), loop_total())
+    fmt: "{} of {}"
+    quoted: "35 of 36"
+    docs: [docs/submission.md]
+  - id: ts.paysim.lift_rejects
+    what: rounds on PaySim whose kept batch the strict `lift` rule would have rejected
+    artifact: ts_paysim
+    expr: (loop_rounds('rejected_by_lift'), loop_total())
+    fmt: "{} of {}"
+    quoted: "36 of 36"
+    docs: [docs/submission.md]
+
   - id: abcd.sign.D_over_C.pr_auc.prose
     what: the ticket-12 question in prose — adaptive over static template, PR-AUC
     artifact: abcd

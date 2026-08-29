@@ -56,12 +56,52 @@ def test_the_registry_covers_the_document_that_carries_the_headline(registry: Re
     covered = {(r.file, r.section) for r in registry.regions}
     assert ("README.md", "## Main result") in covered
     assert ("docs/results.md", "## The A/B/C/D experiment") in covered
+    assert ("docs/submission.md", "## The result, in one table") in covered
 
 
 def test_every_allowed_constant_states_why_it_is_not_a_measurement(registry: Registry) -> None:
     assert registry.allow, "an empty allow list means the reasons went somewhere else"
     for token, reason in registry.allow.items():
         assert len(reason) > 12, f"{token!r} is allowed without a reason anyone can check"
+
+
+def test_an_allowance_scoped_to_one_document_does_not_excuse_another(tmp_path: Path) -> None:
+    """A constant excused where its reason holds must still be unexplained where it does not.
+
+    The write-up quotes counts out of other documents — nine vectors, eighteen folds — and those
+    have no business passing unremarked inside the headline table.
+    """
+    (tmp_path / "artifacts").mkdir()
+    (tmp_path / "artifacts/run.json").write_text(json.dumps({"runs": [{"results": {"A": 0.5}}]}))
+    (tmp_path / "here.md").write_text("## Result\n\nIt scored 0.50 over 9 vectors.\n")
+    (tmp_path / "elsewhere.md").write_text("## Result\n\nIt scored 0.50 over 9 vectors.\n")
+    (tmp_path / "claims.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "artifacts": {"run": "artifacts/run.json"},
+                "regions": [
+                    {"file": "here.md", "section": "## Result"},
+                    {"file": "elsewhere.md", "section": "## Result"},
+                ],
+                "allow": {"9": {"why": "the vectors in the taxonomy", "in": ["here.md"]}},
+                "claims": [
+                    {
+                        "id": "a.value",
+                        "what": "the only number in the fixture",
+                        "artifact": "run",
+                        "expr": "at('runs.0.results.A')",
+                        "fmt": "{:.2f}",
+                        "quoted": "0.50",
+                        "docs": ["here.md", "elsewhere.md"],
+                    }
+                ],
+            }
+        )
+    )
+    registry = Registry.load(tmp_path / "claims.yaml")
+    assert registry.allow["9"] == "the vectors in the taxonomy"
+    gaps = registry.coverage(tmp_path)
+    assert [(g.file, g.token) for g in gaps] == [("elsewhere.md", "9")]
 
 
 # ── the harness discriminates: cases whose answers are known ────────────────────

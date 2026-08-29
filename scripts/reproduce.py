@@ -1,22 +1,25 @@
 """One command. Either the numbers in this repository reproduce, or you find out why not.
 
     python scripts/reproduce.py              # everything a fresh clone can check, ~2 minutes
-    python scripts/reproduce.py --claims-only  # documents against artefacts only, ~1 second
+    python scripts/reproduce.py --claims-only  # documents against artefacts and guardrails, ~1s
     python scripts/reproduce.py --once         # skip the run-it-twice half
     python scripts/reproduce.py --record       # re-record the committed expectation
     python scripts/reproduce.py --anchor amlworld --anchor-seed 7   # re-run a real seed
 
-Four stages, each of which can fail on its own:
+Five stages, each of which can fail on its own:
 
   1. **environment** — the interpreter, the platform and the libraries that do the arithmetic.
      Never fails; it is the context every other stage is read in.
   2. **claims** — every number quoted in the documents, recomputed from the committed artefacts.
      This is how the *real* headline is checked on a machine with no anchor downloaded: the
      A/B/C/D result is re-derived from `artifacts/abcd/`, not re-run.
-  3. **synthetic headline** — the whole loop, end to end, on the zero-download default, compared
+  3. **guardrails** — every sentence in those documents, against the seven honesty guardrails. A
+     number can be the artefact's and the sentence around it can still claim more than the run
+     supports, which is the failure a numeric check cannot see.
+  4. **synthetic headline** — the whole loop, end to end, on the zero-download default, compared
      against a committed expectation. Then run again, and the two runs compared to each other:
      the same seed twice has to give the same number.
-  4. **anchor** (optional) — re-run one seed of the real A/B/C/D and diff it against the committed
+  5. **anchor** (optional) — re-run one seed of the real A/B/C/D and diff it against the committed
      artefact. Needs the anchor in `data/raw/`, so it is skipped rather than failed without it.
 
 **Stage 3 is a pipeline check, not a result.** `data=synthetic` has no real anchor, and every
@@ -47,6 +50,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from afl.repro.claims import REGISTRY_PATH, Registry
+from afl.repro.guardrails import RULES_PATH, Guardrails
 from afl.utils.runcard import environment, stamp
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +109,43 @@ def stage_claims(root: Path, registry_path: Path = REGISTRY_PATH) -> Stage:
     )
 
 
-# ── stage 3: the loop itself, on the zero-download default ──────────────────────
+# ── stage 3: the wording, against the guardrails ────────────────────────────────
+def stage_guardrails(root: Path, rules_path: Path = RULES_PATH) -> Stage:
+    """The other half of the claims audit: is the sentence around the number the artefact's too?
+
+    Cheap enough to run beside the numeric check, and it fails on exactly the thing a reviewer
+    would find first — a fidelity diagnostic sold as proof, a projection written as a realised
+    figure, a latency budget asserted without a decision point.
+    """
+    started = time.time()
+    rails = Guardrails.load(root / rules_path)
+    documents = rails.files(root)
+    violations = rails.audit(root)
+    unenforced = rails.unenforced()
+    status = PASS if not violations and not unenforced else FAIL
+    detail = f"{len(rails.guardrails)} guardrails over {len(documents)} documents"
+    if violations:
+        detail += f"; {len(violations)} sentence(s) overstate the runs"
+    if unenforced:
+        detail += "; listed with no rule: " + ", ".join(g.id for g in unenforced)
+    return Stage(
+        "guardrails (wording)",
+        status,
+        detail,
+        time.time() - started,
+        {
+            "documents": len(documents),
+            "guardrails": len(rails.guardrails),
+            "violations": [
+                {"guardrail": v.guardrail, "kind": v.kind, "file": v.file, "why": v.why}
+                for v in violations
+            ],
+            "unenforced": [g.id for g in unenforced],
+        },
+    )
+
+
+# ── stage 4: the loop itself, on the zero-download default ──────────────────────
 def run_loop(seed: int, out_dir: Path, run_name: str = "adaptive") -> dict:
     """One synthetic end-to-end run, into a directory of its own. Returns its headline."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -240,7 +280,7 @@ def stage_synthetic(root: Path, seed: int, twice: bool, expected_path: Path) -> 
     return stages
 
 
-# ── stage 4: the real anchor, when it is on the machine ─────────────────────────
+# ── stage 5: the real anchor, when it is on the machine ─────────────────────────
 # Two real experiments live in this repository and they are re-run by different scripts, so the
 # anchor decides which one this stage means: amlworld is the A/B/C/D headline (ticket 12), the
 # other anchors are the three-system table (ticket 16). `docs/results.md` sets them side by side
@@ -369,7 +409,9 @@ def record(root: Path, seed: int, expected_path: Path) -> int:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
-    p.add_argument("--claims-only", action="store_true", help="documents vs artefacts, no models")
+    p.add_argument(
+        "--claims-only", action="store_true", help="documents vs artefacts + guardrails, no models"
+    )
     p.add_argument("--once", action="store_true", help="skip the second run of the loop")
     p.add_argument("--record", action="store_true", help="re-record the committed expectation")
     p.add_argument("--expected", type=Path, default=EXPECTED)
@@ -397,6 +439,7 @@ def main() -> int:
             data=env,
         ),
         stage_claims(root),
+        stage_guardrails(root),
     ]
     if not args.claims_only:
         stages += stage_synthetic(root, args.seed, twice=not args.once, expected_path=args.expected)

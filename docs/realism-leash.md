@@ -82,11 +82,11 @@ carries two rules for the same question:
 - **`lift`** — reject when the commensurability score exceeds `3 × base_rate`. What ticket 12
   shipped and what the A/B/C/D run used. It has no floor, so it *tightens as the anchor grows*: a
   hundred injected rows in a 600k-row anchor put the bar near 5e-4 PR-AUC, which log-amount alone
-  clears. **On amlsim and paysim it rejects 100% of candidate batches.**
+  clears. **On amlsim and paysim it rejects the batch the loop kept in 71 of the 72 rounds run.**
 - **`envelope`** — reject on `envelope.audit`'s own `trivially_separable` verdict, floor included.
   The rule the rest of the repo already applies to this question.
 
-B ran ticket 16 on `envelope`, because a gate that refuses every candidate makes System C a copy of
+B ran ticket 16 on `envelope`, because a gate that refuses all but one round makes System C a copy of
 System A and the table vacuous. Both verdicts are now recorded on every trial, so no run has to be
 repeated to learn what the other rule would have said.
 

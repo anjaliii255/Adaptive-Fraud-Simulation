@@ -22,21 +22,23 @@ make reproduce            # or: python scripts/reproduce.py
 ```
 
 Needs nothing downloaded. On the machine this was written on — macOS 26.6, arm64, 14 cores,
-Python 3.11.16, LightGBM 4.5.0 — it takes **82 seconds** and prints:
+Python 3.11.16, LightGBM 4.5.0 — it takes **84 seconds** and prints:
 
 ```
 [PASS] environment                          python 3.11.16 · arm64 · lightgbm 4.5.0 · 14 cpus
-[PASS] claims (documents)             0.1s  65/65 claims verified
-[PASS] synthetic headline            42.2s  every headline number matches the committed expectation
-[PASS] determinism (same seed twice)  40.0s  two runs of seed 1337 agree on every number
+[PASS] claims (documents)             0.1s  67/67 claims verified
+[PASS] guardrails (wording)           0.1s  7 guardrails over 33 documents
+[PASS] synthetic headline            41.3s  every headline number matches the committed expectation
+[PASS] determinism (same seed twice)  42.6s  two runs of seed 1337 agree on every number
 ```
 
-Four stages, three of which can fail:
+Five stages, four of which can fail:
 
 | stage | what it proves | cost |
 | --- | --- | --- |
 | environment | the context every other line is read in | instant |
 | claims | every number quoted in the documents still falls out of the artefact it names | ~0.1 s |
+| guardrails | no sentence around those numbers claims more than the run supports | ~0.1 s |
 | synthetic headline | the whole loop runs end to end from a clean clone and lands on the committed numbers | ~40 s |
 | determinism | the same seed twice gives the same number | ~40 s |
 | anchor (opt-in) | one seed of a **real** experiment re-run and diffed against the committed artefact | 7 min (PaySim) |
@@ -47,9 +49,10 @@ defect and is not a pass either.
 
 **Checked in a clean tree, not only in the working copy.** The command was run again in a copy
 containing only the repository's tracked files — no `data/`, no `.git`, no untracked artefacts —
-and all four stages passed in 87 seconds. What that copy did *not* re-do is the install: the
-dependencies were the ones already on this machine, so `pip install -r requirements.txt` on a
-machine that has never installed them remains part of the outstanding cross-machine check below.
+and all five stages passed in 82 seconds, the guardrail audit included. What that copy did *not*
+re-do is the install: the dependencies were the ones already on this machine, so
+`pip install -r requirements.txt` on a machine that has never installed them remains part of the
+outstanding cross-machine check below.
 
 ## What a fresh clone can check, and what it cannot
 
@@ -58,8 +61,9 @@ machine that has never installed them remains part of the outstanding cross-mach
 headline into two questions, answered differently:
 
 - **Does the A/B/C/D result still follow from its artefact?** Checked on every clone, in 0.1 s, by
-  recomputing all 65 registered numbers from `artifacts/abcd/amlworld_gather-scatter.json` and
-  confirming the documents still quote them. This is re-derivation, not re-running.
+  recomputing all 67 registered numbers from the committed artefacts — the A/B/C/D headline from
+  `artifacts/abcd/amlworld_gather-scatter.json` — and confirming the documents still quote them.
+  This is re-derivation, not re-running.
 - **Does the artefact still follow from the code?** Needs AMLworld in `data/raw/`. With it:
   `python scripts/reproduce.py --anchor amlworld --anchor-seed 7` re-runs that seed and diffs
   every system against the committed run. Without it, the stage says which file is missing and
@@ -121,6 +125,27 @@ the environment differs, it reports **UNCONFIRMED** and exits 2, listing exactly
 the environment moved. If the environment matches and the numbers do not, that is a defect and it
 exits 1.
 
+## Every sentence, as well as every number
+
+`make claims` proves the numbers in a document are still the artefacts'. It cannot see the other
+half: a figure can be exactly right and the sentence around it can still claim something no run
+supports — a fidelity diagnostic sold as proof of realism, a projection written as a realised
+figure, a latency budget asserted without naming the decision point it applies at.
+
+`docs/guardrails.yaml` is the registry for that half, and `make guardrails` (also stage 3 of
+`make reproduce`) runs it over every document in the repository, one sentence at a time. Each of
+the seven guardrails carries three things: the statement itself, which has to appear in the
+write-up; `forbid` patterns for the shape the overstatement takes, each with an `unless` that
+exonerates the sentence *refusing* the claim rather than making it; and `require` patterns for the
+qualifier that may not be left out — name `C2ST` without `diagnostic` or `not proof` nearby and
+the check goes red. A guardrail with no rule behind it fails on its own, because a guardrail
+nobody can fail is decoration.
+
+Fenced code blocks are skipped, which is how `docs/submission.md` quotes the sentences it refuses
+to write. `tests/test_guardrails.py` runs the rules against thirteen planted overstatements and
+seven refusals of the same claims, so the audit is checked against answers known in advance rather
+than trusted because it is green.
+
 ## Every number traces to an artefact
 
 `docs/claims.yaml` is the registry: one row per quoted number, each naming the artefact, the
@@ -140,6 +165,12 @@ Covered regions today:
 | `README.md` | `## Main result` |
 | `docs/results.md` | `## The A/B/C/D experiment` |
 | `docs/claim.md` | `### 4. When they do pass, does adaptive beat non-adaptive?` |
+| `docs/submission.md` | `## Four questions, four answers` |
+| `docs/submission.md` | `## The result, in one table` |
+
+An allowance may be scoped to the documents whose reason it holds in (`in: [...]` beside its
+`why`), so a count quoted out of another document — nine vectors, eighteen folds — earns its place
+in the write-up without also being waved through in the headline table it has nothing to do with.
 
 **What is not covered, and why.** `docs/results.md`'s `## Current numbers` (the three-system
 table) has its numbers registered as claims but is not a covered region — the generated

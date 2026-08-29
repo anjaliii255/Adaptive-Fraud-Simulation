@@ -41,7 +41,7 @@ blocks the frontier for both lanes.
 | 19 | ~~The convergence artefact~~ **done — the loop closes, the transfer does not** | ▲ A | 11, 12 |
 | 20 | ~~One command reproduces a headline number~~ **done — one command, and the anchor re-run reproduces exactly** | ▲ A | 16, 19 |
 | 21 | The live demo | ▲ A | 19 |
-| 22 | Submission pack and claims audit | ◆ A+B | 15, 16, 20, 21 |
+| 22 | ~~Submission pack and claims audit~~ **done — four overstatements struck, and the guardrails are a command** | ◆ A+B | 15, 16, 20, 21 |
 
 **Person A owns 10 tickets** (03, 04, 05, 06, 12, 13, 14, 19, 20, 21).
 **Person B owns 10 tickets** (02, 07, 08, 09, 10, 11, 15, 16, 17, 18).
@@ -1699,15 +1699,66 @@ reproducible curve".
 
 **Blocked by:** 15, 16, 20, 21.
 
-**Status:** ready-for-agent
+**Status:** done — the write-up is `docs/submission.md`, the wording audit is `make guardrails`
+over `docs/guardrails.yaml`, and both are stages of `make reproduce`
 
-- [ ] Every claim in the write-up traces to a committed artefact, checked one by one
-- [ ] All seven guardrails applied to the actual wording, not just listed
-- [ ] The deliberate cuts are stated as scope decisions: multimodal/deepfake, LLM
-      social-engineering generator, multiple tabular generators, mandatory GNN, full RL,
-      agent-swarm simulation
-- [ ] The taxonomy is presented at three levels, never flattened
-- [ ] Any result contradicting the hypothesis is reported plainly, in the same voice as the
-      supporting ones
-- [ ] Both owners have re-run the headline command on their own machine and got the stated number
-- [ ] A reviewer given only the repo and the README can reproduce the headline number unaided
+- [x] **Every claim in the write-up traces to a committed artefact, checked one by one.** The
+      write-up's two result sections are *covered regions* in `docs/claims.yaml`, so both
+      directions are enforced: every number recomputes from the artefact it names, and any number
+      in them that is not a registered claim or an excused constant fails the check. Two new
+      claims were needed and the registry grew from 65 to 67. Allowances can now be scoped to the
+      documents whose reason they hold in, so a count quoted out of the threat model earns its
+      place in the write-up without being waved through in the headline table.
+- [x] **All seven guardrails applied to the actual wording, not just listed.** Each is a rule with
+      three parts — the statement, which has to appear in the write-up; `forbid` patterns for the
+      shape the overstatement takes, each with an `unless` that exonerates the sentence *refusing*
+      the claim; and `require` patterns for the qualifier that may not be left out, because naming
+      `C2ST` without `diagnostic` or `not proof` nearby is the failure a banned-phrase list cannot
+      see. A guardrail with no rule behind it fails on its own. 33 documents in scope, the
+      architecture deck and the generated documents included; `Tickets.md` deliberately excluded,
+      for the same reason `docs/claims.yaml` leaves it alone.
+- [x] **The deliberate cuts are stated as scope decisions**, all six, each with the reason and
+      what would change the answer. Two of them are stronger than cuts: the GNN and the sequence
+      model were built, measured and benched with the evidence published, and the write-up says
+      which is which.
+- [x] **The taxonomy is presented at three levels, never flattened** — mechanisms, enablers, and
+      attacks against the model itself, as three tables rather than one, with M1 alone at level 3
+      and in template mode.
+- [x] **Any result contradicting the hypothesis is reported plainly.** It is the headline, not an
+      appendix: adaptive loses to static template augmentation 6/7 by PR-AUC, directional at
+      p = 0.062, and unconstrained because the leash vetoed 0 of 42 rounds.
+- [ ] **Both owners have re-run the headline command — ONE MACHINE ONLY.** Owner A's machine ran
+      `make reproduce` end to end: five stages, 84 seconds, all pass. Owner B's machine has not,
+      and the row is left visibly empty in `docs/submission.md` rather than assumed. This is the
+      same outstanding item ticket 20 recorded, and it is the only box on this ticket that is not
+      ticked.
+- [x] **A reviewer given only the repo and the README can reproduce the headline number unaided.**
+      Re-checked for this ticket in a copy holding only the tracked files — no `data/`, no `.git`,
+      no untracked artefacts — where all five stages passed in 82 seconds.
+
+**Four overstatements the line-by-line audit struck**, each a sentence that was true of some run
+and not of the committed one:
+
+1. `docs/claim.md` said the evasion rate **"plateaus near 0.20"**, so "a fifth of the attacker's
+   traffic still gets through" — a sentence the earlier `0.915 → 0.201` correction missed because
+   it carried no digits the numeric check could catch. The curve plateaus near 0.05: 0.106 by
+   round 2, 0.054 by round 5, one seed of seven ending at 0.204. The qualification survives; the
+   numbers behind it are now the artefact's.
+2. **"The `lift` rule rejects 100% of candidate batches"** — in `docs/claim.md` twice,
+   `docs/realism-leash.md` once, and a comment in `afl/attack/multi.py`. The artefacts record 71
+   of 72 rounds. Now registered as two claims (35 of 36 on AMLSim, 36 of 36 on PaySim) so the
+   sentence cannot drift back.
+3. The **provenance-probe row** of `docs/claim.md`'s instrument table quoted one number for two
+   different probes. On AMLSim the injected-versus-real probe scores 0.355 and the fold *passes*
+   it; what fails there is the System C counterfactual at 0.995. On PaySim it is the other way
+   round, at 0.970. Split into three rows that each name their probe and their anchor.
+4. `README.md` said **"the loop converges on all four anchors"**. It was run to convergence on
+   three; BankSim stopped at a three-gate spike that returned NO-GO before the loop was pointed at
+   it. Corrected, with the ADR named.
+
+**One finding recorded rather than fixed.** The `reason` strings that
+`artifacts/three_system/*.json` stores for System C's withheld column describe the counterfactual
+probe in the ordinary probe's words, and `docs/three_system.md` inherits it. The number is right
+and the label on it is not. Fixing it means regenerating a headline artefact to change a sentence
+inside it, which belongs to ticket 16 rather than here — so it is written down in
+`docs/submission.md` instead of quietly left.

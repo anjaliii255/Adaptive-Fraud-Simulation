@@ -124,6 +124,21 @@ def _namespace(blob: Any) -> dict[str, Any]:
             out.append(block["floor"][key])
         return out
 
+    def loop(field_name: str) -> list[Any]:
+        """Every per-round value the loop logged, all seeds and all systems.
+
+        The three-system artefact keeps its round trace under each system rather than beside the
+        run, and only the adaptive arm has one. Ticket 22 needed it: three documents said the
+        strict `lift` rule "rejects 100% of candidate batches", and what the artefact actually
+        records is the rule firing on the batch the loop kept in all but one round.
+        """
+        return [
+            history.get(field_name)
+            for r in runs()
+            for system in r.get("systems", [])
+            for history in (system.get("loop") or [])
+        ]
+
     def counts(path: str) -> Any:
         """A count from the first seed's `counts` block — the fold is the same on every seed."""
         node = runs()[0]["counts"]
@@ -151,6 +166,9 @@ def _namespace(blob: Any) -> dict[str, Any]:
         # three-system
         "cell": cell,
         "floor": floor,
+        "loop": loop,
+        "loop_rounds": lambda field_name: sum(1 for v in loop(field_name) if v),
+        "loop_total": lambda: len(loop("round")),
         "counts": counts,
         # statistics — `sd` is the sample sd a 7-seed table should quote, `psd` the population
         # one `make figures` prints. Which is which has already gone wrong once, so both are
@@ -304,6 +322,32 @@ def section_text(doc: str, section: str, until: str = "") -> str:
     return "\n".join(out)
 
 
+def _allowances(raw: dict) -> tuple[dict[str, str], dict[str, tuple[str, ...]]]:
+    """Allowed constants, and the documents each one is allowed in.
+
+    Two shapes, because most allowances are genuinely global and a few must not be. A string
+    value excuses the token everywhere:
+
+        "0.05": "the significance convention the result is judged against"
+
+    A mapping excuses it only where the reason holds, which is how a count quoted out of another
+    document earns its place in the write-up without also being waved through in the headline
+    table it has nothing to do with:
+
+        "9": {why: "the vectors in the taxonomy", in: [docs/submission.md]}
+    """
+    reasons: dict[str, str] = {}
+    scopes: dict[str, tuple[str, ...]] = {}
+    for token, value in raw.items():
+        token = str(token)
+        if isinstance(value, dict):
+            reasons[token] = str(value.get("why", ""))
+            scopes[token] = tuple(str(f) for f in value.get("in", ()))
+        else:
+            reasons[token] = str(value)
+    return reasons, scopes
+
+
 @dataclass
 class Registry:
     """The whole registry: the artefacts, the claims over them, and the covered regions."""
@@ -312,17 +356,20 @@ class Registry:
     claims: list[Claim]
     regions: list[Region]
     allow: dict[str, str]
+    allow_in: dict[str, tuple[str, ...]] = field(default_factory=dict)
     path: Path = REGISTRY_PATH
 
     @classmethod
     def load(cls, path: Path | str = REGISTRY_PATH) -> Registry:
         path = Path(path)
         raw = yaml.safe_load(path.read_text())
+        allow, allow_in = _allowances(raw.get("allow") or {})
         return cls(
             artifacts={str(k): str(v) for k, v in (raw.get("artifacts") or {}).items()},
             claims=[Claim.from_dict(c) for c in raw.get("claims") or ()],
             regions=[Region.from_dict(r) for r in raw.get("regions") or ()],
-            allow={str(k): str(v) for k, v in (raw.get("allow") or {}).items()},
+            allow=allow,
+            allow_in=allow_in,
             path=path,
         )
 
@@ -375,20 +422,31 @@ class Registry:
             checks.append(Check(claim, computed, ok, reason, hits))
         return checks
 
+    def allowed_in(self, token: str, file: str) -> bool:
+        """Is this constant excused in this document? Unscoped allowances are excused anywhere."""
+        scope = self.allow_in.get(token)
+        return not scope or file in scope
+
     def coverage(self, root: Path | str = Path(".")) -> list[Gap]:
         """Every number in a covered section must be a claim or an allowed constant.
 
         Two passes, because a claim is not always one number. Phrases — `0 of 42`, `1/7`, a commit
         sha — are masked out of the text first; what remains is tokenised and each token has to be
         a registered or allowed value on its own.
+
+        Allowances are resolved per region, so a constant excused in one document does not go
+        quietly missing from the check in another: `9` is the vector count the write-up quotes
+        from the threat model, and it is still an unexplained number if it turns up in the
+        headline table.
         """
         root = Path(root)
-        known = {c.quoted for c in self.claims} | set(self.allow)
-        phrases = sorted((t for t in known if not NUMBER.fullmatch(t)), key=len, reverse=True)
-        singles = {t for t in known if NUMBER.fullmatch(t)}
+        registered = {c.quoted for c in self.claims}
 
         gaps: list[Gap] = []
         for region in self.regions:
+            known = registered | {t for t in self.allow if self.allowed_in(t, region.file)}
+            phrases = sorted((t for t in known if not NUMBER.fullmatch(t)), key=len, reverse=True)
+            singles = {t for t in known if NUMBER.fullmatch(t)}
             path = root / region.file
             if not path.exists():
                 gaps.append(Gap(region.file, region.section, "-", "document not found"))

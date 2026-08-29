@@ -25,8 +25,9 @@ Four questions decide whether this worked, each gating the next:
 
 **We do not claim that adaptive augmentation improves recall on a held-out family.** An earlier
 version of this README did; our own 7-seed test does not support it, and the one place a large gain
-appeared, the provenance probe explained it. `docs/claim.md` states what we claim and what we do
-not, with every number traced to the artefact that produced it.
+appeared, a model trained only on which generator wrote the row reproduced it. `docs/submission.md`
+is the write-up; `docs/claim.md` states what we claim and what we do not, with every number traced
+to the artefact that produced it.
 
 The full design, the nine attack vectors, and the reasoning behind each choice live in the
 architecture doc (`docs/architecture.html`). Read that for intent; this README is for running the
@@ -117,8 +118,10 @@ reported as withheld rather than reported as wins.
 
 ## Where this is right now
 
-The pipeline runs end to end on real data. Four public anchors have been tried; the loop converges
-on all of them and **no anchor validates the adaptive claim**. What is built and committed:
+The pipeline runs end to end on real data. Four public anchors have been tried; the loop was run to
+convergence on three of them — BankSim stopped at a three-gate spike that returned NO-GO before the
+loop was ever pointed at it (`docs/adr/0004-banksim-spike-and-the-null-result.md`) — and **no anchor
+validates the adaptive claim**. What is built and committed:
 
 - **Attack side** — 9 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
   gate in front of the detector.
@@ -156,7 +159,8 @@ source .venv/bin/activate
 pip install -e '.[dev]'        # or: uv sync --extra dev
 
 make smoke                     # runs the whole loop on dummy data; has to pass
-make reproduce                 # the one command: documents vs artefacts, then the loop twice
+make reproduce                 # the one command: documents vs artefacts and guardrails, loop twice
+make guardrails                # the wording alone, against the seven honesty guardrails
 make loop                      # the adaptive loop on the synthetic default, no download
 
 streamlit run prototype/app.py # the working prototype, five acts, no download
@@ -164,10 +168,10 @@ streamlit run prototype/app.py # the working prototype, five acts, no download
 
 `make reproduce` is the one to run first on a fresh clone. It needs nothing downloaded, takes
 about eighty seconds, and either everything checks out or it tells you which number moved:
-every figure quoted in these documents is recomputed from the artefact it names, then the whole
-loop is run twice on the synthetic default and both runs are compared against a committed
-expectation and against each other. `docs/reproducibility.md` says what that does and does not
-prove.
+every figure quoted in these documents is recomputed from the artefact it names, every sentence
+around those figures is checked against the seven honesty guardrails, then the whole loop is run
+twice on the synthetic default and both runs are compared against a committed expectation and
+against each other. `docs/reproducibility.md` says what that does and does not prove.
 
 `make sequence` and `make gnn` are the only targets needing more (torch, via `make setup-deep`).
 Nothing else imports them and the default suite stays green without either.
@@ -262,7 +266,7 @@ serve            FastAPI service + the older single-run Streamlit view
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
                  build_anomaly, build_sequence, build_fidelity, build_loao, build_three_system,
-                 make_figures
+                 make_figures, reproduce, check_claims, check_guardrails
 ```
 
 
@@ -270,6 +274,7 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 
 | doc | what is in it |
 | --- | --- |
+| `docs/submission.md` | **start here** — the write-up: the story, the result, the taxonomy, the guardrails and the cuts |
 | `docs/claim.md` | what we claim and what we do not, with the four success questions |
 | `docs/architecture.md` | the red/blue seam, the contract, features, detector, decision layer |
 | `docs/evaluation.md` | leave-one-attack-out, transfer test, commensurability, fidelity, seeds |
@@ -280,6 +285,7 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 | `docs/realism-leash.md` | why the per-round leash was not binding, and how the two audit rules reconcile |
 | `docs/reproducibility.md` | what reproduces, what is not verified, and the residual variance |
 | `docs/claims.yaml` | the registry: every quoted number, the artefact it comes from, and how it is recomputed |
+| `docs/guardrails.yaml` | the seven honesty guardrails as rules `make guardrails` runs over every sentence |
 | `docs/adr/` | the decisions, in the order they were taken |
 | `prototype/README.md` | the working prototype: what is live, what is replayed, how to deploy it |
 
@@ -292,8 +298,8 @@ Generated from artefacts, never edited by hand: `docs/features.md`, `docs/detect
 **We do not claim that adaptive augmentation improves recall on a held-out family.** On the one
 anchor where the question was fair to ask, our own 7-seed test puts adaptive ahead of the
 static-template control on 2 of 7 seeds by recall (p = 0.938) and 1 of 7 by PR-AUC (p = 0.992) —
-and where a large gain did appear, the provenance probe explained it. `docs/claim.md` is the full
-statement.
+and where a large gain did appear, a model told only which rows the generator wrote reproduced it.
+`docs/claim.md` is the full statement.
 
 Fidelity metrics are diagnostics, not proofs. A C2ST score near chance does not mean "realistic,"
 and DCR/MIA do not mean "private." They mean we tested for memorisation and membership leakage.
