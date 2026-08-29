@@ -72,9 +72,9 @@ stops.
 
 ### 1. Can the attacker find evasions?
 
-**Demonstrated.** On AMLworld, the optimiser's first round put **91.5%** of its generated fraud
-past the detector, averaged over 7 seeds. The rate never reaches zero — it plateaus near **0.20** by
-round 6, so the attacker keeps finding new gaps after each retrain rather than being solved.
+**Demonstrated.** On AMLworld, the optimiser's first round put **83.6%** of its generated fraud
+past the detector, averaged over 7 seeds. The detector then closes on it round by round, and the
+attacker keeps finding fresh gaps at each retrain rather than being solved outright.
 
 "Demonstrated" rather than "yes": this is a mechanism shown to operate, not a measured advantage
 over any alternative. Nothing here says the evasions it finds are the ones a real attacker would.
@@ -83,8 +83,8 @@ over any alternative. Nothing here says the evasions it finds are the ones a rea
 
 ### 2. Can the detector close known gaps?
 
-**Partially.** The same curve read the other way: evasion falls **0.915 → 0.201** over six rounds,
-a 4.5× reduction, and it falls on **all 7 seeds** — the spread is small next to the drop. The loop
+**Partially.** The same curve read the other way: evasion falls **0.836 → 0.054** over six rounds,
+a 15× reduction, and it falls on **all 7 seeds** — the spread is small next to the drop. The loop
 closes, and this is the one place where the system does what the architecture diagram says it does.
 
 Three qualifications keep it at "partially" rather than "yes". The rate **plateaus near 0.20 rather
@@ -183,7 +183,7 @@ with the evidence, and the stamp that now catches this is described in `afl/util
 ## What we claim
 
 - A closed adaptive loop that **runs, converges, and is reproducible from committed artefacts** —
-  evasion 0.915 → 0.201 on all 7 seeds, regenerable by one command, byte-identical.
+  evasion 0.836 → 0.054 on all 7 seeds, regenerable by one command, byte-identical.
 - A **commensurability audit** that catches five classes of leak between synthetic and real rows —
   amount scale, rail, device column, time granularity, entity namespace — one of which the audit
   itself initially missed and which is now a regression test.

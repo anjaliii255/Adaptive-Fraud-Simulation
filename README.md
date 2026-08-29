@@ -18,8 +18,8 @@ Four questions decide whether this worked, each gating the next:
 
 | | question | answer |
 |---|---|---|
-| 1 | Can the attacker find evasions? | **Demonstrated** — 91.5% of generated fraud past the detector in round 0, never driven below ~0.20 |
-| 2 | Can the detector close known gaps? | **Partially** — evasion falls 0.915 → 0.201 on all 7 seeds, but plateaus, and every extra layer built to close a gap was benched |
+| 1 | Can the attacker find evasions? | **Demonstrated** — 83.6% of generated fraud past the detector in round 0, before the detector adapts |
+| 2 | Can the detector close known gaps? | **Partially** — evasion falls 0.836 → 0.054 on all 7 seeds, but that is aggregate rather than per vector, and every extra layer built to close a gap was benched |
 | 3 | Do the attacks pass the fidelity and provenance gates? | **On one anchor of four** — 4 of 18 leave-one-attack-out folds carry a quotable number |
 | 4 | When they do, does adaptive beat non-adaptive? | **No — it underperforms.** D > C on 1/7 seeds (p = 0.992); C > D on 6/7 (p = 0.062, directional). And unconstrained: the leash vetoed 0/42 |
 

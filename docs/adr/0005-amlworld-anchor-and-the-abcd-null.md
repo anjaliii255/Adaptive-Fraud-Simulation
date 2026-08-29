@@ -126,7 +126,7 @@ a realism-bounded adaptive attacker. `docs/realism-leash.md`.
 
 ## Consequences, and what holds
 
-- **The adaptive loop runs and converges.** Evasion falls 0.915 → 0.201 across six rounds on all 7
+- **The adaptive loop runs and converges.** Evasion falls 0.836 → 0.054 across six rounds on all 7
   seeds — the one curve in this project that moves the way the architecture doc predicted. Held-out
   recall stays flat and noisy beside it, which is this null in a picture rather than a table
   (`artifacts/abcd/amlworld_gather-scatter_convergence.png`, ticket 19).
