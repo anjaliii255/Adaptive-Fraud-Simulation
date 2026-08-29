@@ -1,0 +1,24 @@
+# Streamlit Community Cloud installs from here when the entrypoint is prototype/app.py.
+#
+# Deliberately minimal. The prototype renders every screen from committed artefacts and runs the
+# real simulator and audit in-process; it needs none of the training stack. Leaving mlflow, shap,
+# optuna, lightgbm and torch out keeps the image inside the free tier's memory and build limits —
+# measured: the live path imports numpy, pydantic and pyyaml, and nothing else.
+#
+# scikit-learn is here because `envelope.audit` imports `average_precision_score` lazily — the
+# separability bars on screen 2 are PR-AUC per contract field. Found by installing this file into
+# a clean environment and running the live path, not by reading the imports.
+#
+# Pins match the root requirements.txt. Keep them in sync.
+streamlit>=1.36,<1.41
+pydantic>=2.7,<3
+numpy>=1.26,<2.1
+pyyaml>=6.0,<7
+scikit-learn>=1.5,<1.6
+scipy>=1.13,<1.15
+# act 02's BLUE TEAM panel scores through the real trained detector, so the model stack ships too.
+# Measured on a clean environment: 554 MB installed, 377 MB resident with the detector fitted,
+# against a ~1 GB tier. torch and torch-geometric stay out — the GNN is benched, not demonstrated.
+pandas>=2.2,<2.3
+lightgbm>=4.3,<4.6
+shap>=0.45,<0.47

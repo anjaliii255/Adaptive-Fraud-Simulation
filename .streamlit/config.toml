@@ -1,0 +1,14 @@
+# Dark field console. Red is the attacker, blue is the defender.
+[theme]
+base = "dark"
+primaryColor = "#49a0e6"
+backgroundColor = "#101416"
+secondaryBackgroundColor = "#171c1e"
+textColor = "#e6e8e3"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
