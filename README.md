@@ -131,6 +131,10 @@ on all of them and **no anchor validates the adaptive claim**. What is built and
   `enabled: false`, and a test refuses to let either be switched on while the committed evidence
   says no. `artifacts/gnn/`, `artifacts/sequence/`, written up in `docs/gnn.md`,
   `docs/sequence.md` and `docs/negative-results.md`.
+- **Working prototype** — five acts over the committed artefacts, with the generate-and-audit step
+  and the detector running live in-process. Every screen renders from a committed artefact even
+  with the live path dead, and replayed data is badged rather than shown as live.
+  `streamlit run prototype/app.py`, written up in `prototype/README.md`.
 
 Out of the box a fresh clone runs on a synthetic placeholder with nothing to download, and anything
 a synthetic run prints is stamped as a pipeline check.
@@ -149,6 +153,8 @@ pip install -e '.[dev]'        # or: uv sync --extra dev
 
 make smoke                     # runs the whole loop on dummy data; has to pass
 make loop                      # the adaptive loop on the synthetic default, no download
+
+streamlit run prototype/app.py # the working prototype, five acts, no download
 ```
 
 `make sequence` and `make gnn` are the only targets needing more (torch, via `make setup-deep`).
@@ -227,7 +233,8 @@ afl/defend       features, models, graded decision, SHAP explanations           
 afl/fidelity     3-level scorecard (statistical / structural / utility) + privacy
 afl/loop         where attack meets defend; the closed loop lives here
 afl/evaluation   out-of-time split, leave-one-attack-out, three-system table         [blue]
-serve            FastAPI + Streamlit demo
+prototype        the working prototype: five acts over the committed artefacts
+serve            FastAPI service + the older single-run Streamlit view
 config           Hydra configs; costs/ is the operating point, experiment/{baseline,smote,adaptive}
 scripts          run_experiment, build_splits, build_features, build_baseline, build_decisions,
                  build_anomaly, build_sequence, build_fidelity, build_loao, build_three_system,
@@ -248,6 +255,7 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 | `docs/data.md` | data cards, the anchors, and the four-anchor limitation |
 | `docs/realism-leash.md` | why the per-round leash was not binding, and how the two audit rules reconcile |
 | `docs/adr/` | the decisions, in the order they were taken |
+| `prototype/README.md` | the working prototype: what is live, what is replayed, how to deploy it |
 
 Generated from artefacts, never edited by hand: `docs/features.md`, `docs/detector.md`,
 `docs/decisions.md`, `docs/anomaly.md`, `docs/loao.md`, `docs/fidelity.md`, `docs/sequence.md`,
