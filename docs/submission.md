@@ -96,7 +96,7 @@ adaptive attacker could do.
 
 ## The taxonomy, at three levels
 
-Nine vectors, eight fully simulated. The level is the organising fact and it is never flattened
+26 vectors identified, 8 fully simulated. The nine below are the ones the engines produce; the other seventeen are specified with the surface each would need, in `docs/coverage.md`. The level is the organising fact and it is never flattened
 into one list, because the three levels are answerable by different defences and a flat list hides
 that. Definitions in `afl/attack/templates/vectors.yaml`, reasoning in
 `docs/adr/0001-vector-taxonomy-and-holdout.md`, status in `docs/threat-model.md`.

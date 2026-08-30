@@ -117,3 +117,7 @@ skills-lock.json
 # the reason AMLworld was used at all, and a reason that traces to nothing is not a reason.
 !artifacts/spike/
 !artifacts/spike/**
+# the landscape counts, as an artefact. the documents quote 26 identified and 8
+# simulated; make claims checks both against this file rather than against prose.
+!artifacts/coverage/
+!artifacts/coverage/**

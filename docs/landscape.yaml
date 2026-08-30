@@ -1,0 +1,69 @@
+# landscape.yaml — the identification map, separate from the generator dispatch table.
+#
+# WHY THIS FILE EXISTS, SEPARATELY FROM vectors.yaml:
+#   vectors.yaml is the generator dispatch table. Simulator.generate reads it, and its validator
+#   (STATUSES = built/template/planned, ENGINES = graph/velocity/drift, every non-built entry needs
+#   a `gap`) is the reason "8 simulated" is trustworthy — a vector that cannot be generated raises
+#   loudly rather than silently emitting nothing. Loosening that validator to hold landscape entries
+#   would trade away the exact guard that makes the count honest.
+#
+#   So the landscape lives here instead. This file is NOT read by the simulator. It is read by the
+#   prototype MISSION act (for the full identified count) and by build_coverage.py --doc-only (to
+#   generate docs/coverage.md). The `simulated:` block below MUST mirror vectors.yaml exactly —
+#   build_coverage.py should assert that its 9 ids, engines and statuses match vectors.yaml, so this
+#   file cannot drift from what actually generates.
+#
+# THE COUNT THAT STAYS FIXED: "8 simulated" (8 built + M1 template). Only the *identified* total
+# grows. IDs S1–S3, C1–C3, M1–M3 are frozen and match the architecture doc; identified vectors use
+# distinct ids that never collide with them (guardrail 7 keys off those tokens).
+#
+# STATUS VOCABULARY here (wider than vectors.yaml, on purpose):
+#   built       — vectors.yaml generates the defining behaviour; runs through the audit gate.
+#   template    — generated in template mode only; defining tell not modelled (M1).
+#   identified  — mapped and specified, NOT generated. Carries `needs`: the anchor/channel it would
+#                 require. These are demonstrated capabilities of the threat landscape, not attacks
+#                 reproduced here, and never a claim about real-world prevalence.
+
+version: 1
+
+# ── The nine that generate. Mirror of vectors.yaml — keep in sync, asserted by build_coverage.py ──
+simulated:
+  - {id: S1, name: "Mule network & layering",            level: mechanism,    surface: bank_transfer,   engine: graph,    tier: strong, status: built}
+  - {id: S2, name: "Card testing / BIN enumeration",     level: mechanism,    surface: card,            engine: velocity, tier: strong, status: built}
+  - {id: S3, name: "Account takeover via drift",         level: mechanism,    surface: account_takeover,engine: drift,    tier: strong, status: built}
+  - {id: C1, name: "Bust-out",                           level: mechanism,    surface: credit,          engine: drift,    tier: common, status: built}
+  - {id: C2, name: "UPI collect-request / APP scam",     level: enabler,      surface: social_eng_app,  engine: velocity, tier: common, status: built}
+  - {id: C3, name: "Instant-A2A pass-through",           level: mechanism,    surface: instant_a2a,     engine: graph,    tier: common, status: built}
+  - {id: M1, name: "Boundary probing / paced evasion",   level: model-attack, surface: detector,        engine: velocity, tier: mid,    status: template}
+  - {id: M2, name: "Synthetic-identity lifecycle",       level: enabler,      surface: onboarding,      engine: drift,    tier: mid,    status: built}
+  - {id: M3, name: "First-party / friendly fraud",       level: mechanism,    surface: card,            engine: drift,    tier: mid,    status: built, holdout: true}
+
+# ── The identified landscape. Mapped, specified, NOT generated. Distinct ids; each names its need. ──
+identified:
+
+  # Enabler — what GenAI forges in the human / identity / comms layer before the transaction.
+  # (Built enablers already cover APP-scam (C2) and synthetic-identity (M2); these are the gaps.)
+  - {id: EN-KYCVID,  name: "Deepfake liveness / KYC video-injection bypass",        level: enabler, surface: onboarding,        needs: "biometric / liveness channel"}
+  - {id: EN-VOICE,   name: "Voice-clone vishing (CEO fraud, family-emergency)",     level: enabler, surface: social_eng_voice,  needs: "voice channel"}
+  - {id: EN-VIDEO,   name: "Deepfake video-call authorising a wire (Arup-style)",   level: enabler, surface: social_eng_video,  needs: "video channel"}
+  - {id: EN-ROMANCE, name: "LLM-automated pig-butchering / romance scam at scale",  level: enabler, surface: social_eng_app,    needs: "comms <-> transaction linkage"}
+  - {id: EN-PHISH,   name: "Breach-personalised spear-phishing at scale",           level: enabler, surface: account_takeover,  needs: "comms corpus; behavioural proxy only via drift engine"}
+  - {id: EN-PAGE,    name: "Adaptive phishing pages that mutate to evade URL/DOM",  level: enabler, surface: account_takeover,  needs: "web-channel artefact, not a transaction"}
+  - {id: EN-OTPBOT,  name: "AI voice-bot OTP interception mid-auth",                level: enabler, surface: account_takeover,  needs: "auth-flow anchor"}
+  - {id: EN-DISPUTE, name: "LLM-automated chargeback / friendly-fraud disputes",    level: enabler, surface: disputes,          needs: "dispute channel"}
+  - {id: EN-MERCH,   name: "Synthetic merchant / fake acquiring for bust-out",      level: enabler, surface: acquiring,         needs: "merchant-side anchor"}
+
+  # Mechanism — money-movement mechanics not yet expressed by the built three engines.
+  - {id: ME-STRUCT,  name: "Adaptive structuring / smurfing under thresholds",      level: mechanism, surface: bank_transfer,   needs: "expressible on a tabular anchor — candidate to build via velocity"}
+  - {id: ME-XRAIL,   name: "Cross-rail hop (card -> wallet -> bank -> crypto)",      level: mechanism, surface: multi_rail,      needs: "a multi-rail anchor"}
+  - {id: ME-PEEL,    name: "Peel-chain / structured crypto off-ramp",               level: mechanism, surface: crypto,          needs: "a crypto-rail anchor"}
+
+  # Model-attack — against the detector or the pipeline itself. (M1 already probes the boundary.)
+  - {id: MO-POISON,  name: "Feedback-loop data poisoning of the retrained detector",level: model-attack, surface: pipeline,   needs: "loop-poisoning instrumentation"}
+  - {id: MO-EXTRACT, name: "Model extraction / query-based boundary recon",         level: model-attack, surface: detector_api,needs: "a query interface"}
+  - {id: MO-SHAP,    name: "SHAP-guided feature manipulation (gradient-free)",       level: model-attack, surface: detector,   needs: "expressible; held back on purpose — a working evasion recipe against our own detector"}
+  - {id: MO-INJECT,  name: "Prompt injection against a payment LLM copilot",        level: model-attack, surface: agentic,     needs: "an agent surface"}
+  - {id: MO-AGENT,   name: "Agentic-commerce abuse (autonomous purchasing agents)", level: model-attack, surface: agentic,     needs: "emerging; no anchor yet"}
+
+# 9 simulated (8 built + M1 template) + 17 identified = 26 vectors mapped across 6 surfaces
+# (onboarding, social engineering, account takeover, transaction/rail, disputes/acquiring, agentic/model).

@@ -123,7 +123,7 @@ convergence on three of them — BankSim stopped at a three-gate spike that retu
 loop was ever pointed at it (`docs/adr/0004-banksim-spike-and-the-null-result.md`) — and **no anchor
 validates the adaptive claim**. What is built and committed:
 
-- **Attack side** — 9 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
+- **Attack side** — 26 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
   gate in front of the detector.
 - **Defence side** — 56 causal features, a tuned LightGBM detector, graded cost-based actions with
   SHAP reason codes, and an anomaly layer that did not earn its place.
@@ -280,7 +280,8 @@ scripts          run_experiment, build_splits, build_features, build_baseline, b
 | `docs/evaluation.md` | leave-one-attack-out, transfer test, commensurability, fidelity, seeds |
 | `docs/results.md` | both comparison experiments side by side, and the withheld columns |
 | `docs/negative-results.md` | anomaly layer, sequence model, temporal GNN — built, measured, benched |
-| `docs/threat-model.md` | the 9 vectors identified, 8 fully simulated, M1 in template mode |
+| `docs/threat-model.md` | the 26 vectors identified, 8 fully simulated, M1 in template mode |
+| `docs/coverage.md` | generated: the mapped landscape against what the engines produce |
 | `docs/data.md` | data cards, the anchors, and the four-anchor limitation |
 | `docs/realism-leash.md` | why the per-round leash was not binding, and how the two audit rules reconcile |
 | `docs/reproducibility.md` | what reproduces, what is not verified, and the residual variance |

@@ -33,6 +33,7 @@ SPIKE = ROOT / "artifacts/spike/amlworld.json"
 TRANSFER = ROOT / "artifacts/transfer/amlworld.json"
 SPLITS = ROOT / "artifacts/splits/amlworld_oot.json"
 VECTORS = ROOT / "afl/attack/templates/vectors.yaml"
+LANDSCAPE = ROOT / "docs/landscape.yaml"
 
 FONTS = "https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
 
@@ -155,6 +156,17 @@ def load_vectors() -> list[dict]:
 
         raw = yaml.safe_load(Path(VECTORS).read_text())["vectors"]
         return [{"id": k, **v} for k, v in raw.items()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+@st.cache_data(show_spinner=False)
+def load_identified() -> list[dict]:
+    """The mapped-but-not-generated vectors. Separate file, so `built` can never count them."""
+    try:
+        import yaml
+
+        return yaml.safe_load(Path(LANDSCAPE).read_text()).get("identified", [])
     except Exception:  # noqa: BLE001
         return []
 
@@ -462,10 +474,13 @@ def act_mission() -> None:
 
     st.write("")
     vecs = load_vectors()
+    ident = load_identified()
+    # `built` counts vectors.yaml only. The landscape file can never inflate it.
     built = sum(1 for v in vecs if v.get("status") == "built")
+    total = len(vecs) + len(ident)
     st.markdown(
         f"<div class='hdr' style='border:none;margin:0;padding:0'>"
-        f"<span class='micro'>threat model / {len(vecs)} identified, {built} simulated</span>"
+        f"<span class='micro'>threat model / {total} identified, {built} simulated</span>"
         f"&nbsp;{tag('identify', 'red')}</div>",
         unsafe_allow_html=True,
     )
@@ -481,6 +496,12 @@ def act_mission() -> None:
             body += (
                 f"<div class='vec'><code>{v['id']}</code><b>{v.get('name', '')}</b>"
                 f"<span>{v.get('engine', '')}</span>{flag}</div>"
+            )
+        for v in [x for x in ident if x.get("level") == level]:
+            body += (
+                f"<div class='vec' style='opacity:.62'><code style='color:{AMBER}'>{v['id']}</code>"
+                f"<b>{v.get('name', '')}</b><span>{v.get('surface', '')}</span>"
+                f"{tag('identified', 'amber')}</div>"
             )
         col.markdown(body + "</div>", unsafe_allow_html=True)
     nav("run mission")
@@ -735,7 +756,8 @@ def act_verdict() -> None:
     rows = []
     for name in ("A_real", "B_smote", "C_template", "D_adaptive"):
         pr = [r["results"][name]["pr_auc"] for r in blob["runs"]]
-        rows.append((name, statistics.fmean(pr), statistics.pstdev(pr)))
+        # sample sd (ddof=1), the spread abcd_experiment.py prints and claims.yaml checks
+        rows.append((name, statistics.fmean(pr), statistics.stdev(pr)))
     top = max(m + s for _, m, s in rows)
     labels = {
         "A_real": ("A", "real only"),

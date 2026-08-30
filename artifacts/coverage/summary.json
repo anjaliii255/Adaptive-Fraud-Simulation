@@ -1,0 +1,32 @@
+{
+  "by_level": {
+    "enabler": 11,
+    "mechanism": 9,
+    "model-attack": 6
+  },
+  "identified_total": 26,
+  "provenance": {
+    "environment": {
+      "cpu_count": 10,
+      "machine": "arm64",
+      "packages": {
+        "lightgbm": "4.5.0",
+        "numpy": "2.0.2",
+        "optuna": "4.0.0",
+        "pandas": "2.2.3",
+        "scikit-learn": "1.5.2",
+        "scipy": "1.14.1",
+        "shap": "0.46.0",
+        "torch": null
+      },
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "python": "3.11.15"
+    },
+    "git_commit": "add56c2abdac872c849e2c778facb4a6aef74f67",
+    "git_dirty": true,
+    "seed": null
+  },
+  "simulated_built": 8,
+  "simulated_template": 1,
+  "specified_not_generated": 17
+}

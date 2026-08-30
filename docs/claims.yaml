@@ -19,6 +19,7 @@ artifacts:
   abcd_binding: artifacts/abcd/diagnostics/amlworld_gather-scatter_binding.json
   ts_paysim: artifacts/three_system/paysim.json
   ts_amlsim: artifacts/three_system/amlsim.json
+  coverage: artifacts/coverage/summary.json
 
 # Sections whose every number must trace to a claim below. These are the four places the
 # headline result is stated; `docs/reproducibility.md` records what is not yet covered and why.
@@ -57,6 +58,17 @@ allow:
 
 claims:
   # ── the fold itself ─────────────────────────────────────────────────────────
+  # ── the attack landscape ─────────────────────────────────────────────────────
+  # the count lived only in prose until artifacts/coverage/summary.json existed, which is
+  # exactly the shape of drift this file exists to catch. `simulated` is asserted equal to
+  # vectors.yaml by build_coverage.py, so 8 still comes from what generates.
+  - id: coverage.identified_total
+    what: vectors identified across the mapped landscape
+    artifact: coverage
+    expr: at('identified_total')
+    quoted: "26"
+    docs: ["README.md", "docs/coverage.md", "docs/submission.md"]
+
   - id: abcd.seeds
     what: seeds in the A/B/C/D run
     artifact: abcd

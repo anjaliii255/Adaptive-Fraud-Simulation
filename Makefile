@@ -1,4 +1,4 @@
-.PHONY: setup setup-deep smoke test splits features baseline decisions anomaly sequence gnn loao fidelity fidelity-selftest loop table compare figures reproduce claims guardrails demo lint fmt clean
+.PHONY: coverage setup setup-deep smoke test splits features baseline decisions anomaly sequence gnn loao fidelity fidelity-selftest loop table compare figures reproduce claims guardrails demo lint fmt clean
 
 setup:    ## install pinned deps into .venv (python 3.11)
 	uv sync --extra dev
@@ -64,6 +64,10 @@ reproduce: ## THE one command: documents vs artefacts, the wording against the g
           ## expectation. ~2 minutes, nothing to download. Add `--anchor amlworld` to re-run a
           ## seed of the real thing.
 	uv run python scripts/reproduce.py
+
+coverage: ## the attack landscape: what we mapped vs what generates. asserts the mirror against
+          ## vectors.yaml and refuses to write a doc that disagrees with it
+	uv run python scripts/build_coverage.py --doc-only
 
 claims:   ## every number quoted in the documents, recomputed from the artefact it names
 	uv run python scripts/check_claims.py
