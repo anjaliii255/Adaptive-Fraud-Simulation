@@ -18,10 +18,10 @@ Four questions decide whether this worked, each gating the next:
 
 | | question | answer |
 |---|---|---|
-| 1 | Can the attacker find evasions? | **Demonstrated** — 83.6% of generated fraud past the detector in round 0, before the detector adapts |
-| 2 | Can the detector close known gaps? | **Partially** — evasion falls 0.836 → 0.054 on all 7 seeds, but that is aggregate rather than per vector, and every extra layer built to close a gap was benched |
-| 3 | Do the attacks pass the fidelity and provenance gates? | **On one anchor of four** — 4 of 18 leave-one-attack-out folds carry a quotable number |
-| 4 | When they do, does adaptive beat non-adaptive? | **No — it underperforms.** D > C on 1/7 seeds (p = 0.992); C > D on 6/7 (p = 0.062, directional). And unconstrained: the leash vetoed 0/42 |
+| 1 | Can the attacker find evasions? | **Demonstrated** - 83.6% of generated fraud past the detector in round 0, before the detector adapts |
+| 2 | Can the detector close known gaps? | **Partially** - evasion falls 0.836 → 0.054 on all 7 seeds, but that is aggregate rather than per vector, and every extra layer built to close a gap was benched |
+| 3 | Do the attacks pass the fidelity and provenance gates? | **On one anchor of four** - 4 of 18 leave-one-attack-out folds carry a quotable number |
+| 4 | When they do, does adaptive beat non-adaptive? | **No - it underperforms.** D > C on 1/7 seeds (p = 0.992); C > D on 6/7 (p = 0.062, directional). And unconstrained: the leash vetoed 0/42 |
 
 **We do not claim that adaptive augmentation improves recall on a held-out family.** An earlier
 version of this README did; our own 7-seed test does not support it, and the one place a large gain
@@ -123,9 +123,9 @@ convergence on three of them — BankSim stopped at a three-gate spike that retu
 loop was ever pointed at it (`docs/adr/0004-banksim-spike-and-the-null-result.md`) — and **no anchor
 validates the adaptive claim**. What is built and committed:
 
-- **Attack side** — 26 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
+- **Attack side** - 26 vectors identified, 8 fully simulated; M1 is an adversarial boundary-probing extension in template mode. The multi-vector adaptive optimiser runs closed-loop with an audit
   gate in front of the detector.
-- **Defence side** — 56 causal features, a tuned LightGBM detector, graded cost-based actions with
+- **Defence side** - 56 causal features, a tuned LightGBM detector, graded cost-based actions with
   SHAP reason codes, and an anomaly layer that did not earn its place.
 - **Instruments** — commensurability audit, provenance probe, transfer test, 3-level fidelity
   scorecard, leave-one-attack-out harness. These are what most of the results are about.
@@ -138,7 +138,7 @@ validates the adaptive claim**. What is built and committed:
   are checked against the artefacts they cite, and the loop is run twice and compared against a
   committed expectation. Every artefact records the commit, the seed and the library versions that
   produced it. `make reproduce`, written up in `docs/reproducibility.md`.
-- **Working prototype** — five acts over the committed artefacts, with the generate-and-audit step
+- **Working prototype** - five acts over the committed artefacts, with the generate-and-audit step
   and the detector running live in-process. Every screen renders from a committed artefact even
   with the live path dead, and replayed data is badged rather than shown as live.
   `streamlit run prototype/app.py`, written up in `prototype/README.md`.
