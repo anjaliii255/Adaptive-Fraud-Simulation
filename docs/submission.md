@@ -6,6 +6,15 @@ two result sections below is recomputed from a committed artefact by `make claim
 sentence in this repository is checked against the honesty guardrails by `make guardrails`. Both
 run in under a second and both are wired into `make reproduce`._
 
+| | |
+|---|---|
+| **Live prototype** | https://epoch-fraud-lab.streamlit.app/ |
+| **Code** | https://github.com/anjaliii255/epoch |
+
+The prototype is a five-act walkthrough. Attack generation and the commensurability audit run live
+in-process; results replay from committed artefacts and are badged, so replayed data is never
+shown as live.
+
 ## The story
 
 Not: we built an AI fraud platform.
